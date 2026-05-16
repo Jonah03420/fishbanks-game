@@ -1,3 +1,4 @@
+import FishGraph from '../components/FishGraph'
 import { useState } from 'react'
 import { GAME_CONFIG, berechneFischbestand, berechneFang, berechneGewinn } from '../game/fishLogic'
 
@@ -5,11 +6,21 @@ function GamePage({ gameState, setGameState }) {
   const spielerTeam = gameState.teams[0]
   const [ausgesandt, setAusgesandt] = useState(1)
 
-  function handleRunde() {
-    // KI Entscheidungen (gierig - senden alle Boote)
+  function kiEntscheidung(fischbestand, boote) {
+  if (fischbestand > 70) {
+    return Math.floor(boote * 0.7)
+  } else if (fischbestand > 40) {
+    return Math.floor(boote * 0.5)
+  } else {
+    return Math.floor(boote * 0.8)
+  }
+}
+
+    function handleRunde() {
+    // KI Entscheidungen
     const neueTeams = gameState.teams.map((team, index) => ({
-      ...team,
-      ausgesandteBoote: index === 0 ? ausgesandt : team.boote
+        ...team,
+        ausgesandteBoote: index === 0 ? ausgesandt : kiEntscheidung(gameState.fischbestand, team.boote)
     }))
 
     // Gesamte Boote berechnen
@@ -20,13 +31,13 @@ function GamePage({ gameState, setGameState }) {
 
     // Fang & Gewinn pro Team
     const teamsNachRunde = neueTeams.map(team => {
-      const fang = berechneFang(team.ausgesandteBoote, gameState.fischbestand, gesamteBoote)
-      const gewinn = berechneGewinn(fang, team.ausgesandteBoote)
-      return {
+        const fang = berechneFang(team.ausgesandteBoote, gameState.fischbestand, gesamteBoote)
+        const gewinn = berechneGewinn(fang, team.ausgesandteBoote)
+        return {
         ...team,
         letzterFang: fang,
         guthaben: team.guthaben + gewinn,
-      }
+        }
     })
 
     // Verlauf speichern
@@ -79,6 +90,8 @@ function GamePage({ gameState, setGameState }) {
           {gameState.fischbestand > 60 ? '✅ Gesund' : gameState.fischbestand > 30 ? '⚠️ Gefährdet' : '🚨 Kritisch!'}
         </div>
       </div>
+
+      <FishGraph verlauf={gameState.verlauf} />
 
       {/* Teams Übersicht */}
       <div className="grid grid-cols-2 gap-4 mb-6">
