@@ -1,21 +1,22 @@
 import { GAME_CONFIG } from './fishLogic'
 
-export function erstelleStartzustand() {
+export function erstelleStartzustand(playerName = 'Team A', maxRunden = GAME_CONFIG.maxRunden) {
   return {
     runde: 1,
     fischbestand: GAME_CONFIG.startFischbestand,
     phase: 'entscheidung', // 'entscheidung' | 'ergebnis' | 'ende'
+    maxRunden,
     teams: [
-      erstelleTeam('Team A', '🔴'),
-      erstelleTeam('Team B', '🟡'),
-      erstelleTeam('Team C', '🟢'),
-      erstelleTeam('Team D', '🔵'),
+      erstelleTeam(playerName, '🔴', false, null),
+      erstelleTeam('Team B', '🟡', true, 'gierig'),
+      erstelleTeam('Team C', '🟢', true, 'kooperativ'),
+      erstelleTeam('Team D', '🔵', true, 'rational'),
     ],
-    verlauf: [], // Speichert alle Runden für Debriefing
+    verlauf: [],
   }
 }
 
-function erstelleTeam(name, farbe) {
+function erstelleTeam(name, farbe, istKI, persoenlichkeit) {
   return {
     name,
     farbe,
@@ -23,6 +24,7 @@ function erstelleTeam(name, farbe) {
     guthaben: GAME_CONFIG.startGuthaben,
     ausgesandteBoote: 0,
     letzterFang: 0,
-    istKI: true, // Standardmäßig KI - erstes Team ist Spieler
+    istKI,
+    persoenlichkeit, // null | 'gierig' | 'kooperativ' | 'rational'
   }
 }

@@ -1,1 +1,40 @@
 @import "tailwindcss";
+
+/* Fish bar smooth animation */
+.fish-bar-transition {
+  transition: width 0.6s ease-in-out, background-color 0.6s ease;
+}
+
+/* Floating fish animation on start page */
+@keyframes floatFish {
+  0%   { transform: translateY(0px) rotate(0deg); }
+  25%  { transform: translateY(-8px) rotate(3deg); }
+  50%  { transform: translateY(-4px) rotate(0deg); }
+  75%  { transform: translateY(-12px) rotate(-3deg); }
+  100% { transform: translateY(0px) rotate(0deg); }
+}
+
+.float-fish {
+  display: inline-block;
+  animation: floatFish 3s ease-in-out infinite;
+}
+
+/* Fade-in for cards */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeInUp 0.4s ease forwards;
+}
+
+/* Pulse for critical fish stock */
+@keyframes pulseRed {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  50%       { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.3); }
+}
+
+.pulse-critical {
+  animation: pulseRed 1.5s ease-in-out infinite;
+}

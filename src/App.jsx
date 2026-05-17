@@ -8,8 +8,8 @@ function App() {
   const [gameState, setGameState] = useState(null)
   const [phase, setPhase] = useState('start')
 
-  function handleStart() {
-    setGameState(erstelleStartzustand())
+  function handleStart(playerName, maxRunden) {
+    setGameState(erstelleStartzustand(playerName, maxRunden))
     setPhase('game')
   }
 
