@@ -1,119 +1,77 @@
-import { useState } from 'react'
-
-function StartPage({ onStart }) {
-  const [playerName, setPlayerName] = useState('')
-  const [maxRunden, setMaxRunden] = useState(20)
-  const [showInstructions, setShowInstructions] = useState(false)
-
-  function handleStart() {
-    onStart(playerName.trim() || 'Team A', maxRunden)
-  }
-
+function StartPage({ onSolo, onMultiplayer }) {
   return (
-    <div className="min-h-screen bg-blue-900 flex items-center justify-center p-4 sm:p-8">
-      <div className="bg-white/10 backdrop-blur rounded-2xl p-8 sm:p-10 max-w-lg w-full text-white">
+    <div className="w-full h-full bg-blue-900 text-white flex overflow-hidden">
 
-        {/* Titel */}
-        <div className="text-center mb-8">
-          <div className="text-6xl mb-3 float-fish inline-block">🐟</div>
-          <h1 className="text-4xl font-bold mb-2">Fish Banks Game</h1>
-          <p className="text-blue-200">
-            Kannst du die Fischbestände nachhaltig bewirtschaften?
-          </p>
-        </div>
+      {/* Left panel — branding + feature highlights */}
+      <div className="flex-1 flex flex-col justify-center px-16 py-12 bg-gradient-to-br from-blue-800 to-blue-950">
+        <div className="text-9xl mb-6 float-fish inline-block">🐟</div>
+        <h1 className="text-6xl font-bold mb-4 leading-tight">Fish Banks<br />Game</h1>
+        <p className="text-blue-200 text-xl mb-10 max-w-md">
+          Kannst du die Fischbestände nachhaltig bewirtschaften – während andere Teams rücksichtslos fischen?
+        </p>
 
-        {/* Spielerkonfiguration */}
-        <div className="space-y-4 mb-6">
-          {/* Spielername */}
-          <div>
-            <label className="block text-sm text-blue-200 mb-1">👤 Dein Teamname</label>
-            <input
-              type="text"
-              value={playerName}
-              onChange={e => setPlayerName(e.target.value)}
-              placeholder="Team A"
-              maxLength={20}
-              className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-blue-300 focus:outline-none focus:border-blue-400 focus:bg-white/15 transition-colors"
-            />
+        <div className="grid grid-cols-2 gap-4 max-w-lg">
+          <div className="bg-white/10 rounded-2xl p-4">
+            <div className="text-2xl mb-2">🌊</div>
+            <div className="font-bold text-sm mb-1">Gemeinsame Ressource</div>
+            <div className="text-blue-300 text-xs">Alle Teams teilen denselben Fischbestand – Übernutzung zerstört ihn für alle.</div>
           </div>
-
-          {/* Rundenanzahl */}
-          <div>
-            <label className="block text-sm text-blue-200 mb-2">🔄 Spiellänge</label>
-            <div className="grid grid-cols-3 gap-2">
-              {[10, 15, 20].map(r => (
-                <button
-                  key={r}
-                  onClick={() => setMaxRunden(r)}
-                  className={`py-3 rounded-xl font-bold transition-colors ${maxRunden === r ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-blue-200'}`}
-                >
-                  {r} Runden
-                  {r === 20 && <div className="text-xs font-normal">Standard</div>}
-                  {r === 10 && <div className="text-xs font-normal">Schnell</div>}
-                  {r === 15 && <div className="text-xs font-normal">Mittel</div>}
-                </button>
-              ))}
-            </div>
+          <div className="bg-white/10 rounded-2xl p-4">
+            <div className="text-2xl mb-2">🤖</div>
+            <div className="font-bold text-sm mb-1">KI-Gegner</div>
+            <div className="text-blue-300 text-xs">Gierig, kooperativ oder rational – drei verschiedene Persönlichkeiten fordern dich heraus.</div>
+          </div>
+          <div className="bg-white/10 rounded-2xl p-4">
+            <div className="text-2xl mb-2">📈</div>
+            <div className="font-bold text-sm mb-1">Echtzeit-Analyse</div>
+            <div className="text-blue-300 text-xs">Verfolge Fischbestand und Guthaben aller Teams über den gesamten Spielverlauf.</div>
+          </div>
+          <div className="bg-white/10 rounded-2xl p-4">
+            <div className="text-2xl mb-2">🎓</div>
+            <div className="font-bold text-sm mb-1">Lernspiel</div>
+            <div className="text-blue-300 text-xs">Basierend auf Garrett Hardins „Tragedy of the Commons" und Elinor Ostroms Forschung.</div>
           </div>
         </div>
+      </div>
 
-        {/* Spielinfos */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="bg-white/10 rounded-xl p-3 text-center">
-            <div className="text-2xl font-bold">{maxRunden}</div>
-            <div className="text-xs text-blue-200">Runden</div>
-          </div>
-          <div className="bg-white/10 rounded-xl p-3 text-center">
-            <div className="text-2xl font-bold">4</div>
-            <div className="text-xs text-blue-200">Teams</div>
-          </div>
-          <div className="bg-white/10 rounded-xl p-3 text-center">
-            <div className="text-2xl font-bold">50k</div>
-            <div className="text-xs text-blue-200">Startkapital</div>
-          </div>
+      {/* Right panel — action */}
+      <div className="w-96 flex flex-col justify-center px-10 py-12 bg-blue-950/60 border-l border-white/10">
+        <h2 className="text-2xl font-bold mb-2">Spielmodus wählen</h2>
+        <p className="text-blue-300 text-sm mb-10">Solo gegen KI oder gemeinsam mit Freunden im Multiplayer.</p>
+
+        <div className="flex flex-col gap-4">
+          <button
+            onClick={onSolo}
+            className="w-full bg-green-500 hover:bg-green-400 text-white font-bold py-5 px-6 rounded-2xl text-lg transition-colors text-left flex items-center gap-4"
+          >
+            <span className="text-3xl">🎮</span>
+            <div>
+              <div className="font-bold">Solo spielen</div>
+              <div className="text-green-100 text-sm font-normal">Gegen KI-Teams antreten</div>
+            </div>
+          </button>
+
+          <button
+            onClick={onMultiplayer}
+            className="w-full bg-blue-500 hover:bg-blue-400 text-white font-bold py-5 px-6 rounded-2xl text-lg transition-colors text-left flex items-center gap-4"
+          >
+            <span className="text-3xl">👥</span>
+            <div>
+              <div className="font-bold">Multiplayer</div>
+              <div className="text-blue-100 text-sm font-normal">Mit Freunden im Netzwerk</div>
+            </div>
+          </button>
         </div>
 
-        {/* Spielregeln aufklappen */}
-        <button
-          onClick={() => setShowInstructions(!showInstructions)}
-          className="w-full text-blue-300 hover:text-white text-sm mb-3 transition-colors flex items-center justify-center gap-2"
-        >
-          {showInstructions ? '▲' : '▼'} Spielregeln anzeigen
-        </button>
-
-        {showInstructions && (
-          <div className="bg-white/5 border border-white/10 rounded-xl p-5 mb-6 text-sm space-y-3">
-            <div>
-              <div className="font-bold text-blue-200 mb-1">🎯 Ziel</div>
-              <p className="text-blue-300">Verdiene so viel Geld wie möglich durch Fischfang – ohne den gemeinsamen Fischbestand zu zerstören.</p>
-            </div>
-            <div>
-              <div className="font-bold text-blue-200 mb-1">🎮 Pro Runde hast du 3 Entscheidungen:</div>
-              <ul className="text-blue-300 space-y-1">
-                <li>🚢 <strong className="text-white">Boot kaufen</strong> – kostet 5.000€, erhöht deine Fangkapazität</li>
-                <li>💸 <strong className="text-white">Boot verkaufen</strong> – bringt 3.000€, reduziert Kapazität</li>
-                <li>🐟 <strong className="text-white">Boote aussenden</strong> – wähle wie viele du zum Fischen schickst</li>
-              </ul>
-            </div>
-            <div>
-              <div className="font-bold text-blue-200 mb-1">⚠️ Achtung</div>
-              <p className="text-blue-300">Der Fischbestand wächst sich nach – aber nur wenn nicht zu viel gefischt wird. Fällt er auf 0%, ist das Spiel sofort vorbei.</p>
-            </div>
-            <div>
-              <div className="font-bold text-blue-200 mb-1">🤖 Gegner</div>
-              <p className="text-blue-300">Du spielst gegen 3 KI-Teams mit verschiedenen Strategien: <strong className="text-white">Gierig</strong>, <strong className="text-white">Kooperativ</strong> und <strong className="text-white">Rational</strong>.</p>
-            </div>
-          </div>
-        )}
-
-        {/* Start Button */}
-        <button
-          onClick={handleStart}
-          className="w-full bg-green-500 hover:bg-green-400 text-white font-bold py-4 px-8 rounded-xl text-xl transition-colors"
-        >
-          🎮 Spiel starten
-        </button>
-
+        <div className="mt-12 bg-white/5 rounded-2xl p-5 text-xs text-blue-400">
+          <div className="font-bold text-blue-300 mb-2">So funktioniert es</div>
+          <ol className="space-y-1.5 list-decimal list-inside">
+            <li>Konfiguriere Schwierigkeit & Spiellänge</li>
+            <li>Entscheide jede Runde: Wie viele Boote sendest du aus?</li>
+            <li>Kaufe & verkaufe Boote, um deine Flotte zu optimieren</li>
+            <li>Bewirtschafte nachhaltig – oder riskiere den Kollaps!</li>
+          </ol>
+        </div>
       </div>
     </div>
   )

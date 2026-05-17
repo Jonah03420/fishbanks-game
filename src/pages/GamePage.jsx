@@ -1,67 +1,82 @@
 import FishGraph from '../components/FishGraph'
 import { useState } from 'react'
-import { GAME_CONFIG, berechneFischbestand, berechneFang, berechneGewinn } from '../game/fishLogic'
+import {
+    GAME_CONFIG, berechneFischbestand, berechneFang, berechneGewinn,
+    kiBootAktionLeicht, kiAusgesandtLeicht,
+    kiBootAktionMittel, kiAusgesandtMittel,
+    kiBootAktionSchwer, kiAusgesandtSchwer,
+    erzeugeMarktereignis,
+} from '../game/fishLogic'
 
 const PERSOENLICHKEIT_LABEL = {
-    gierig:     { label: '🔴 Gierig',     beschreibung: 'Fischt maximal, kauft aggressiv' },
-    kooperativ: { label: '🤝 Kooperativ', beschreibung: 'Fischt nachhaltig, schützt Bestand' },
-    rational:   { label: '🧠 Rational',   beschreibung: 'Nash-Gleichgewicht, ROI-optimiert' },
+    gierig:     { label: '🔴 Gierig',     },
+    kooperativ: { label: '🤝 Kooperativ', },
+    rational:   { label: '🧠 Rational',   },
 }
 
-function kiEntscheidungGierig(boote) {
-    return boote // immer maximale Kapazität
+const DIFF_BADGE = {
+    leicht: { icon: '🟢', label: 'Leicht', bg: 'bg-green-500/25', text: 'text-green-300' },
+    mittel: { icon: '🟡', label: 'Mittel', bg: 'bg-yellow-500/25', text: 'text-yellow-300' },
+    schwer: { icon: '🔴', label: 'Schwer', bg: 'bg-red-500/25',   text: 'text-red-300'   },
 }
 
-function kiEntscheidungKooperativ(fischbestand, boote) {
-    if (fischbestand > 60) return Math.floor(boote * 0.55)
-    if (fischbestand > 40) return Math.floor(boote * 0.45)
-    return Math.floor(boote * 0.3) // stark reduzieren bei kritischem Bestand
-}
+function kiTeamAktionen(team, fischbestand, verlauf, alleTeams, schwierigkeit) {
+    let booteResult
 
-function kiEntscheidungRational(fischbestand, boote, gesamteBooteVorherigeRunde) {
-    // Nash-Gleichgewicht: Jedes Team maximiert Gewinn gegeben der anderen Strategien
-    // Optimaler Fang sinkt wenn Bestand sinkt (rationaler Anreiz)
-    if (fischbestand > 70) return Math.floor(boote * 0.75)
-    if (fischbestand > 50) return Math.floor(boote * 0.6)
-    if (fischbestand > 30) return Math.floor(boote * 0.45)
-    return Math.floor(boote * 0.35) // rationaler Rückzug bei geringem Bestand
-}
-
-function kiBootAktion(team, fischbestand) {
-    let boote = team.boote
-    let guthaben = team.guthaben
-
-    if (team.persoenlichkeit === 'gierig') {
-        // Kauft aggressiv wenn Bestand > 50%, verkauft nie
-        if (fischbestand > 50 && guthaben >= GAME_CONFIG.bootKosten) {
-            boote += 1
-            guthaben -= GAME_CONFIG.bootKosten
-        }
-    } else if (team.persoenlichkeit === 'kooperativ') {
-        // Verkauft Boote wenn Bestand kritisch
-        if (fischbestand < 25 && boote > 2) {
-            boote -= 1
-            guthaben += GAME_CONFIG.bootVerkaufswert
-        }
-        // Kauft selten – nur wenn Bestand sehr gesund
-        if (fischbestand > 75 && guthaben >= GAME_CONFIG.bootKosten && boote < 6) {
-            boote += 1
-            guthaben -= GAME_CONFIG.bootKosten
-        }
-    } else if (team.persoenlichkeit === 'rational') {
-        // ROI-Kalkulation: Boot lohnt sich wenn erwarteter Zusatzertrag > Kosten
-        // Erwarteter Zusatzfang pro Boot ≈ fischbestand / 20 Fisch → × fischPreis - bootBetriebskosten
-        const erwarteterZusatzGewinn = (fischbestand / 20) * GAME_CONFIG.fischPreis - 500
-        if (erwarteterZusatzGewinn > 0 && guthaben >= GAME_CONFIG.bootKosten && fischbestand > 40) {
-            boote += 1
-            guthaben -= GAME_CONFIG.bootKosten
-        } else if (fischbestand < 30 && boote > 3) {
-            boote -= 1
-            guthaben += GAME_CONFIG.bootVerkaufswert
+    if (schwierigkeit === 'leicht') {
+        booteResult = kiBootAktionLeicht(team)
+        return { ...booteResult, ausgesandteBoote: kiAusgesandtLeicht(booteResult.boote) }
+    }
+    if (schwierigkeit === 'schwer') {
+        booteResult = kiBootAktionSchwer(team, fischbestand, verlauf, alleTeams)
+        return {
+            ...booteResult,
+            ausgesandteBoote: kiAusgesandtSchwer(
+                team.persoenlichkeit, team.name, booteResult.boote,
+                fischbestand, verlauf, alleTeams
+            ),
         }
     }
+    booteResult = kiBootAktionMittel(team, fischbestand)
+    return {
+        ...booteResult,
+        ausgesandteBoote: kiAusgesandtMittel(team.persoenlichkeit, fischbestand, booteResult.boote),
+    }
+}
 
-    return { boote, guthaben }
+function simuliereRunde(state, spielerBoote, schwierigkeit) {
+    const neueTeams = state.teams.map((team, index) => {
+        if (index === 0) return { ...team, ausgesandteBoote: spielerBoote }
+        const aktionen = kiTeamAktionen(
+            team, state.fischbestand, state.verlauf, state.teams, schwierigkeit
+        )
+        return { ...team, ...aktionen }
+    })
+
+    const gesamteBoote = neueTeams.reduce((sum, t) => sum + t.ausgesandteBoote, 0)
+    const neuerFischbestand = berechneFischbestand(state.fischbestand, gesamteBoote)
+    const marktereignis = erzeugeMarktereignis()
+
+    if (import.meta.env.DEV) {
+        console.log(`[Runde ${state.runde}] Markt: ${marktereignis.toFixed(3)}, Boote: [${neueTeams.map(t => t.ausgesandteBoote).join(', ')}], Bestand: ${state.fischbestand} → ${neuerFischbestand}`)
+    }
+
+    const teamsNachRunde = neueTeams.map(team => {
+        const fang = berechneFang(team.ausgesandteBoote, state.fischbestand, gesamteBoote)
+        const gewinn = berechneGewinn(fang, team.ausgesandteBoote, marktereignis)
+        return { ...team, letzterFang: fang, guthaben: team.guthaben + gewinn }
+    })
+
+    const verlaufEintrag = { runde: state.runde, fischbestand: state.fischbestand, gesamteBoote, preisMultiplikator: marktereignis }
+    teamsNachRunde.forEach(team => { verlaufEintrag[team.name] = team.guthaben })
+
+    return {
+        ...state,
+        runde: state.runde + 1,
+        fischbestand: neuerFischbestand,
+        teams: teamsNachRunde,
+        verlauf: [...state.verlauf, verlaufEintrag],
+    }
 }
 
 function GamePage({ gameState, setGameState }) {
@@ -69,6 +84,8 @@ function GamePage({ gameState, setGameState }) {
     const [ausgesandt, setAusgesandt] = useState(1)
     const [rundenErgebnis, setRundenErgebnis] = useState(null)
     const maxRunden = gameState.maxRunden || GAME_CONFIG.maxRunden
+    const schwierigkeit = gameState.schwierigkeitsgrad || 'mittel'
+    const diffBadge = DIFF_BADGE[schwierigkeit] || DIFF_BADGE.mittel
 
     function handleBootKaufen() {
         if (spielerTeam.guthaben < GAME_CONFIG.bootKosten) return
@@ -95,49 +112,16 @@ function GamePage({ gameState, setGameState }) {
     }
 
     function handleRunde() {
-        const neueTeams = gameState.teams.map((team, index) => {
-            if (index === 0) return { ...team, ausgesandteBoote: ausgesandt }
-
-            const { boote: kiBoote, guthaben: kiGuthaben } = kiBootAktion(team, gameState.fischbestand)
-
-            let kiAusgesandt
-            if (team.persoenlichkeit === 'gierig') {
-                kiAusgesandt = kiEntscheidungGierig(kiBoote)
-            } else if (team.persoenlichkeit === 'kooperativ') {
-                kiAusgesandt = kiEntscheidungKooperativ(gameState.fischbestand, kiBoote)
-            } else {
-                kiAusgesandt = kiEntscheidungRational(gameState.fischbestand, kiBoote)
-            }
-
-            return { ...team, boote: kiBoote, guthaben: kiGuthaben, ausgesandteBoote: kiAusgesandt }
-        })
-
-        const gesamteBoote = neueTeams.reduce((sum, t) => sum + t.ausgesandteBoote, 0)
-        const neuerFischbestand = berechneFischbestand(gameState.fischbestand, gesamteBoote)
-
-        const teamsNachRunde = neueTeams.map(team => {
-            const fang = berechneFang(team.ausgesandteBoote, gameState.fischbestand, gesamteBoote)
-            const gewinn = berechneGewinn(fang, team.ausgesandteBoote)
-            return { ...team, letzterFang: fang, guthaben: team.guthaben + gewinn }
-        })
-
-        const verlaufEintrag = { runde: gameState.runde, fischbestand: gameState.fischbestand, gesamteBoote }
-        teamsNachRunde.forEach(team => { verlaufEintrag[team.name] = team.guthaben })
-        const neuerVerlauf = [...gameState.verlauf, verlaufEintrag]
-
-        const fischDelta = neuerFischbestand - gameState.fischbestand
+        const nachRunde = simuliereRunde(gameState, ausgesandt, schwierigkeit)
+        const fischDelta = nachRunde.fischbestand - gameState.fischbestand
 
         setRundenErgebnis({
             runde: gameState.runde,
-            teams: teamsNachRunde,
+            teams: nachRunde.teams,
             fischDelta,
-            neuerFischbestand,
+            neuerFischbestand: nachRunde.fischbestand,
             gameStateNachRunde: {
-                ...gameState,
-                runde: gameState.runde + 1,
-                fischbestand: neuerFischbestand,
-                teams: teamsNachRunde,
-                verlauf: neuerVerlauf,
+                ...nachRunde,
                 phase: gameState.runde >= maxRunden ? 'ende' : 'entscheidung'
             }
         })
@@ -159,47 +143,19 @@ function GamePage({ gameState, setGameState }) {
         }
 
         while (state.runde <= maxRunden && state.fischbestand > 0) {
-            const neueTeams = state.teams.map((team, index) => {
-                if (index === 0) return { ...team, ausgesandteBoote: Math.floor(team.boote * 0.6) }
-                const { boote: kiBoote, guthaben: kiGuthaben } = kiBootAktion(team, state.fischbestand)
-                let kiAusgesandt
-                if (team.persoenlichkeit === 'gierig') kiAusgesandt = kiEntscheidungGierig(kiBoote)
-                else if (team.persoenlichkeit === 'kooperativ') kiAusgesandt = kiEntscheidungKooperativ(state.fischbestand, kiBoote)
-                else kiAusgesandt = kiEntscheidungRational(state.fischbestand, kiBoote)
-                return { ...team, boote: kiBoote, guthaben: kiGuthaben, ausgesandteBoote: kiAusgesandt }
-            })
-
-            const gesamteBoote = neueTeams.reduce((sum, t) => sum + t.ausgesandteBoote, 0)
-            const neuerFischbestand = berechneFischbestand(state.fischbestand, gesamteBoote)
-
-            const teamsNachRunde = neueTeams.map(team => {
-                const fang = berechneFang(team.ausgesandteBoote, state.fischbestand, gesamteBoote)
-                const gewinn = berechneGewinn(fang, team.ausgesandteBoote)
-                return { ...team, letzterFang: fang, guthaben: team.guthaben + gewinn }
-            })
-
-            const verlaufEintrag = { runde: state.runde, fischbestand: state.fischbestand, gesamteBoote }
-            teamsNachRunde.forEach(team => { verlaufEintrag[team.name] = team.guthaben })
-
-            state = {
-                ...state,
-                runde: state.runde + 1,
-                fischbestand: neuerFischbestand,
-                teams: teamsNachRunde,
-                verlauf: [...state.verlauf, verlaufEintrag],
-            }
+            state = simuliereRunde(state, Math.max(1, Math.floor(state.teams[0].boote * 0.6)), schwierigkeit)
         }
 
         setGameState({ ...state, phase: 'ende' })
     }
 
     return (
-        <div className="min-h-screen bg-blue-900 p-4 sm:p-6">
+        <div className="w-full h-full bg-blue-900 text-white flex flex-col overflow-hidden">
 
-            {/* Rundenüberlagerung */}
+            {/* Round result modal */}
             {rundenErgebnis && (
                 <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-                    <div className="bg-blue-900 border border-blue-600 rounded-2xl p-6 max-w-md w-full text-white shadow-2xl">
+                    <div className="bg-blue-900 border border-blue-600 rounded-2xl p-6 max-w-md w-full shadow-2xl">
                         <h2 className="text-xl font-bold mb-1 text-center">📋 Runde {rundenErgebnis.runde} – Ergebnis</h2>
                         <p className="text-blue-300 text-sm text-center mb-4">Was ist diese Runde passiert?</p>
 
@@ -233,100 +189,134 @@ function GamePage({ gameState, setGameState }) {
             )}
 
             {/* Header */}
-            <div className="flex justify-between items-center mb-6 text-white">
-                <h1 className="text-xl sm:text-2xl font-bold">🐟 Fish Banks Game</h1>
+            <div className="flex-none flex justify-between items-center px-6 py-3 border-b border-white/10">
+                <div className="flex items-center gap-3">
+                    <h1 className="text-xl font-bold">🐟 Fish Banks Game</h1>
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${diffBadge.bg} ${diffBadge.text}`}>
+                        {diffBadge.icon} {diffBadge.label}
+                    </span>
+                </div>
                 <div className="text-right">
-                    <div className="text-sm text-blue-200">Runde</div>
-                    <div className="text-2xl font-bold">{gameState.runde} / {maxRunden}</div>
+                    <div className="text-xs text-blue-200">Runde</div>
+                    <div className="text-2xl font-bold leading-none">{gameState.runde} / {maxRunden}</div>
                 </div>
             </div>
 
-            {/* Fischbestand */}
-            <div className={`bg-white/10 rounded-2xl p-6 mb-6 text-white ${gameState.fischbestand <= 30 ? 'pulse-critical' : ''}`}>
-                <div className="flex justify-between mb-2">
-                    <span className="font-bold">🌊 Fischbestand</span>
-                    <span className="font-bold">{gameState.fischbestand}%</span>
-                </div>
-                <div className="w-full bg-white/20 rounded-full h-4 overflow-hidden">
-                    <div
-                        className="h-4 rounded-full fish-bar-transition"
-                        style={{
-                            width: `${gameState.fischbestand}%`,
-                            backgroundColor: gameState.fischbestand > 60 ? '#22c55e' : gameState.fischbestand > 30 ? '#f59e0b' : '#ef4444'
-                        }}
-                    />
-                </div>
-                <div className="text-sm text-blue-200 mt-2">
-                    {gameState.fischbestand > 60 ? '✅ Gesund' : gameState.fischbestand > 30 ? '⚠️ Gefährdet' : '🚨 Kritisch!'}
-                </div>
-            </div>
+            {/* Main two-column layout */}
+            <div className="flex-1 min-h-0 grid grid-cols-2 gap-4 p-4">
 
-            <FishGraph verlauf={gameState.verlauf} />
+                {/* Left column: fish stock + graph */}
+                <div className="flex flex-col gap-3 min-h-0">
 
-            {/* Teams Übersicht */}
-            <div className="grid grid-cols-2 gap-3 mb-6">
-                {gameState.teams.map((team, index) => {
-                    const persLabel = team.persoenlichkeit ? PERSOENLICHKEIT_LABEL[team.persoenlichkeit] : null
-                    return (
-                        <div key={team.name} className={`rounded-xl p-4 text-white ${index === 0 ? 'bg-green-600/80' : 'bg-white/10'}`}>
-                            <div className="flex justify-between items-start">
-                                <span className="font-bold text-sm sm:text-base">{team.farbe} {team.name}</span>
-                                <span className="text-xs">{index === 0 ? '👤 Du' : '🤖'}</span>
-                            </div>
-                            {persLabel && (
-                                <div className="text-xs text-blue-300 mt-0.5 mb-1">{persLabel.label}</div>
-                            )}
-                            <div className="text-sm mt-1">💰 {team.guthaben.toLocaleString()}€</div>
-                            <div className="text-sm">🚢 {team.boote} Boote</div>
-                            {team.letzterFang > 0 && (
-                                <div className="text-sm">🐟 {team.letzterFang} gefangen</div>
-                            )}
+                    <div className={`flex-none bg-white/10 rounded-xl px-4 py-3 ${gameState.fischbestand <= 30 ? 'pulse-critical' : ''}`}>
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="font-bold">🌊 Fischbestand</span>
+                            <span className="font-bold text-lg">{gameState.fischbestand}%</span>
                         </div>
-                    )
-                })}
-            </div>
+                        <div className="w-full bg-white/20 rounded-full h-3 overflow-hidden">
+                            <div
+                                className="h-3 rounded-full fish-bar-transition"
+                                style={{
+                                    width: `${gameState.fischbestand}%`,
+                                    backgroundColor: gameState.fischbestand > 60 ? '#22c55e' : gameState.fischbestand > 30 ? '#f59e0b' : '#ef4444'
+                                }}
+                            />
+                        </div>
+                        <div className="text-sm text-blue-200 mt-1">
+                            {gameState.fischbestand > 60 ? '✅ Gesund' : gameState.fischbestand > 30 ? '⚠️ Gefährdet' : '🚨 Kritisch!'}
+                        </div>
+                    </div>
 
-            {/* Spieler Entscheidung */}
-            <div className="bg-white/10 rounded-2xl p-6 text-white">
-                <h2 className="font-bold text-lg mb-1">🎮 Deine Entscheidung – {spielerTeam.name}</h2>
-                <p className="text-blue-200 text-sm mb-4">Wie viele Boote sendest du aus? (max. {spielerTeam.boote})</p>
-                <div className="flex items-center gap-4 mb-6">
-                    <button onClick={() => setAusgesandt(Math.max(0, ausgesandt - 1))}
-                        className="bg-white/20 hover:bg-white/30 w-10 h-10 rounded-full text-xl font-bold flex items-center justify-center">−</button>
-                    <div className="text-4xl font-bold w-16 text-center">{ausgesandt}</div>
-                    <button onClick={() => setAusgesandt(Math.min(spielerTeam.boote, ausgesandt + 1))}
-                        className="bg-white/20 hover:bg-white/30 w-10 h-10 rounded-full text-xl font-bold flex items-center justify-center">+</button>
-                    <div className="text-blue-200 text-sm">🚢 von {spielerTeam.boote} Booten</div>
+                    {/* Graph fills remaining height */}
+                    <div className="flex-1 min-h-0">
+                        <FishGraph verlauf={gameState.verlauf} />
+                    </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 mb-6">
-                    <button onClick={handleBootKaufen}
-                        disabled={spielerTeam.guthaben < GAME_CONFIG.bootKosten}
-                        className="bg-blue-500 hover:bg-blue-400 disabled:opacity-40 disabled:cursor-not-allowed font-bold py-3 rounded-xl transition-colors">
-                        🚢 Boot kaufen<br />
-                        <span className="text-sm font-normal">5.000€</span>
-                    </button>
-                    <button onClick={handleBootVerkaufen}
-                        disabled={spielerTeam.boote <= 1}
-                        className="bg-orange-500 hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed font-bold py-3 rounded-xl transition-colors">
-                        💸 Boot verkaufen<br />
-                        <span className="text-sm font-normal">3.000€</span>
-                    </button>
+                {/* Right column: teams + decision */}
+                <div className="flex flex-col gap-3 min-h-0">
+
+                    {/* Team cards — 2×2 grid */}
+                    <div className="flex-none grid grid-cols-2 gap-3">
+                        {gameState.teams.map((team, index) => {
+                            const persLabel = team.persoenlichkeit ? PERSOENLICHKEIT_LABEL[team.persoenlichkeit] : null
+                            return (
+                                <div key={team.name} className={`rounded-xl px-4 py-3 ${index === 0 ? 'bg-green-600/80' : 'bg-white/10'}`}>
+                                    <div className="flex justify-between items-start">
+                                        <span className="font-bold text-sm">{team.farbe} {team.name}</span>
+                                        <span className="text-xs opacity-70">{index === 0 ? '👤 Du' : '🤖'}</span>
+                                    </div>
+                                    {persLabel && (
+                                        <div className="text-xs text-blue-300 mt-0.5">{persLabel.label}</div>
+                                    )}
+                                    <div className="text-sm mt-1">💰 {team.guthaben.toLocaleString()}€</div>
+                                    <div className="text-sm">🚢 {team.boote} Boote</div>
+                                    {team.letzterFang > 0 && (
+                                        <div className="text-sm">🐟 {team.letzterFang} gefangen</div>
+                                    )}
+                                </div>
+                            )
+                        })}
+                    </div>
+
+                    {/* Decision panel — fills remaining height */}
+                    <div className="flex-1 min-h-0 bg-white/10 rounded-xl p-4 flex flex-col">
+                        <div className="flex-none">
+                            <h2 className="font-bold text-lg mb-0.5">🎮 Deine Entscheidung – {spielerTeam.name}</h2>
+                            <p className="text-blue-200 text-sm mb-3">Wie viele Boote sendest du aus? (max. {spielerTeam.boote})</p>
+
+                            <div className="flex items-center gap-4 mb-4">
+                                <button
+                                    onClick={() => setAusgesandt(Math.max(0, ausgesandt - 1))}
+                                    className="bg-white/20 hover:bg-white/30 w-10 h-10 rounded-full text-xl font-bold flex items-center justify-center shrink-0"
+                                >−</button>
+                                <div className="text-4xl font-bold w-16 text-center">{ausgesandt}</div>
+                                <button
+                                    onClick={() => setAusgesandt(Math.min(spielerTeam.boote, ausgesandt + 1))}
+                                    className="bg-white/20 hover:bg-white/30 w-10 h-10 rounded-full text-xl font-bold flex items-center justify-center shrink-0"
+                                >+</button>
+                                <div className="text-blue-200 text-sm">von {spielerTeam.boote} Booten</div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 mb-4">
+                                <button
+                                    onClick={handleBootKaufen}
+                                    disabled={spielerTeam.guthaben < GAME_CONFIG.bootKosten}
+                                    className="bg-blue-500 hover:bg-blue-400 disabled:opacity-40 disabled:cursor-not-allowed font-bold py-3 rounded-xl transition-colors text-sm"
+                                >
+                                    🚢 Boot kaufen<br />
+                                    <span className="font-normal">5.000€</span>
+                                </button>
+                                <button
+                                    onClick={handleBootVerkaufen}
+                                    disabled={spielerTeam.boote <= 1}
+                                    className="bg-orange-500 hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed font-bold py-3 rounded-xl transition-colors text-sm"
+                                >
+                                    💸 Boot verkaufen<br />
+                                    <span className="font-normal">3.000€</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="mt-auto">
+                            {import.meta.env.DEV && (
+                                <button
+                                    onClick={handleDevSkip}
+                                    className="w-full bg-purple-600 hover:bg-purple-500 font-bold py-2 rounded-xl mb-3 transition-colors text-sm"
+                                >
+                                    ⚡ DEV: Spiel simulieren
+                                </button>
+                            )}
+                            <button
+                                onClick={handleRunde}
+                                className="w-full bg-green-500 hover:bg-green-400 font-bold py-4 rounded-xl text-xl transition-colors"
+                            >
+                                ✅ Runde bestätigen
+                            </button>
+                        </div>
+                    </div>
                 </div>
-
-                {import.meta.env.DEV && (
-                    <button onClick={handleDevSkip}
-                        className="w-full bg-purple-600 hover:bg-purple-500 font-bold py-2 rounded-xl mb-3 transition-colors text-sm">
-                        ⚡ DEV: Spiel simulieren
-                    </button>
-                )}
-
-                <button onClick={handleRunde}
-                    className="w-full bg-green-500 hover:bg-green-400 font-bold py-4 rounded-xl text-xl transition-colors">
-                    ✅ Runde bestätigen
-                </button>
             </div>
-
         </div>
     )
 }

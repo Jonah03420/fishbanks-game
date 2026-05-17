@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+
 /* Fish bar smooth animation */
 .fish-bar-transition {
   transition: width 0.6s ease-in-out, background-color 0.6s ease;
