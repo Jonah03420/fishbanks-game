@@ -43,7 +43,7 @@ if (import.meta.env.DEV) {
         balance -= orderCost
 
         const pass = opCosts === 300 && minBalance === 4200 && zinsen === 84 && balance === 4684 && actualOrder === 2
-        console.log('[MIT Order Test]')
+        console.log('[MIT Order Test — Positive]')
         console.log(`  Start balance (after auction buy): ${startBalance}€  ← $5000 − $500`)
         console.log(`  Op costs (${deployedShips} deployed × ${GAME_CONFIG.betriebskosten}€): −${opCosts}€  → balance ${4500 - opCosts}€`)
         console.log(`  Fish revenue (${fang} × ${GAME_CONFIG.fischPreis}€): +${fishRevenue}€  → balance ${4500 - opCosts + fishRevenue}€`)
@@ -52,7 +52,29 @@ if (import.meta.env.DEV) {
         console.log(`  Ship orders (${actualOrder} × ${GAME_CONFIG.bootKosten}€): −${orderCost}€  → balance ${balance}€`)
         console.log(`  Max order (ceil(${fleet}/2)): ${maxOrder}  |  Actual order: ${actualOrder}`)
         console.log(`  Ships in delivery: ${actualOrder}  → fleet next round: ${fleet + actualOrder}`)
-        console.log(`  ${pass ? 'PASS ✅' : 'FAIL ❌'}  expected: opCosts=300, minBalance=4200, interest=84, finalBalance=4684, fleet→6`)
+        console.log(`  ${pass ? 'PASS ✅' : 'FAIL ❌'}  expected: opCosts=300, minBalance=4200, interest=+84, finalBalance=4684, fleet→6`)
+
+        // Negative balance test
+        // Start: $200, buy 1 ship at $500 → startBalance −$300
+        // Step 3: 4×$75 → −$600 (min), Step 4: 20×$20 → −$200, Step 5: −$600×2% = −$12 → −$212
+        ;(function verifyNegativeBalance() {
+            let nb = -300   // balance after auction buy
+            let nbMin = nb
+            const nbOpCosts = 4 * GAME_CONFIG.betriebskosten   // $300
+            nb -= nbOpCosts
+            nbMin = Math.min(nbMin, nb)   // −600
+            nb += 20 * GAME_CONFIG.fischPreis   // +400 → −200
+            nbMin = Math.min(nbMin, nb)   // stays −600
+            const nbZinsen = Math.round(nbMin * GAME_CONFIG.zinsRate)   // −12
+            nb += nbZinsen   // −212
+            const nbPass = nbMin === -600 && nbZinsen === -12 && nb === -212
+            console.log('[MIT Order Test — Negative Balance]')
+            console.log(`  Start balance (after auction buy): −300€`)
+            console.log(`  Op costs (4 × 75€): −300€  → balance −600€, min −600€`)
+            console.log(`  Fish revenue (20 × 20€): +400€  → balance −200€, min stays −600€`)
+            console.log(`  Interest (−600 × 2%): ${nbZinsen}€  → balance ${nb}€`)
+            console.log(`  ${nbPass ? 'PASS ✅' : 'FAIL ❌'}  expected: minBalance=−600, interest=−12, finalBalance=−212`)
+        })()
     })()
 }
 
@@ -150,6 +172,14 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         return { ...team, boote: team.boote + delivered, shipsInDelivery: 0 }
     })
 
+    if (import.meta.env.DEV) {
+        console.log(`\n=== ROUND ${state.runde} PROCESSING ===`)
+        if (roundDeliveries.length > 0)
+            roundDeliveries.forEach(d => console.log(`  Step 1 - Ships delivered to ${d.name}: +${d.count}`))
+        else
+            console.log('  Step 1 - No ship deliveries')
+    }
+
     // ── Step 2: Fleet decisions (AI buy/sell + human pre-round sells already applied) ──
     const teamsNachEntscheidung = teamsNachLieferung.map((team, index) => {
         if (!team.istKI) {
@@ -222,6 +252,14 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         const orderCost = actualOrder * GAME_CONFIG.bootKosten
         balance -= orderCost
 
+        if (import.meta.env.DEV) {
+            console.log(`  [${team.name}] Step 2 - After auction:         ${startBalance.toLocaleString()}€`)
+            console.log(`  [${team.name}] Step 3 - After operating costs: ${(startBalance - opCosts).toLocaleString()}€  (−${opCosts}€, ${deployedShips} deployed ships)`)
+            console.log(`  [${team.name}] Step 4 - After fish sales:      ${(startBalance - opCosts + fishRevenue).toLocaleString()}€  (+${fishRevenue}€, ${fang} fish)`)
+            console.log(`  [${team.name}] Step 5 - Min balance was: ${minBalance.toLocaleString()}€  Interest: ${zinsen >= 0 ? '+' : ''}${zinsen.toLocaleString()}€`)
+            console.log(`  [${team.name}] Step 6 - After ship orders:     ${balance.toLocaleString()}€  (${actualOrder} × 300€ ordered)`)
+        }
+
         return {
             ...team,
             letzterFang: fang,
@@ -267,6 +305,12 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         ...team,
         netWorth: berechneNetWorth(team.guthaben, team.boote, neuerMarktpreis),
     }))
+
+    if (import.meta.env.DEV) {
+        console.log(`  Step 7 - Fish stock: ${state.fischbestand.toLocaleString()} → ${neuerFischbestand.toLocaleString()}  (total catch: ${gesamtFang}, weather: ${wetterfaktor.toFixed(2)}×)`)
+        finalTeams.forEach(t => console.log(`  Step 8 - Net Worth [${t.name}]: ${t.netWorth.toLocaleString()}€  (${t.guthaben.toLocaleString()}€ + ${t.boote} ships × ${neuerMarktpreis}€)`))
+        console.log('=== END ROUND ===')
+    }
 
     const verlaufEintrag = { runde: state.runde, fischbestand: state.fischbestand, gesamtFang, wetterfaktor }
     finalTeams.forEach(team => { verlaufEintrag[team.name] = team.netWorth })
@@ -493,8 +537,8 @@ function GamePage({ gameState, setGameState }) {
                                             <div>Start balance: <span className="text-white">{s.startBalance.toLocaleString()}€</span></div>
                                             <div>Op costs ({s.deployedShips} deployed): <span className="text-red-300">−{s.opCosts.toLocaleString()}€</span></div>
                                             <div>Fish sales: <span className="text-green-300">+{s.fishRevenue.toLocaleString()}€</span></div>
-                                            <div>Min balance: <span className="text-yellow-300">{s.minBalance.toLocaleString()}€</span></div>
-                                            <div>Interest (2%): <span className={s.zinsen >= 0 ? 'text-green-300' : 'text-red-300'}>{s.zinsen >= 0 ? '+' : ''}{s.zinsen.toLocaleString()}€</span></div>
+                                            <div>Minimum balance this round: <span className="text-yellow-300">{s.minBalance.toLocaleString()}€</span></div>
+                                            <div>{s.zinsen >= 0 ? 'Interest earned:' : 'Interest charged:'} <span className={s.zinsen >= 0 ? 'text-green-300' : 'text-red-300'}>{s.zinsen >= 0 ? '+' : ''}{s.zinsen.toLocaleString()}€</span></div>
                                             <div>Ship orders ({s.actualOrder} × 300€): <span className="text-red-300">−{s.orderCost.toLocaleString()}€</span></div>
                                         </div>
                                         <div className="mt-1 pt-1 border-t border-white/10 grid grid-cols-3 gap-x-2 text-xs text-blue-300 leading-relaxed">
