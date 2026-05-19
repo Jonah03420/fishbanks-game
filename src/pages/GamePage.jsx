@@ -9,8 +9,8 @@ import {
 
 // ─── MIT Order Verification Test (DEV only) ───────────────────────────────────
 // Scenario: team starts with $5000, buys 1 ship at auction ($500) → balance $4500, fleet 4
-// All 4 ships deployed (coastal + deep sea), 0 in harbor
-// Step 3: op costs  4 deployed × $75 = $300  → balance $4200, min $4200
+// Fleet of 4 ships (0 in harbor, rest coastal/deep sea); all 4 pay operating costs (MIT: all zones)
+// Step 3: op costs  4 ships × $75 = $300  → balance $4200, min $4200
 // Step 4: fish      50 fish × $20 = $1000 → balance $5200, min stays $4200
 // Step 5: interest  $4200 × 2%   = $84   → balance $5284
 // Step 6: orders    2 ships × $300 = $600  → balance $4684, shipsInDelivery = 2
@@ -19,14 +19,14 @@ if (import.meta.env.DEV) {
     ;(function verifyMITOrder() {
         const startBalance = 4500   // after buying 1 ship at auction ($5000 − $500)
         const fleet = 4             // 3 original + 1 bought at auction
-        const deployedShips = 4     // all in coastal + deep sea, none in harbor
+        const deployedShips = 4     // fleet size = 4; all pay operating costs (none in harbor here)
         const fang = 50
         const shipsOrdered = 2
 
         let balance = startBalance
         let minBalance = balance
 
-        const opCosts = deployedShips * GAME_CONFIG.betriebskosten   // deployed ships only
+        const opCosts = deployedShips * GAME_CONFIG.betriebskosten   // all ships in fleet
         balance -= opCosts
         minBalance = Math.min(minBalance, balance)
 
@@ -45,7 +45,7 @@ if (import.meta.env.DEV) {
         const pass = opCosts === 300 && minBalance === 4200 && zinsen === 84 && balance === 4684 && actualOrder === 2
         console.log('[MIT Order Test — Positive]')
         console.log(`  Start balance (after auction buy): ${startBalance}€  ← $5000 − $500`)
-        console.log(`  Op costs (${deployedShips} deployed × ${GAME_CONFIG.betriebskosten}€): −${opCosts}€  → balance ${4500 - opCosts}€`)
+        console.log(`  Op costs (${deployedShips} ships × ${GAME_CONFIG.betriebskosten}€): −${opCosts}€  → balance ${4500 - opCosts}€`)
         console.log(`  Fish revenue (${fang} × ${GAME_CONFIG.fischPreis}€): +${fishRevenue}€  → balance ${4500 - opCosts + fishRevenue}€`)
         console.log(`  Minimum balance: ${minBalance}€  (reached after op costs)`)
         console.log(`  Interest (${minBalance} × 2%): +${zinsen}€  → balance ${4500 - opCosts + fishRevenue + zinsen}€`)
@@ -154,7 +154,7 @@ function kiTeamAktionen(team, fischbestand, verlauf, alleTeams, schwierigkeit, m
 // MIT Step sequence within a round:
 //   (Ship deliveries from last round happen first)
 //   Step 2: Auction buy/sell — already reflected in team.bankBalance on entry
-//   Step 3: Operating costs — Coastal + Deep Sea ships only (Harbor ships are free)
+//   Step 3: Operating costs — ALL ships in fleet (Harbor, Coastal, Deep Sea)
 //   Step 4: Fish catch & sales revenue (zone-based: coastal 15/ship, deep sea 25/ship)
 //   Step 5: Interest on MINIMUM balance reached during Steps 2–4
 //   Step 6: New ship orders — paid now, delivered at start of NEXT round
@@ -226,8 +226,8 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         let balance = startBalance
         let minBalance = balance
 
-        // Step 3: Operating costs — ONLY Coastal + Deep Sea ships; Harbor ships are free
-        const deployedShips = (team.coastalShips || 0) + (team.deepSeaShips || 0)
+        // Step 3: Operating costs — ALL ships in fleet (Harbor, Coastal, Deep Sea per MIT spec)
+        const deployedShips = team.fleet
         const opCosts = deployedShips * GAME_CONFIG.betriebskosten
         balance -= opCosts
         minBalance = Math.min(minBalance, balance)
@@ -254,7 +254,7 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
 
         if (import.meta.env.DEV) {
             console.log(`  [${team.name}] Step 2 - After auction:         ${startBalance.toLocaleString()}€`)
-            console.log(`  [${team.name}] Step 3 - After operating costs: ${(startBalance - opCosts).toLocaleString()}€  (−${opCosts}€, ${deployedShips} deployed ships)`)
+            console.log(`  [${team.name}] Step 3 - After operating costs: ${(startBalance - opCosts).toLocaleString()}€  (−${opCosts}€, ${deployedShips} ships in fleet)`)
             console.log(`  [${team.name}] Step 4 - After fish sales:      ${(startBalance - opCosts + fishRevenue).toLocaleString()}€  (+${fishRevenue}€, ${fang} fish)`)
             console.log(`  [${team.name}] Step 5 - Min balance was: ${minBalance.toLocaleString()}€  Interest: ${zinsen >= 0 ? '+' : ''}${zinsen.toLocaleString()}€`)
             console.log(`  [${team.name}] Step 6 - After ship orders:     ${balance.toLocaleString()}€  (${actualOrder} × 300€ ordered)`)
