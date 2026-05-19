@@ -70,15 +70,15 @@ export function berechneNetWorth(bankBalance, boote, shipPrice) {
 // ─── Leicht ──────────────────────────────────────────────────────────────────
 
 export function kiBootAktionLeicht(team, verkaufPreis = GAME_CONFIG.bootVerkaufswert) {
-  const { boote, guthaben } = team
+  const { fleet: boote, bankBalance: guthaben } = team
   const r = Math.random()
   if (r > 0.93 && guthaben >= GAME_CONFIG.bootKosten && boote < 7) {
-    return { boote: boote + 1, guthaben: guthaben - GAME_CONFIG.bootKosten }
+    return { fleet: boote + 1, bankBalance: guthaben - GAME_CONFIG.bootKosten }
   }
   if (r < 0.04 && boote > 2) {
-    return { boote: boote - 1, guthaben: guthaben + verkaufPreis }
+    return { fleet: boote - 1, bankBalance: guthaben + verkaufPreis }
   }
-  return { boote, guthaben }
+  return { fleet: boote, bankBalance: guthaben }
 }
 
 export function kiAusgesandtLeicht(boote) {
@@ -124,13 +124,13 @@ function andereBooteGeschaetzt(meineTeamName, alleTeams) {
 }
 
 export function kiBootAktionSchwer(team, fischbestand, verlauf, alleTeams, verkaufPreis = GAME_CONFIG.bootVerkaufswert) {
-  let { boote, guthaben, persoenlichkeit, name } = team
+  let { fleet: boote, bankBalance: guthaben, persoenlichkeit, name } = team
   const trend = berechneTrend(verlauf)
 
   // Panic selling: 8% chance when trend is sharply negative (−300 = −5% of 6000)
   // and stock is low (< 2400 = 40%)
   if (trend < -300 && fischbestand < 2400 && boote > 3 && Math.random() < 0.08) {
-    return { boote: boote - 1, guthaben: guthaben + verkaufPreis }
+    return { fleet: boote - 1, bankBalance: guthaben + verkaufPreis }
   }
 
   const andereGeschaetzt = andereBooteGeschaetzt(name, alleTeams)
@@ -159,27 +159,27 @@ export function kiBootAktionSchwer(team, fischbestand, verlauf, alleTeams, verka
     guthaben += verkaufPreis
   }
 
-  return { boote, guthaben }
+  return { fleet: boote, bankBalance: guthaben }
 }
 
 // Zone allocation for AI teams based on personality and fish density.
-// Returns { harborBoote, coastalBoote, deepSeaBoote } summing to boote.
+// Returns { harborShips, coastalShips, deepSeaShips } summing to boote.
 export function kiZoneAllokierung(persoenlichkeit, boote, ausgesandt, fischbestand) {
   const harbor = boote - ausgesandt
   if (persoenlichkeit === 'gierig') {
     // All deployed ships to Deep Sea — maximum yield
-    return { harborBoote: harbor, coastalBoote: 0, deepSeaBoote: ausgesandt }
+    return { harborShips: harbor, coastalShips: 0, deepSeaShips: ausgesandt }
   } else if (persoenlichkeit === 'kooperativ') {
     // Deployed ships go to Coastal — gentler on the stock
-    return { harborBoote: harbor, coastalBoote: ausgesandt, deepSeaBoote: 0 }
+    return { harborShips: harbor, coastalShips: ausgesandt, deepSeaShips: 0 }
   } else { // rational — always reserve 1 in Harbor, split rest by density
     const adjustedHarbor = Math.max(harbor, Math.min(1, boote))
     const remaining = boote - adjustedHarbor
     const fishDichte = fischbestand / GAME_CONFIG.maxFischbestand
     if (fishDichte > 0.5) {
-      return { harborBoote: adjustedHarbor, coastalBoote: 0, deepSeaBoote: remaining }
+      return { harborShips: adjustedHarbor, coastalShips: 0, deepSeaShips: remaining }
     } else {
-      return { harborBoote: adjustedHarbor, coastalBoote: remaining, deepSeaBoote: 0 }
+      return { harborShips: adjustedHarbor, coastalShips: remaining, deepSeaShips: 0 }
     }
   }
 }

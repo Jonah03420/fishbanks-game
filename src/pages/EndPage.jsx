@@ -88,7 +88,7 @@ function EndPage({ gameState, onRestart }) {
                         <div className="text-xs text-yellow-200 mb-0.5">Winner</div>
                         <div className="text-xl font-bold">{winner.farbe} {winner.name}</div>
                         <div className="text-yellow-200 text-sm font-bold">{winner.netWorth.toLocaleString()}€ Net Worth</div>
-                        <div className="text-yellow-300 text-xs">{winner.guthaben.toLocaleString()}€ + {(winner.boote * marketShipPrice).toLocaleString()}€ ({winner.boote} ships)</div>
+                        <div className="text-yellow-300 text-xs">{winner.bankBalance.toLocaleString()}€ + {(winner.fleet * marketShipPrice).toLocaleString()}€ ({winner.fleet} ships)</div>
                     </div>
                 </div>
 
@@ -139,7 +139,7 @@ function EndPage({ gameState, onRestart }) {
                                     </div>
                                     <div className="text-right">
                                         <div className="font-bold text-xs">{team.netWorth.toLocaleString()}€</div>
-                                        <div className="text-xs text-blue-300">{team.guthaben.toLocaleString()}€ + {(team.boote * marketShipPrice).toLocaleString()}€ ({team.boote} ships)</div>
+                                        <div className="text-xs text-blue-300">{team.bankBalance.toLocaleString()}€ + {(team.fleet * marketShipPrice).toLocaleString()}€ ({team.fleet} ships)</div>
                                     </div>
                                 </div>
                             ))}

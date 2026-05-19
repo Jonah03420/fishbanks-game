@@ -89,7 +89,7 @@ const PERSOENLICHKEIT_LABEL = {
 }
 
 function aktualisiereMarktpreis(aktuellPreis, alleTeams) {
-    const totalBoote = alleTeams.reduce((sum, t) => sum + t.boote, 0)
+    const totalBoote = alleTeams.reduce((sum, t) => sum + t.fleet, 0)
     let neuerPreis = aktuellPreis
     if (totalBoote > 15) neuerPreis *= 0.95
     else if (totalBoote < 9) neuerPreis *= 1.05
@@ -101,7 +101,7 @@ function kiMaxGebot(team, fischbestand, marketShipPrice) {
     if (team.persoenlichkeit === 'gierig') maxBid = fischbestand > 3000 ? 800 : 300
     else if (team.persoenlichkeit === 'kooperativ') maxBid = 400
     else maxBid = Math.round(marketShipPrice * 1.1)
-    return Math.min(maxBid, team.guthaben)
+    return Math.min(maxBid, team.bankBalance)
 }
 
 function loeseAuktion(teams, sellerIdx, anzahlAngebote, fischbestand, marketShipPrice) {
@@ -109,7 +109,7 @@ function loeseAuktion(teams, sellerIdx, anzahlAngebote, fischbestand, marketShip
     let t = teams.map(x => ({ ...x }))
     const auctionEvents = []
     for (let i = 0; i < anzahlAngebote; i++) {
-        if (t[sellerIdx].boote <= 1) break
+        if (t[sellerIdx].fleet <= 1) break
         let bestBid = 149
         let bestBidderIdx = -1
         t.forEach((team, idx) => {
@@ -120,8 +120,8 @@ function loeseAuktion(teams, sellerIdx, anzahlAngebote, fischbestand, marketShip
         if (bestBidderIdx === -1) {
             auctionEvents.push({ erfolg: false })
         } else {
-            t[sellerIdx] = { ...t[sellerIdx], boote: t[sellerIdx].boote - 1, guthaben: t[sellerIdx].guthaben + bestBid }
-            t[bestBidderIdx] = { ...t[bestBidderIdx], boote: t[bestBidderIdx].boote + 1, guthaben: t[bestBidderIdx].guthaben - bestBid }
+            t[sellerIdx] = { ...t[sellerIdx], fleet: t[sellerIdx].fleet - 1, bankBalance: t[sellerIdx].bankBalance + bestBid }
+            t[bestBidderIdx] = { ...t[bestBidderIdx], fleet: t[bestBidderIdx].fleet + 1, bankBalance: t[bestBidderIdx].bankBalance - bestBid }
             auctionEvents.push({ erfolg: true, kaeufer: t[bestBidderIdx].name, preis: bestBid })
         }
     }
@@ -135,7 +135,7 @@ function kiTeamAktionen(team, fischbestand, verlauf, alleTeams, schwierigkeit, m
         result = {
             ...booteResult,
             ausgesandteBoote: kiAusgesandtSchwer(
-                team.persoenlichkeit, team.name, booteResult.boote,
+                team.persoenlichkeit, team.name, booteResult.fleet,
                 fischbestand, verlauf, alleTeams
             ),
         }
@@ -153,7 +153,7 @@ function kiTeamAktionen(team, fischbestand, verlauf, alleTeams, schwierigkeit, m
 //
 // MIT Step sequence within a round:
 //   (Ship deliveries from last round happen first)
-//   Step 2: Auction buy/sell — already reflected in team.guthaben on entry
+//   Step 2: Auction buy/sell — already reflected in team.bankBalance on entry
 //   Step 3: Operating costs — Coastal + Deep Sea ships only (Harbor ships are free)
 //   Step 4: Fish catch & sales revenue (zone-based: coastal 15/ship, deep sea 25/ship)
 //   Step 5: Interest on MINIMUM balance reached during Steps 2–4
@@ -169,7 +169,7 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         if (delivered > 0) {
             roundDeliveries.push({ name: team.name, farbe: team.farbe, count: delivered })
         }
-        return { ...team, boote: team.boote + delivered, shipsInDelivery: 0 }
+        return { ...team, fleet: team.fleet + delivered, shipsInDelivery: 0 }
     })
 
     if (import.meta.env.DEV) {
@@ -189,9 +189,9 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
             const deepSea = d.deepSea || 0
             return {
                 ...team,
-                harborBoote: harbor,
-                coastalBoote: coastal,
-                deepSeaBoote: deepSea,
+                harborShips: harbor,
+                coastalShips: coastal,
+                deepSeaShips: deepSea,
                 ausgesandteBoote: coastal + deepSea,
             }
         }
@@ -206,8 +206,8 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
     const dichte = state.fischbestand / GAME_CONFIG.maxFischbestand
     const sqrtDichte = Math.sqrt(Math.max(0, dichte))
     const teamCatches = teamsNachEntscheidung.map(t => {
-        const coastal = Math.round((t.coastalBoote || 0) * 15 * sqrtDichte * wetterfaktor)
-        const deepSea = Math.round((t.deepSeaBoote || 0) * 25 * sqrtDichte * wetterfaktor)
+        const coastal = Math.round((t.coastalShips || 0) * 15 * sqrtDichte * wetterfaktor)
+        const deepSea = Math.round((t.deepSeaShips || 0) * 25 * sqrtDichte * wetterfaktor)
         return { coastal, deepSea, total: coastal + deepSea }
     })
     const rawTotalCatch = teamCatches.reduce((sum, c) => sum + c.total, 0)
@@ -222,12 +222,12 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         const shipsOrdered = !team.istKI ? (humanDecisions[index]?.shipsOrdered || 0) : 0
 
         // Starting balance after Step 2 (pre-round auction activity)
-        const startBalance = team.guthaben
+        const startBalance = team.bankBalance
         let balance = startBalance
         let minBalance = balance
 
         // Step 3: Operating costs — ONLY Coastal + Deep Sea ships; Harbor ships are free
-        const deployedShips = (team.coastalBoote || 0) + (team.deepSeaBoote || 0)
+        const deployedShips = (team.coastalShips || 0) + (team.deepSeaShips || 0)
         const opCosts = deployedShips * GAME_CONFIG.betriebskosten
         balance -= opCosts
         minBalance = Math.min(minBalance, balance)
@@ -246,7 +246,7 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         balance += zinsen
 
         // Step 6: New ship orders — paid now, ships arrive at start of NEXT round
-        const maxOrder = Math.ceil(team.boote / 2)
+        const maxOrder = Math.ceil(team.fleet / 2)
         const canAfford = balance >= GAME_CONFIG.bootKosten ? Math.floor(balance / GAME_CONFIG.bootKosten) : 0
         const actualOrder = Math.max(0, Math.min(shipsOrdered, maxOrder, canAfford))
         const orderCost = actualOrder * GAME_CONFIG.bootKosten
@@ -264,15 +264,15 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
             ...team,
             letzterFang: fang,
             letzteZinsen: zinsen,
-            guthaben: balance,
+            bankBalance: balance,
             shipsInDelivery: actualOrder,
             roundSummary: {
                 startBalance,
                 opCosts,
                 deployedShips,
-                harborShips: team.harborBoote || 0,
-                coastalShips: team.coastalBoote || 0,
-                deepSeaShips: team.deepSeaBoote || 0,
+                harborShips: team.harborShips || 0,
+                coastalShips: team.coastalShips || 0,
+                deepSeaShips: team.deepSeaShips || 0,
                 coastalFang,
                 deepSeaFang,
                 fang,
@@ -284,7 +284,7 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
                 orderCost,
                 finalBalance: balance,
             },
-            netWorth: berechneNetWorth(balance, team.boote, marketShipPrice),
+            netWorth: berechneNetWorth(balance, team.fleet, marketShipPrice),
         }
     })
 
@@ -293,7 +293,7 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
     for (const [idxStr, decision] of Object.entries(humanDecisions)) {
         const idx = parseInt(idxStr)
         if ((decision.boatsOffered || 0) > 0) {
-            const maxOffer = Math.min(decision.boatsOffered, Math.max(0, teamsNachRunde[idx].boote - 1))
+            const maxOffer = Math.min(decision.boatsOffered, Math.max(0, teamsNachRunde[idx].fleet - 1))
             const { teams: updated, auctionEvents } = loeseAuktion(teamsNachRunde, idx, maxOffer, neuerFischbestand, marketShipPrice)
             teamsNachRunde = updated
             allAuctionEvents = [...allAuctionEvents, ...auctionEvents]
@@ -303,12 +303,12 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
     const neuerMarktpreis = aktualisiereMarktpreis(marketShipPrice, teamsNachRunde)
     const finalTeams = teamsNachRunde.map(team => ({
         ...team,
-        netWorth: berechneNetWorth(team.guthaben, team.boote, neuerMarktpreis),
+        netWorth: berechneNetWorth(team.bankBalance, team.fleet, neuerMarktpreis),
     }))
 
     if (import.meta.env.DEV) {
         console.log(`  Step 7 - Fish stock: ${state.fischbestand.toLocaleString()} → ${neuerFischbestand.toLocaleString()}  (total catch: ${gesamtFang}, weather: ${wetterfaktor.toFixed(2)}×)`)
-        finalTeams.forEach(t => console.log(`  Step 8 - Net Worth [${t.name}]: ${t.netWorth.toLocaleString()}€  (${t.guthaben.toLocaleString()}€ + ${t.boote} ships × ${neuerMarktpreis}€)`))
+        finalTeams.forEach(t => console.log(`  Step 8 - Net Worth [${t.name}]: ${t.netWorth.toLocaleString()}€  (${t.bankBalance.toLocaleString()}€ + ${t.fleet} ships × ${neuerMarktpreis}€)`))
         console.log('=== END ROUND ===')
     }
 
@@ -343,7 +343,7 @@ function GamePage({ gameState, setGameState }) {
     const [currentCoastal, setCurrentCoastal] = useState(0)
     const [currentDeepSea, setCurrentDeepSea] = useState(() => {
         const firstHuman = gameState.teams.find(t => !t.istKI)
-        return firstHuman ? firstHuman.boote : 0
+        return firstHuman ? firstHuman.fleet : 0
     })
     const [currentBoatsOffered, setCurrentBoatsOffered] = useState(0)
     const [currentShipsOrdered, setCurrentShipsOrdered] = useState(0)
@@ -370,16 +370,16 @@ function GamePage({ gameState, setGameState }) {
         ? humanTeams[activeEntryIdx + 1]
         : null
 
-    const fleetSize = activeTeam ? activeTeam.boote : 0
+    const fleetSize = activeTeam ? activeTeam.fleet : 0
     const totalAllocated = currentHarbor + currentCoastal + currentDeepSea
     const allAllocated = totalAllocated === fleetSize
-    const maxShipOrder = activeTeam ? Math.ceil(activeTeam.boote / 2) : 0
+    const maxShipOrder = activeTeam ? Math.ceil(activeTeam.fleet / 2) : 0
     const safeShipsOrdered = Math.min(currentShipsOrdered, maxShipOrder)
 
     // Sell ship instantly at market price (Step 2 auction sale — immediate)
     function handleBootVerkaufen() {
-        if (activeSlot === null || activeTeam.boote <= 1) return
-        const neueBoote = activeTeam.boote - 1
+        if (activeSlot === null || activeTeam.fleet <= 1) return
+        const neueBoote = activeTeam.fleet - 1
         // Shrink zone allocation to match new fleet — reduce deepSea first, then coastal, then harbor
         let h = currentHarbor, c = currentCoastal, d = currentDeepSea
         if (h + c + d > neueBoote) {
@@ -394,8 +394,8 @@ function GamePage({ gameState, setGameState }) {
             ...gameState,
             teams: gameState.teams.map((team, i) => {
                 if (i !== activeSlot) return team
-                const neuesGuthaben = team.guthaben + marketShipPrice
-                return { ...team, boote: neueBoote, guthaben: neuesGuthaben, netWorth: berechneNetWorth(neuesGuthaben, neueBoote, marketShipPrice) }
+                const newBankBalance = team.bankBalance + marketShipPrice
+                return { ...team, fleet: neueBoote, bankBalance: newBankBalance, netWorth: berechneNetWorth(newBankBalance, neueBoote, marketShipPrice) }
             })
         })
     }
@@ -424,7 +424,7 @@ function GamePage({ gameState, setGameState }) {
             // Reset zone allocator for the next player's fleet
             if (nextEntry) {
                 const nextTeam = gameState.teams[nextEntry.slotIndex]
-                setCurrentDeepSea(nextTeam.boote)
+                setCurrentDeepSea(nextTeam.fleet)
             } else {
                 setCurrentDeepSea(0)
             }
@@ -461,7 +461,7 @@ function GamePage({ gameState, setGameState }) {
         setHumanDecisions({})
         setCurrentHarbor(0)
         setCurrentCoastal(0)
-        setCurrentDeepSea(firstHumanTeam ? firstHumanTeam.boote : 0)
+        setCurrentDeepSea(firstHumanTeam ? firstHumanTeam.fleet : 0)
         setCurrentBoatsOffered(0)
         setCurrentShipsOrdered(0)
     }
@@ -472,8 +472,8 @@ function GamePage({ gameState, setGameState }) {
             const decisions = {}
             state.teams.forEach((team, idx) => {
                 if (!team.istKI) {
-                    const deployed = Math.max(1, Math.floor(team.boote * 0.6))
-                    decisions[idx] = { harbor: team.boote - deployed, coastal: 0, deepSea: deployed, boatsOffered: 0, shipsOrdered: 0 }
+                    const deployed = Math.max(1, Math.floor(team.fleet * 0.6))
+                    decisions[idx] = { harbor: team.fleet - deployed, coastal: 0, deepSea: deployed, boatsOffered: 0, shipsOrdered: 0 }
                 }
             })
             state = simuliereRunde(state, decisions, schwierigkeit)
@@ -678,8 +678,8 @@ function GamePage({ gameState, setGameState }) {
                                     {team.persoenlichkeit && (
                                         <div className="text-xs text-blue-300">{PERSOENLICHKEIT_LABEL[team.persoenlichkeit]}</div>
                                     )}
-                                    <div className="text-xs text-blue-200">Balance: {team.guthaben.toLocaleString()}€</div>
-                                    <div className="text-xs text-blue-200">Fleet: {(team.boote * marketShipPrice).toLocaleString()}€ ({team.boote} ships)</div>
+                                    <div className="text-xs text-blue-200">Balance: {team.bankBalance.toLocaleString()}€</div>
+                                    <div className="text-xs text-blue-200">Fleet: {(team.fleet * marketShipPrice).toLocaleString()}€ ({team.fleet} ships)</div>
                                     <div className="text-xs font-bold">Net Worth: {team.netWorth.toLocaleString()}€</div>
                                     {team.letzterFang > 0 && (
                                         <div className="text-xs text-blue-300">Catch: {team.letzterFang} | Interest: {team.letzteZinsen >= 0 ? '+' : ''}{team.letzteZinsen}€</div>
@@ -770,7 +770,7 @@ function GamePage({ gameState, setGameState }) {
                                 <div className="grid grid-cols-2 gap-2">
                                     <button
                                         onClick={handleBootVerkaufen}
-                                        disabled={activeTeam.boote <= 1}
+                                        disabled={activeTeam.fleet <= 1}
                                         className="bg-orange-500 hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed font-bold py-2 rounded-xl transition-colors text-xs"
                                     >
                                         Sell Ship<br />
@@ -801,7 +801,7 @@ function GamePage({ gameState, setGameState }) {
                                 </div>
 
                                 {/* Auction: offer ships to AI bidders */}
-                                {activeTeam.boote > 1 && (
+                                {activeTeam.fleet > 1 && (
                                     <div className="bg-yellow-500/10 border border-yellow-400/20 rounded-lg px-3 py-2">
                                         <div className="text-xs text-yellow-300 font-bold mb-1">Offer Ships at Auction</div>
                                         <div className="flex items-center gap-2">
@@ -811,7 +811,7 @@ function GamePage({ gameState, setGameState }) {
                                             >−</button>
                                             <div className="text-lg font-bold w-7 text-center">{currentBoatsOffered}</div>
                                             <button
-                                                onClick={() => setCurrentBoatsOffered(Math.min(activeTeam.boote - 1, currentBoatsOffered + 1))}
+                                                onClick={() => setCurrentBoatsOffered(Math.min(activeTeam.fleet - 1, currentBoatsOffered + 1))}
                                                 className="bg-white/20 hover:bg-white/30 w-7 h-7 rounded-full font-bold text-sm flex items-center justify-center shrink-0"
                                             >+</button>
                                             <div className="text-xs text-blue-300">min. 150€ starting bid</div>

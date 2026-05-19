@@ -13,10 +13,10 @@ export function erstelleStartzustandAusLobby(room, playerIndex) {
   const teams = [0, 1, 2, 3].map(slot => {
     const player = room.players[slot]
     if (player) {
-      return erstelleTeam(player.name, TEAM_COLORS[slot], false, null, startGuthaben, startBoote, true)
+      return erstelleTeam(slot + 1, player.name, TEAM_COLORS[slot], false, null, startGuthaben, startBoote, true)
     }
     return erstelleTeam(
-      TEAM_NAMES[slot], TEAM_COLORS[slot], true,
+      slot + 1, TEAM_NAMES[slot], TEAM_COLORS[slot], true,
       SLOT_PERSONALITIES[slot] || 'kooperativ',
       startGuthaben, startBoote, false
     )
@@ -36,19 +36,20 @@ export function erstelleStartzustandAusLobby(room, playerIndex) {
   }
 }
 
-function erstelleTeam(name, farbe, istKI, persoenlichkeit, startGuthaben, startBoote, isRealHuman) {
+function erstelleTeam(id, name, farbe, istKI, persoenlichkeit, startGuthaben, startBoote, isRealHuman) {
   return {
+    id,
     name, farbe,
-    boote: startBoote,
-    guthaben: startGuthaben,
+    fleet: startBoote,
+    bankBalance: startGuthaben,
     netWorth: startGuthaben + startBoote * GAME_CONFIG.auctionPreis,
     ausgesandteBoote: 0,
-    harborBoote: 0,
-    coastalBoote: 0,
-    deepSeaBoote: 0,
+    harborShips: 0,
+    coastalShips: 0,
+    deepSeaShips: 0,
     letzterFang: 0,
     letzteZinsen: 0,
-    shipsInDelivery: 0,   // ships ordered last round; delivered at start of next round (MIT Step 7)
+    shipsInDelivery: 0,
     istKI,
     persoenlichkeit,
     isRealHuman,
