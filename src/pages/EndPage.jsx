@@ -1,46 +1,49 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts'
-import { GAME_CONFIG, berechneFischbestand, berechneFang, berechneGewinn } from '../game/fishLogic'
+import { GAME_CONFIG, berechneFischbestand } from '../game/fishLogic'
 
 function berechneOptimalesErgebnis(maxRunden, startFischbestand) {
     let fischbestand = startFischbestand
     let totalGuthaben = GAME_CONFIG.startGuthaben
 
     for (let r = 1; r <= maxRunden && fischbestand > 0; r++) {
-        const bootsAnzahl = 5
-        const ausgesandt = Math.floor(bootsAnzahl * 0.5)
-        const gesamteBoote = ausgesandt * 4
-        const fang = berechneFang(ausgesandt, fischbestand, gesamteBoote)
-        const gewinn = berechneGewinn(fang, ausgesandt)
+        // Optimal: each of 4 teams sends 1 of 3 ships (conservative, ~33% capacity)
+        const ausgesandtGesamt = 4  // 1 ship per team × 4 teams
+        const dichte = fischbestand / GAME_CONFIG.maxFischbestand
+        const eff = 25 * Math.sqrt(Math.max(0, dichte))
+        const gesamtFang = Math.min(ausgesandtGesamt * eff, fischbestand)
+        const perTeamFang = gesamtFang / 4
+        const gewinn = perTeamFang * GAME_CONFIG.fischPreis - 1 * GAME_CONFIG.betriebskosten
         totalGuthaben += gewinn
-        fischbestand = berechneFischbestand(fischbestand, gesamteBoote)
+        fischbestand = berechneFischbestand(fischbestand, Math.round(gesamtFang))
     }
 
-    return { endFischbestand: fischbestand, endGuthaben: totalGuthaben }
+    return { endFischbestand: fischbestand, endGuthaben: Math.round(totalGuthaben) }
 }
 
 function EndPage({ gameState, onRestart }) {
-    const winner = [...gameState.teams].sort((a, b) => b.guthaben - a.guthaben)[0]
+    const winner = [...gameState.teams].sort((a, b) => b.netWorth - a.netWorth)[0]
     const kollabiert = gameState.fischbestand === 0
     const maxRunden = gameState.maxRunden || GAME_CONFIG.maxRunden
+    const marketShipPrice = gameState.marketShipPrice || GAME_CONFIG.auctionPreis
 
     const teamColors = ['#ef4444', '#f59e0b', '#22d3ee', '#a78bfa']
 
-    const guthabenDaten = gameState.teams.map(team => ({
+    const netWorthDaten = gameState.teams.map(team => ({
         name: team.name,
-        Guthaben: team.guthaben,
+        'Net Worth': team.netWorth,
     }))
 
-    const sortedTeams = [...gameState.teams].sort((a, b) => b.guthaben - a.guthaben)
+    const sortedTeams = [...gameState.teams].sort((a, b) => b.netWorth - a.netWorth)
     const spielerRang = sortedTeams.findIndex(t => !t.istKI) + 1
     const spielerTeam = gameState.teams[0]
 
-    const fischScore = gameState.fischbestand * 0.4
+    const fischScore = (gameState.fischbestand / GAME_CONFIG.maxFischbestand) * 100 * 0.4
     const rangScore = ((4 - spielerRang + 1) / 4) * 100 * 0.6
     const sustainabilityScore = Math.round(fischScore + rangScore)
 
     const optimal = berechneOptimalesErgebnis(maxRunden, GAME_CONFIG.startFischbestand)
 
-    let niedrigsterBestand = { runde: 0, wert: 100 }
+    let niedrigsterBestand = { runde: 0, wert: Infinity }
     let groessterEinzelAbfall = { runde: 0, delta: 0 }
     gameState.verlauf.forEach((v, i) => {
         if (v.fischbestand < niedrigsterBestand.wert) {
@@ -74,7 +77,7 @@ function EndPage({ gameState, onRestart }) {
                         <p className="text-blue-200 text-xs mt-0.5">
                             {kollabiert
                                 ? 'Tragedy of the Commons'
-                                : `${gameState.fischbestand}% Fischbestand verbleibend`}
+                                : `${gameState.fischbestand.toLocaleString()} / ${GAME_CONFIG.maxFischbestand.toLocaleString()} Fisch`}
                         </p>
                         <p className="text-blue-300 text-xs">{gameState.verlauf.length} Runden gespielt</p>
                     </div>
@@ -86,7 +89,8 @@ function EndPage({ gameState, onRestart }) {
                     <div>
                         <div className="text-xs text-yellow-200 mb-0.5">Gewinner</div>
                         <div className="text-xl font-bold">{winner.farbe} {winner.name}</div>
-                        <div className="text-yellow-200 text-sm">💰 {winner.guthaben.toLocaleString()}€</div>
+                        <div className="text-yellow-200 text-sm font-bold">📊 {winner.netWorth.toLocaleString()}€ Net Worth</div>
+                        <div className="text-yellow-300 text-xs">{winner.guthaben.toLocaleString()}€ + {(winner.boote * marketShipPrice).toLocaleString()}€ ({winner.boote} Boote)</div>
                     </div>
                 </div>
 
@@ -107,12 +111,12 @@ function EndPage({ gameState, onRestart }) {
                     <div className="grid grid-cols-2 gap-2 mt-2 text-xs text-blue-300">
                         <div className="bg-white/10 rounded-lg px-2 py-1.5">
                             <div className="text-white font-bold text-xs">Dein Ergebnis</div>
-                            <div>💰 {spielerTeam.guthaben.toLocaleString()}€</div>
+                            <div>📊 {spielerTeam.netWorth.toLocaleString()}€</div>
                             <div>🏅 Platz {spielerRang} / 4</div>
                         </div>
                         <div className="bg-white/10 rounded-lg px-2 py-1.5">
-                            <div className="text-white font-bold text-xs">Optimum (50%)</div>
-                            <div>🐟 {optimal.endFischbestand}% Bestand</div>
+                            <div className="text-white font-bold text-xs">Optimum (33%)</div>
+                            <div>🐟 {optimal.endFischbestand.toLocaleString()} Fisch</div>
                             <div>💰 {optimal.endGuthaben.toLocaleString()}€</div>
                         </div>
                     </div>
@@ -135,7 +139,10 @@ function EndPage({ gameState, onRestart }) {
                                         <span>{team.farbe} {team.name}</span>
                                         <span className="text-xs text-blue-400">{team.istKI ? '🤖' : '👤'}</span>
                                     </div>
-                                    <span className="font-bold text-xs">{team.guthaben.toLocaleString()}€</span>
+                                    <div className="text-right">
+                                        <div className="font-bold text-xs">📊 {team.netWorth.toLocaleString()}€</div>
+                                        <div className="text-xs text-blue-300">{team.guthaben.toLocaleString()}€ + {(team.boote * marketShipPrice).toLocaleString()}€ ({team.boote} Boote)</div>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -149,7 +156,7 @@ function EndPage({ gameState, onRestart }) {
                                     <span className="text-lg shrink-0">📉</span>
                                     <div>
                                         <div className="font-bold text-xs">Tiefster Fischbestand</div>
-                                        <div className="text-blue-300 text-xs">Runde {niedrigsterBestand.runde}: nur {niedrigsterBestand.wert}% verblieben</div>
+                                        <div className="text-blue-300 text-xs">Runde {niedrigsterBestand.runde}: nur {niedrigsterBestand.wert.toLocaleString()} Fisch</div>
                                     </div>
                                 </div>
                             )}
@@ -158,7 +165,18 @@ function EndPage({ gameState, onRestart }) {
                                     <span className="text-lg shrink-0">⚡</span>
                                     <div>
                                         <div className="font-bold text-xs">Größter Einzel-Rückgang</div>
-                                        <div className="text-blue-300 text-xs">Runde {groessterEinzelAbfall.runde}: −{groessterEinzelAbfall.delta}% in einer Runde</div>
+                                        <div className="text-blue-300 text-xs">Runde {groessterEinzelAbfall.runde}: −{groessterEinzelAbfall.delta.toLocaleString()} Fisch in einer Runde</div>
+                                    </div>
+                                </div>
+                            )}
+                            {gameState.auctionHistory?.length > 0 && (
+                                <div className="flex items-start gap-2 bg-yellow-500/10 rounded-lg p-2.5">
+                                    <span className="text-lg shrink-0">🔨</span>
+                                    <div>
+                                        <div className="font-bold text-xs">Auktionen diese Partie</div>
+                                        <div className="text-blue-300 text-xs">
+                                            {gameState.auctionHistory.length} Boot{gameState.auctionHistory.length !== 1 ? 'e' : ''} für ø {Math.round(gameState.auctionHistory.reduce((s, e) => s + e.preis, 0) / gameState.auctionHistory.length).toLocaleString()}€
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -167,7 +185,7 @@ function EndPage({ gameState, onRestart }) {
                                 <div>
                                     <div className="font-bold text-xs">Endstand</div>
                                     <div className="text-blue-300 text-xs">
-                                        {gameState.fischbestand}% Bestand – {kollabiert ? 'kollabiert' : gameState.fischbestand >= 50 ? 'erhalten' : 'knapp'}
+                                        {gameState.fischbestand.toLocaleString()} Fisch – {kollabiert ? 'kollabiert' : gameState.fischbestand >= GAME_CONFIG.maxFischbestand * 0.5 ? 'erhalten' : 'knapp'}
                                     </div>
                                 </div>
                             </div>
@@ -179,21 +197,21 @@ function EndPage({ gameState, onRestart }) {
                 <div className="flex flex-col gap-3 min-h-0">
 
                     <div className="flex-1 min-h-0 bg-white/10 rounded-xl p-4 flex flex-col">
-                        <h2 className="flex-none font-bold text-sm mb-1">📈 Fischbestand & Guthaben</h2>
+                        <h2 className="flex-none font-bold text-sm mb-1">📈 Fischbestand & Net Worth</h2>
                         <p className="flex-none text-blue-300 text-xs mb-2">Verlauf über alle Runden</p>
                         <div className="flex-1 min-h-0">
                             <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={gameState.verlauf} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                                     <XAxis dataKey="runde" stroke="rgba(255,255,255,0.5)" tick={{ fontSize: 10 }} />
-                                    <YAxis yAxisId="left" domain={[0, 100]} stroke="#22c55e" tickFormatter={v => `${v}%`} tick={{ fontSize: 10 }} width={35} />
+                                    <YAxis yAxisId="left" domain={[0, GAME_CONFIG.maxFischbestand]} stroke="#22c55e" tickFormatter={v => v >= 1000 ? `${Math.round(v / 1000)}k` : v} tick={{ fontSize: 10 }} width={35} />
                                     <YAxis yAxisId="right" orientation="right" stroke="rgba(255,255,255,0.3)" tickFormatter={v => `${Math.round(v / 1000)}k`} tick={{ fontSize: 10 }} width={38} />
                                     <Tooltip
                                         contentStyle={{ backgroundColor: '#1e3a8a', border: 'none', borderRadius: '8px', fontSize: 11 }}
-                                        formatter={(value, name) => name === 'Fischbestand %' ? [`${value}%`, name] : [`${value.toLocaleString()}€`, name]}
+                                        formatter={(value, name) => name === 'Fischbestand' ? [`${value.toLocaleString()} Fisch`, name] : [`${value.toLocaleString()}€`, name]}
                                     />
                                     <Legend wrapperStyle={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }} />
-                                    <Line yAxisId="left" type="monotone" dataKey="fischbestand" stroke="#22c55e" strokeWidth={2} name="Fischbestand %" dot={false} />
+                                    <Line yAxisId="left" type="monotone" dataKey="fischbestand" stroke="#22c55e" strokeWidth={2} name="Fischbestand" dot={false} />
                                     {gameState.teams.map((team, i) => (
                                         <Line
                                             key={team.name}
@@ -203,7 +221,7 @@ function EndPage({ gameState, onRestart }) {
                                             stroke={teamColors[i]}
                                             strokeWidth={1.5}
                                             strokeDasharray="5 3"
-                                            name={`${team.name} €`}
+                                            name={`${team.name} NW`}
                                             dot={false}
                                         />
                                     ))}
@@ -213,15 +231,15 @@ function EndPage({ gameState, onRestart }) {
                     </div>
 
                     <div className="h-44 bg-white/10 rounded-xl p-4 flex flex-col">
-                        <h2 className="flex-none font-bold text-sm mb-1">💰 Endguthaben Vergleich</h2>
+                        <h2 className="flex-none font-bold text-sm mb-1">📊 Net Worth Vergleich</h2>
                         <div className="flex-1 min-h-0">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={guthabenDaten} margin={{ top: 2, right: 10, left: -10, bottom: 0 }}>
+                                <BarChart data={netWorthDaten} margin={{ top: 2, right: 10, left: -10, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                                     <XAxis dataKey="name" stroke="rgba(255,255,255,0.5)" tick={{ fontSize: 10 }} />
                                     <YAxis stroke="rgba(255,255,255,0.5)" tickFormatter={v => `${Math.round(v / 1000)}k`} tick={{ fontSize: 10 }} width={35} />
-                                    <Tooltip contentStyle={{ backgroundColor: '#1e3a8a', border: 'none', borderRadius: '8px', fontSize: 11 }} formatter={v => [`${v.toLocaleString()}€`, 'Guthaben']} />
-                                    <Bar dataKey="Guthaben" fill="#3b82f6" radius={[3, 3, 0, 0]} />
+                                    <Tooltip contentStyle={{ backgroundColor: '#1e3a8a', border: 'none', borderRadius: '8px', fontSize: 11 }} formatter={v => [`${v.toLocaleString()}€`, 'Net Worth']} />
+                                    <Bar dataKey="Net Worth" fill="#3b82f6" radius={[3, 3, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>

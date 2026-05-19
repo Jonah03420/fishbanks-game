@@ -1,4 +1,5 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { GAME_CONFIG } from '../game/fishLogic'
 
 function FishGraph({ verlauf }) {
   if (verlauf.length === 0) return (
@@ -21,13 +22,13 @@ function FishGraph({ verlauf }) {
             />
             <YAxis
               stroke="rgba(255,255,255,0.5)"
-              domain={[0, 100]}
+              domain={[0, GAME_CONFIG.maxFischbestand]}
               tick={{ fontSize: 10 }}
-              tickFormatter={v => `${v}%`}
+              tickFormatter={v => v.toLocaleString()}
             />
             <Tooltip
               contentStyle={{ backgroundColor: '#1e3a8a', border: 'none', borderRadius: '8px', fontSize: 11 }}
-              formatter={v => [`${v}%`, 'Fischbestand']}
+              formatter={v => [`${v.toLocaleString()} Fisch`, 'Bestand']}
             />
             <Line
               type="monotone"
@@ -35,7 +36,7 @@ function FishGraph({ verlauf }) {
               stroke="#22c55e"
               strokeWidth={2}
               dot={false}
-              name="Fischbestand %"
+              name="Fischbestand"
             />
           </LineChart>
         </ResponsiveContainer>

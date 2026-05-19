@@ -12,13 +12,6 @@ const DIFFICULTIES = [
     kiNote: 'Zufälliges, wenig adaptives Verhalten',
   },
   {
-    id: 'mittel',
-    icon: '🟡',
-    label: 'Mittel',
-    desc: 'Gemischte Strategien: Gierig, Kooperativ, Rational – Standard-Verhalten',
-    kiNote: 'Drei verschiedene KI-Persönlichkeiten',
-  },
-  {
     id: 'schwer',
     icon: '🔴',
     label: 'Schwer',
@@ -36,7 +29,7 @@ const RUNDEN_OPTIONS = [
 function SoloConfigPage({ onStart, onBack }) {
   const [playerName, setPlayerName] = useState('')
   const [maxRunden, setMaxRunden] = useState(20)
-  const [schwierigkeit, setSchwierigkeit] = useState('mittel')
+  const [schwierigkeit, setSchwierigkeit] = useState('leicht')
 
   const diff = DIFFICULTIES.find(d => d.id === schwierigkeit)
 

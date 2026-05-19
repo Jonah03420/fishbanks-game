@@ -23,15 +23,18 @@ function makeId() {
     : `${Date.now()}-${Math.random()}`
 }
 
-export function createRoom({ code, creatorName, maxRunden, maxHumanPlayers }) {
+export function createRoom({ code, creatorName, maxRunden, maxHumanPlayers, schwierigkeitsgrad, startGuthaben, startBoote }) {
   const rooms = readRooms()
   const myId = makeId()
   rooms[code] = {
     code,
     maxRunden,
     maxHumanPlayers,
+    schwierigkeitsgrad,
+    startGuthaben,
+    startBoote,
     players: [{ id: myId, name: creatorName, isCreator: true }],
-    status: 'waiting', // 'waiting' | 'started'
+    status: 'waiting',
   }
   writeRooms(rooms)
   return { room: rooms[code], myId }
@@ -53,10 +56,10 @@ export function getRoom(code) {
   return readRooms()[code] || null
 }
 
-export function updateSettings(code, { maxRunden, maxHumanPlayers }) {
+export function updateSettings(code, settings) {
   const rooms = readRooms()
   if (!rooms[code]) return null
-  rooms[code] = { ...rooms[code], maxRunden, maxHumanPlayers }
+  rooms[code] = { ...rooms[code], ...settings }
   writeRooms(rooms)
   return rooms[code]
 }

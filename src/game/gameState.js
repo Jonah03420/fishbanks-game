@@ -1,71 +1,50 @@
 import { GAME_CONFIG } from './fishLogic'
 
 const TEAM_COLORS = ['🔴', '🟡', '🟢', '🔵']
-const AI_PERSONALITIES = ['gierig', 'kooperativ', 'rational']
-const AI_NAMES = ['Team B', 'Team C', 'Team D', 'Team E']
+const TEAM_NAMES = ['Team A', 'Team B', 'Team C', 'Team D']
+const SLOT_PERSONALITIES = [null, 'gierig', 'kooperativ', 'rational']
 
-export function erstelleStartzustand(playerName = 'Team A', maxRunden = GAME_CONFIG.maxRunden, schwierigkeitsgrad = 'mittel') {
-  return {
-    runde: 1,
-    fischbestand: GAME_CONFIG.startFischbestand,
-    phase: 'entscheidung', // 'entscheidung' | 'ergebnis' | 'ende'
-    maxRunden,
-    schwierigkeitsgrad,
-    teams: [
-      erstelleTeam(playerName, '🔴', false, null),
-      erstelleTeam('Team B', '🟡', true, 'gierig'),
-      erstelleTeam('Team C', '🟢', true, 'kooperativ'),
-      erstelleTeam('Team D', '🔵', true, 'rational'),
-    ],
-    verlauf: [],
-  }
-}
-
-// Builds game state from a finished lobby room.
-// "My" team (playerIndex) goes to index 0 so GamePage's teams[0] == human player.
-// Other joined humans simulate with 'kooperativ' AI since there's no real-time sync yet.
 export function erstelleStartzustandAusLobby(room, playerIndex) {
-  const humanTeams = room.players.map((player, i) => {
-    const isMe = i === playerIndex
-    return erstelleTeam(player.name, TEAM_COLORS[i], !isMe, isMe ? null : 'kooperativ')
+  const startGuthaben = room.startGuthaben || GAME_CONFIG.startGuthaben
+  const startBoote = room.startBoote || GAME_CONFIG.initialBoote
+
+  const teams = [0, 1, 2, 3].map(slot => {
+    const player = room.players[slot]
+    if (player) {
+      const isMe = slot === playerIndex
+      return erstelleTeam(player.name, TEAM_COLORS[slot], !isMe, isMe ? null : 'kooperativ', startGuthaben, startBoote, true)
+    }
+    return erstelleTeam(TEAM_NAMES[slot], TEAM_COLORS[slot], true, SLOT_PERSONALITIES[slot] || 'kooperativ', startGuthaben, startBoote, false)
   })
 
-  const aiCount = 4 - humanTeams.length
-  const aiTeams = Array.from({ length: aiCount }, (_, i) => {
-    const slot = humanTeams.length + i
-    return erstelleTeam(
-      AI_NAMES[slot - 1] || `Team ${slot + 1}`,
-      TEAM_COLORS[slot],
-      true,
-      AI_PERSONALITIES[i % AI_PERSONALITIES.length]
-    )
-  })
-
-  const all = [...humanTeams, ...aiTeams]
-  // Bring my team to front so GamePage's teams[0] is always the local player
-  const [myTeam] = all.splice(playerIndex, 1)
-  all.unshift(myTeam)
+  const [myTeam] = teams.splice(playerIndex, 1)
+  teams.unshift(myTeam)
 
   return {
     runde: 1,
     fischbestand: GAME_CONFIG.startFischbestand,
     phase: 'entscheidung',
     maxRunden: room.maxRunden,
-    schwierigkeitsgrad: 'mittel',
-    teams: all,
+    schwierigkeitsgrad: room.schwierigkeitsgrad || 'leicht',
+    marketShipPrice: GAME_CONFIG.auctionPreis,
+    auctionHistory: [],
+    teams,
     verlauf: [],
   }
 }
 
-function erstelleTeam(name, farbe, istKI, persoenlichkeit) {
+function erstelleTeam(name, farbe, istKI, persoenlichkeit, startGuthaben = GAME_CONFIG.startGuthaben, startBoote = GAME_CONFIG.initialBoote, isRealHuman = false) {
   return {
     name,
     farbe,
-    boote: 5,
-    guthaben: GAME_CONFIG.startGuthaben,
+    boote: startBoote,
+    guthaben: startGuthaben,
+    netWorth: startGuthaben + startBoote * GAME_CONFIG.auctionPreis,
     ausgesandteBoote: 0,
     letzterFang: 0,
+    letzteZinsen: 0,
     istKI,
-    persoenlichkeit, // null | 'gierig' | 'kooperativ' | 'rational'
+    persoenlichkeit,
+    isRealHuman,
   }
 }

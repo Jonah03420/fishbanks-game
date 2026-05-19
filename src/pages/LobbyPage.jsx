@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { GAME_CONFIG } from '../game/fishLogic'
 import {
   generateRoomCode, createRoom, joinRoom, getRoom,
   updateSettings, startGame, leaveRoom,
@@ -42,7 +43,6 @@ function PlayerList({ room, myId }) {
   )
 }
 
-/* Shared two-column shell */
 function Layout({ leftContent, rightContent }) {
   return (
     <div className="w-full h-full bg-blue-900 text-white flex overflow-hidden">
@@ -56,8 +56,8 @@ function Layout({ leftContent, rightContent }) {
   )
 }
 
-export default function LobbyPage({ onStart, onBack }) {
-  const [view, setView] = useState('choose') // 'choose' | 'create' | 'join' | 'waiting-host' | 'waiting-guest'
+export default function LobbyPage({ onStart, onBack, initialView = 'create' }) {
+  const [view, setView] = useState(initialView) // 'create' | 'join' | 'waiting-host' | 'waiting-guest'
   const [playerName, setPlayerName] = useState('')
   const [joinCode, setJoinCode] = useState('')
   const [joinError, setJoinError] = useState('')
@@ -97,7 +97,15 @@ export default function LobbyPage({ onStart, onBack }) {
   function doCreate() {
     const name = playerName.trim() || 'Spieler 1'
     const code = generateRoomCode()
-    const result = createRoom({ code, creatorName: name, maxRunden: 20, maxHumanPlayers: 2 })
+    const result = createRoom({
+      code,
+      creatorName: name,
+      maxRunden: 20,
+      maxHumanPlayers: 2,
+      schwierigkeitsgrad: 'leicht',
+      startGuthaben: GAME_CONFIG.startGuthaben,
+      startBoote: GAME_CONFIG.initialBoote,
+    })
     setRoom(result.room)
     setMyId(result.myId)
     setView('waiting-host')
@@ -115,12 +123,9 @@ export default function LobbyPage({ onStart, onBack }) {
     setView('waiting-guest')
   }
 
-  function changeSetting(field, value) {
+  function changeSetting(key, value) {
     if (!room) return
-    const next = updateSettings(room.code, {
-      maxRunden: field === 'maxRunden' ? value : room.maxRunden,
-      maxHumanPlayers: field === 'maxHumanPlayers' ? value : room.maxHumanPlayers,
-    })
+    const next = updateSettings(room.code, { [key]: value })
     if (next) setRoom(next)
   }
 
@@ -137,66 +142,8 @@ export default function LobbyPage({ onStart, onBack }) {
     if (room && myId) leaveRoom(room.code, myId)
     setRoom(null)
     setMyId(null)
-    setView('choose')
+    onBack()
   }
-
-  // ── choose ──────────────────────────────────────────────────────────────────
-  if (view === 'choose') return (
-    <Layout
-      leftContent={
-        <>
-          <div className="text-7xl mb-6">🐟</div>
-          <h1 className="text-4xl font-bold mb-4">Multiplayer</h1>
-          <p className="text-blue-200 text-lg mb-10 max-w-md">
-            Spiele Fish Banks mit Freunden im selben Netzwerk. Ein Spieler erstellt einen Raum, die anderen treten per Code bei.
-          </p>
-          <div className="space-y-4 max-w-md">
-            <div className="bg-white/10 rounded-2xl p-5 flex gap-4 items-start">
-              <div className="text-2xl shrink-0">🆕</div>
-              <div>
-                <div className="font-bold mb-1">Spiel erstellen</div>
-                <div className="text-blue-300 text-sm">Du bist Host, konfigurierst Runden & Spieleranzahl und startest das Spiel wenn alle bereit sind.</div>
-              </div>
-            </div>
-            <div className="bg-white/10 rounded-2xl p-5 flex gap-4 items-start">
-              <div className="text-2xl shrink-0">🔗</div>
-              <div>
-                <div className="font-bold mb-1">Spiel beitreten</div>
-                <div className="text-blue-300 text-sm">Gib den 4-stelligen Raum-Code ein, den der Host mit dir geteilt hat.</div>
-              </div>
-            </div>
-          </div>
-        </>
-      }
-      rightContent={
-        <>
-          <h2 className="text-2xl font-bold mb-2">Spielmodus wählen</h2>
-          <p className="text-blue-300 text-sm mb-8">Erstelle einen neuen Raum oder tritt einem bestehenden bei.</p>
-          <div className="flex flex-col gap-4 mb-8">
-            <button onClick={() => setView('create')}
-              className="w-full bg-green-500 hover:bg-green-400 font-bold py-5 px-6 rounded-2xl text-lg transition-colors text-left flex items-center gap-4">
-              <span className="text-3xl">🆕</span>
-              <div>
-                <div className="font-bold">Spiel erstellen</div>
-                <div className="text-green-100 text-sm font-normal">Als Host einen Raum eröffnen</div>
-              </div>
-            </button>
-            <button onClick={() => setView('join')}
-              className="w-full bg-blue-500 hover:bg-blue-400 font-bold py-5 px-6 rounded-2xl text-lg transition-colors text-left flex items-center gap-4">
-              <span className="text-3xl">🔗</span>
-              <div>
-                <div className="font-bold">Spiel beitreten</div>
-                <div className="text-blue-100 text-sm font-normal">Mit Raum-Code eintreten</div>
-              </div>
-            </button>
-          </div>
-          <button onClick={onBack} className="w-full text-blue-300 hover:text-white text-sm transition-colors py-2">
-            ← Zurück zur Startseite
-          </button>
-        </>
-      }
-    />
-  )
 
   // ── create ──────────────────────────────────────────────────────────────────
   if (view === 'create') return (
@@ -205,14 +152,14 @@ export default function LobbyPage({ onStart, onBack }) {
         <>
           <h2 className="text-3xl font-bold mb-4">Raum erstellen</h2>
           <p className="text-blue-200 mb-8 max-w-md">
-            Du wirst Host des Spiels. Nach dem Erstellen erhältst du einen 4-stelligen Raum-Code, den du mit Freunden teilen kannst.
+            Du wirst Host des Spiels. Nach dem Erstellen erhältst du einen 4-stelligen Raum-Code, den du mit Teilnehmern teilen kannst.
           </p>
           <div className="space-y-4 max-w-md">
             <div className="bg-white/10 rounded-2xl p-5">
               <div className="font-bold mb-2">👑 Als Host kannst du:</div>
               <ul className="text-blue-300 text-sm space-y-1.5 list-disc list-inside">
-                <li>Die Rundenzahl konfigurieren (10, 15 oder 20)</li>
-                <li>Die maximale Spieleranzahl festlegen (1–4)</li>
+                <li>Rundenzahl, Startkapital &amp; Startflotte konfigurieren</li>
+                <li>KI-Schwierigkeit für leere Slots wählen</li>
                 <li>Das Spiel starten, sobald alle bereit sind</li>
               </ul>
             </div>
@@ -226,7 +173,7 @@ export default function LobbyPage({ onStart, onBack }) {
       }
       rightContent={
         <>
-          <h2 className="text-2xl font-bold mb-2">🆕 Spiel erstellen</h2>
+          <h2 className="text-2xl font-bold mb-2">🎮 Spiel erstellen</h2>
           <p className="text-blue-300 text-sm mb-8">Gib deinen Namen ein und erstelle einen Raum.</p>
           <div className="mb-6">
             <label className="block text-sm text-blue-200 mb-2">👤 Dein Name</label>
@@ -245,7 +192,7 @@ export default function LobbyPage({ onStart, onBack }) {
               className="w-full bg-green-500 hover:bg-green-400 font-bold py-4 rounded-xl text-lg transition-colors">
               ✅ Raum erstellen
             </button>
-            <button onClick={() => setView('choose')} className="w-full text-blue-300 hover:text-white text-sm transition-colors py-2">
+            <button onClick={onBack} className="w-full text-blue-300 hover:text-white text-sm transition-colors py-2">
               ← Zurück
             </button>
           </div>
@@ -311,7 +258,7 @@ export default function LobbyPage({ onStart, onBack }) {
               className="w-full bg-blue-500 hover:bg-blue-400 font-bold py-4 rounded-xl text-lg transition-colors">
               🔗 Beitreten
             </button>
-            <button onClick={() => setView('choose')} className="w-full text-blue-300 hover:text-white text-sm transition-colors py-2">
+            <button onClick={onBack} className="w-full text-blue-300 hover:text-white text-sm transition-colors py-2">
               ← Zurück
             </button>
           </div>
@@ -330,7 +277,7 @@ export default function LobbyPage({ onStart, onBack }) {
         {/* Left: room code + players */}
         <div className="flex-1 flex flex-col justify-center px-16 py-12 bg-gradient-to-br from-blue-800 to-blue-950 gap-6">
           <div>
-            <p className="text-blue-200 text-sm mb-3">Raum-Code – teile ihn mit Freunden</p>
+            <p className="text-blue-200 text-sm mb-3">Raum-Code – teile ihn mit Teilnehmern</p>
             <div className="bg-white/15 border-2 border-white/30 rounded-2xl px-10 py-5 inline-block mb-6">
               <div className="text-6xl font-bold tracking-widest font-mono">{room.code}</div>
             </div>
@@ -347,7 +294,7 @@ export default function LobbyPage({ onStart, onBack }) {
         </div>
 
         {/* Right: settings + controls */}
-        <div className="w-[420px] flex flex-col justify-center px-10 py-12 bg-blue-950/60 border-l border-white/10 gap-6">
+        <div className="w-[420px] flex flex-col justify-center px-10 py-8 bg-blue-950/60 border-l border-white/10 gap-4">
           <div>
             <h2 className="text-2xl font-bold mb-1">⚙️ Einstellungen</h2>
             <p className="text-blue-300 text-sm">Du bist Host – konfiguriere das Spiel.</p>
@@ -375,6 +322,45 @@ export default function LobbyPage({ onStart, onBack }) {
                   disabled={n < room.players.length}
                   className={`py-3 rounded-xl font-bold text-sm transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${room.maxHumanPlayers === n ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-blue-200'}`}>
                   {n}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm text-blue-200 mb-2">🎯 KI-Schwierigkeit</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[['leicht', '🟢 Leicht'], ['schwer', '🔴 Schwer']].map(([val, lbl]) => (
+                <button key={val}
+                  onClick={() => changeSetting('schwierigkeitsgrad', val)}
+                  className={`py-3 rounded-xl font-bold text-sm transition-colors ${(room.schwierigkeitsgrad || 'leicht') === val ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-blue-200'}`}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm text-blue-200 mb-2">💰 Startkapital</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[3000, 5000, 8000].map(n => (
+                <button key={n}
+                  onClick={() => changeSetting('startGuthaben', n)}
+                  className={`py-2 rounded-xl font-bold text-xs transition-colors ${(room.startGuthaben || GAME_CONFIG.startGuthaben) === n ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-blue-200'}`}>
+                  {(n / 1000).toLocaleString()}k€
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm text-blue-200 mb-2">🚢 Startflotte</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[2, 3, 5].map(n => (
+                <button key={n}
+                  onClick={() => changeSetting('startBoote', n)}
+                  className={`py-2 rounded-xl font-bold text-sm transition-colors ${(room.startBoote || GAME_CONFIG.initialBoote) === n ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-blue-200'}`}>
+                  {n} Boote
                 </button>
               ))}
             </div>
