@@ -23,7 +23,7 @@ function makeId() {
     : `${Date.now()}-${Math.random()}`
 }
 
-export function createRoom({ code, creatorName, maxRunden, maxHumanPlayers, schwierigkeitsgrad, startGuthaben, startBoote }) {
+export function createRoom({ code, creatorName, maxRunden, maxHumanPlayers, schwierigkeitsgrad, startGuthaben, startBoote, ...adminParams }) {
   const rooms = readRooms()
   const myId = makeId()
   rooms[code] = {
@@ -33,6 +33,7 @@ export function createRoom({ code, creatorName, maxRunden, maxHumanPlayers, schw
     schwierigkeitsgrad,
     startGuthaben,
     startBoote,
+    ...adminParams,
     players: [{ id: myId, name: creatorName, isCreator: true }],
     status: 'waiting',
   }

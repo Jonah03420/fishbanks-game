@@ -1,6 +1,6 @@
 import { GAME_CONFIG } from '../game/fishLogic'
 
-function StartPage({ onCreateGame, onJoinGame }) {
+function StartPage({ onCreateGame, onJoinGame, onOpenAdmin }) {
   return (
     <div className="w-full h-full bg-blue-900 text-white flex overflow-hidden">
 
@@ -91,6 +91,13 @@ function StartPage({ onCreateGame, onJoinGame }) {
             <li>Manage sustainably – or risk the collapse!</li>
           </ol>
         </div>
+
+        <button
+          onClick={onOpenAdmin}
+          className="mt-4 text-blue-600 hover:text-blue-400 text-xs flex items-center gap-1 transition-colors"
+        >
+          ⚙ Instructor Settings
+        </button>
       </div>
     </div>
   )

@@ -1,20 +1,24 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts'
 import { GAME_CONFIG, berechneFischbestand } from '../game/fishLogic'
 
-function berechneOptimalesErgebnis(maxRunden, startFischbestand) {
+function berechneOptimalesErgebnis(maxRunden, startFischbestand, params) {
     let fischbestand = startFischbestand
-    let totalGuthaben = GAME_CONFIG.startGuthaben
+    const startingCapital = params?.startingCapital ?? GAME_CONFIG.startGuthaben
+    let totalGuthaben = startingCapital
+    const fishPrice = params?.fishPrice ?? GAME_CONFIG.fischPreis
+    const opCost = params?.operatingCostPerShip ?? GAME_CONFIG.betriebskosten
 
     for (let r = 1; r <= maxRunden && fischbestand > 0; r++) {
         // Optimal: each of 4 teams sends 1 of 3 ships (conservative, ~33% capacity)
         const ausgesandtGesamt = 4  // 1 ship per team × 4 teams
-        const dichte = fischbestand / GAME_CONFIG.maxFischbestand
+        const maxFisch = params?.maxFishPopulation ?? GAME_CONFIG.maxFischbestand
+        const dichte = fischbestand / maxFisch
         const eff = 25 * Math.sqrt(Math.max(0, dichte))
         const gesamtFang = Math.min(ausgesandtGesamt * eff, fischbestand)
         const perTeamFang = gesamtFang / 4
-        const gewinn = perTeamFang * GAME_CONFIG.fischPreis - 1 * GAME_CONFIG.betriebskosten
+        const gewinn = perTeamFang * fishPrice - 1 * opCost
         totalGuthaben += gewinn
-        fischbestand = berechneFischbestand(fischbestand, Math.round(gesamtFang))
+        fischbestand = berechneFischbestand(fischbestand, Math.round(gesamtFang), params)
     }
 
     return { endFischbestand: fischbestand, endGuthaben: Math.round(totalGuthaben) }
@@ -37,11 +41,13 @@ function EndPage({ gameState, onRestart }) {
     const spielerTeam = gameState.teams[gameState.playerIndex ?? 0]
     const spielerRang = sortedTeams.findIndex(t => t.name === spielerTeam.name) + 1
 
-    const fischScore = (gameState.fischbestand / GAME_CONFIG.maxFischbestand) * 100 * 0.4
-    const rangScore = ((4 - spielerRang + 1) / 4) * 100 * 0.6
+    const maxFisch = gameState.params?.maxFishPopulation ?? GAME_CONFIG.maxFischbestand
+    const numTeams = gameState.teams.length
+    const fischScore = (gameState.fischbestand / maxFisch) * 100 * 0.4
+    const rangScore = ((numTeams - spielerRang + 1) / numTeams) * 100 * 0.6
     const sustainabilityScore = Math.round(fischScore + rangScore)
 
-    const optimal = berechneOptimalesErgebnis(maxRunden, GAME_CONFIG.startFischbestand)
+    const optimal = berechneOptimalesErgebnis(maxRunden, gameState.params?.startingFishStock ?? GAME_CONFIG.startFischbestand, gameState.params)
 
     let niedrigsterBestand = { runde: 0, wert: Infinity }
     let groessterEinzelAbfall = { runde: 0, delta: 0 }
@@ -76,7 +82,7 @@ function EndPage({ gameState, onRestart }) {
                         <p className="text-blue-200 text-xs mt-0.5">
                             {kollabiert
                                 ? 'Tragedy of the Commons'
-                                : `${gameState.fischbestand.toLocaleString()} / ${GAME_CONFIG.maxFischbestand.toLocaleString()} fish`}
+                                : `${gameState.fischbestand.toLocaleString()} / ${maxFisch.toLocaleString()} fish`}
                         </p>
                         <p className="text-blue-300 text-xs">{gameState.verlauf.length} rounds played</p>
                     </div>
@@ -110,7 +116,7 @@ function EndPage({ gameState, onRestart }) {
                         <div className="bg-white/10 rounded-lg px-2 py-1.5">
                             <div className="text-white font-bold text-xs">Your Result</div>
                             <div>{spielerTeam.netWorth.toLocaleString()}€ Net Worth</div>
-                            <div>Rank {spielerRang} / 4</div>
+                            <div>Rank {spielerRang} / {numTeams}</div>
                         </div>
                         <div className="bg-white/10 rounded-lg px-2 py-1.5">
                             <div className="text-white font-bold text-xs">Optimum (33%)</div>
@@ -179,7 +185,7 @@ function EndPage({ gameState, onRestart }) {
                                 <div>
                                     <div className="font-bold text-xs">Final Status</div>
                                     <div className="text-blue-300 text-xs">
-                                        {gameState.fischbestand.toLocaleString()} fish – {kollabiert ? 'collapsed' : gameState.fischbestand >= GAME_CONFIG.maxFischbestand * 0.5 ? 'sustained' : 'low'}
+                                        {gameState.fischbestand.toLocaleString()} fish – {kollabiert ? 'collapsed' : gameState.fischbestand >= maxFisch * 0.5 ? 'sustained' : 'low'}
                                     </div>
                                 </div>
                             </div>
@@ -198,7 +204,7 @@ function EndPage({ gameState, onRestart }) {
                                 <LineChart data={gameState.verlauf} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                                     <XAxis dataKey="runde" stroke="rgba(255,255,255,0.5)" tick={{ fontSize: 10 }} />
-                                    <YAxis yAxisId="left" domain={[0, GAME_CONFIG.maxFischbestand]} stroke="#22c55e" tickFormatter={v => v >= 1000 ? `${Math.round(v / 1000)}k` : v} tick={{ fontSize: 10 }} width={35} />
+                                    <YAxis yAxisId="left" domain={[0, maxFisch]} stroke="#22c55e" tickFormatter={v => v >= 1000 ? `${Math.round(v / 1000)}k` : v} tick={{ fontSize: 10 }} width={35} />
                                     <YAxis yAxisId="right" orientation="right" stroke="rgba(255,255,255,0.3)" tickFormatter={v => `${Math.round(v / 1000)}k`} tick={{ fontSize: 10 }} width={38} />
                                     <Tooltip
                                         contentStyle={{ backgroundColor: '#1e3a8a', border: 'none', borderRadius: '8px', fontSize: 11 }}

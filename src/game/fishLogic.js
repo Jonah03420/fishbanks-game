@@ -34,19 +34,21 @@ function shipEffectiveness(fischDichte) {
 
 // Logistic growth after total catch is removed.
 // gesamtFang: total fish caught by ALL teams this round (already capped to current stock).
-export function berechneFischbestand(aktuellerBestand, gesamtFang) {
-  const wachstum = GAME_CONFIG.wachstumsRate
+export function berechneFischbestand(aktuellerBestand, gesamtFang, params) {
+  const wachstum = (params?.fishReproductionRate ?? GAME_CONFIG.wachstumsRate)
     * aktuellerBestand
-    * (1 - aktuellerBestand / GAME_CONFIG.maxFischbestand)
+    * (1 - aktuellerBestand / (params?.maxFishPopulation ?? GAME_CONFIG.maxFischbestand))
   const neuerBestand = aktuellerBestand - gesamtFang + wachstum
-  return Math.min(GAME_CONFIG.maxFischbestand, Math.max(0, Math.round(neuerBestand)))
+  const maxFisch = params?.maxFishPopulation ?? GAME_CONFIG.maxFischbestand
+  return Math.min(maxFisch, Math.max(0, Math.round(neuerBestand)))
 }
 
 // Per-team catch: each deployed ship catches based on current fish density.
 // No share-denominator — competition is via stock depletion across rounds.
-export function berechneFang(ausgesandteBoote, fischbestand) {
+export function berechneFang(ausgesandteBoote, fischbestand, params) {
   if (ausgesandteBoote === 0) return 0
-  const fischDichte = fischbestand / GAME_CONFIG.maxFischbestand
+  const maxFisch = params?.maxFishPopulation ?? GAME_CONFIG.maxFischbestand
+  const fischDichte = fischbestand / maxFisch
   return Math.round(ausgesandteBoote * shipEffectiveness(fischDichte))
 }
 
@@ -69,11 +71,12 @@ export function berechneNetWorth(bankBalance, boote, shipPrice) {
 
 // ─── Leicht ──────────────────────────────────────────────────────────────────
 
-export function kiBootAktionLeicht(team, verkaufPreis = GAME_CONFIG.bootVerkaufswert) {
+export function kiBootAktionLeicht(team, verkaufPreis = GAME_CONFIG.bootVerkaufswert, params) {
   const { fleet: boote, bankBalance: guthaben } = team
+  const newShipCost = params?.newShipPrice ?? GAME_CONFIG.bootKosten
   const r = Math.random()
-  if (r > 0.93 && guthaben >= GAME_CONFIG.bootKosten && boote < 7) {
-    return { fleet: boote + 1, bankBalance: guthaben - GAME_CONFIG.bootKosten }
+  if (r > 0.93 && guthaben >= newShipCost && boote < 7) {
+    return { fleet: boote + 1, bankBalance: guthaben - newShipCost }
   }
   if (r < 0.04 && boote > 2) {
     return { fleet: boote - 1, bankBalance: guthaben + verkaufPreis }
@@ -101,14 +104,17 @@ function berechneTrend(verlauf) {
 
 // Grid-search: find profit-maximising boat count.
 // With the linear per-ship catch formula, profit is linear in b → result is 0 or max.
-function bestResponse(meineMaxBoote, andereBoote, fischbestand) {
-  const fischDichte = fischbestand / GAME_CONFIG.maxFischbestand
+function bestResponse(meineMaxBoote, andereBoote, fischbestand, params) {
+  const maxFisch = params?.maxFishPopulation ?? GAME_CONFIG.maxFischbestand
+  const fischPreis = params?.fishPrice ?? GAME_CONFIG.fischPreis
+  const opCost = params?.operatingCostPerShip ?? GAME_CONFIG.betriebskosten
+  const fischDichte = fischbestand / maxFisch
   const eff = shipEffectiveness(fischDichte)
   let bestBoote = 0
   let bestGewinn = 0
   for (let b = 1; b <= meineMaxBoote; b++) {
     const meinFang = b * eff
-    const gewinn = meinFang * GAME_CONFIG.fischPreis - b * GAME_CONFIG.betriebskosten
+    const gewinn = meinFang * fischPreis - b * opCost
     if (gewinn > bestGewinn) {
       bestGewinn = gewinn
       bestBoote = b
@@ -123,13 +129,16 @@ function andereBooteGeschaetzt(meineTeamName, alleTeams) {
     .reduce((sum, t) => sum + (t.ausgesandteBoote || 3), 0)
 }
 
-export function kiBootAktionSchwer(team, fischbestand, verlauf, alleTeams, verkaufPreis = GAME_CONFIG.bootVerkaufswert) {
+export function kiBootAktionSchwer(team, fischbestand, verlauf, alleTeams, verkaufPreis = GAME_CONFIG.bootVerkaufswert, params) {
   let { fleet: boote, bankBalance: guthaben, persoenlichkeit, name } = team
   const trend = berechneTrend(verlauf)
+  const maxFisch = params?.maxFishPopulation ?? GAME_CONFIG.maxFischbestand
+  const fischPreis = params?.fishPrice ?? GAME_CONFIG.fischPreis
+  const opCost = params?.operatingCostPerShip ?? GAME_CONFIG.betriebskosten
+  const newShipCost = params?.newShipPrice ?? GAME_CONFIG.bootKosten
 
-  // Panic selling: 8% chance when trend is sharply negative (−300 = −5% of 6000)
-  // and stock is low (< 2400 = 40%)
-  if (trend < -300 && fischbestand < 2400 && boote > 3 && Math.random() < 0.08) {
+  // Panic selling: 8% chance when trend is sharply negative and stock is low (< 40%)
+  if (trend < maxFisch * -0.05 && fischbestand < maxFisch * 0.4 && boote > 3 && Math.random() < 0.08) {
     return { fleet: boote - 1, bankBalance: guthaben + verkaufPreis }
   }
 
@@ -137,23 +146,23 @@ export function kiBootAktionSchwer(team, fischbestand, verlauf, alleTeams, verka
 
   function expectedProfit(meineBoote) {
     if (meineBoote === 0) return 0
-    const opt = bestResponse(meineBoote, andereGeschaetzt, fischbestand)
-    const fischDichte = fischbestand / GAME_CONFIG.maxFischbestand
+    const opt = bestResponse(meineBoote, andereGeschaetzt, fischbestand, params)
+    const fischDichte = fischbestand / maxFisch
     const meinFang = opt * shipEffectiveness(fischDichte)
-    return meinFang * GAME_CONFIG.fischPreis - opt * GAME_CONFIG.betriebskosten
+    return meinFang * fischPreis - opt * opCost
   }
 
   const marginalROI = (expectedProfit(boote + 1) - expectedProfit(boote)) * rand(0.85, 1.15)
 
   // Scaled kaufSchwelle: gierig=30, rational=150, kooperativ=250
   const kaufSchwelle = (persoenlichkeit === 'gierig' ? 30 : persoenlichkeit === 'rational' ? 150 : 250) * rand(0.90, 1.10)
-  // verkaufTrendSchwelle: cooperativ=−180 (−3%), rational=−300 (−5%), gierig=−480 (−8%)
-  const verkaufTrendSchwelle = persoenlichkeit === 'kooperativ' ? -180 : persoenlichkeit === 'rational' ? -300 : -480
+  // verkaufTrendSchwelle relative to maxFisch: kooperativ=−3%, rational=−5%, gierig=−8%
+  const verkaufTrendSchwelle = persoenlichkeit === 'kooperativ' ? maxFisch * -0.03 : persoenlichkeit === 'rational' ? maxFisch * -0.05 : maxFisch * -0.08
 
-  // fischbestand > 2100 = 35%, trend >= -120 = -2%
-  if (marginalROI > kaufSchwelle && guthaben >= GAME_CONFIG.bootKosten && fischbestand > 2100 && trend >= -120 && boote < 10) {
+  // Buy if profitable, stock > 35%, trend > -2%
+  if (marginalROI > kaufSchwelle && guthaben >= newShipCost && fischbestand > maxFisch * 0.35 && trend >= maxFisch * -0.02 && boote < 10) {
     boote += 1
-    guthaben -= GAME_CONFIG.bootKosten
+    guthaben -= newShipCost
   } else if (trend < verkaufTrendSchwelle && boote > 3) {
     boote -= 1
     guthaben += verkaufPreis
@@ -164,18 +173,17 @@ export function kiBootAktionSchwer(team, fischbestand, verlauf, alleTeams, verka
 
 // Zone allocation for AI teams based on personality and fish density.
 // Returns { harborShips, coastalShips, deepSeaShips } summing to boote.
-export function kiZoneAllokierung(persoenlichkeit, boote, ausgesandt, fischbestand) {
+export function kiZoneAllokierung(persoenlichkeit, boote, ausgesandt, fischbestand, params) {
   const harbor = boote - ausgesandt
   if (persoenlichkeit === 'gierig') {
-    // All deployed ships to Deep Sea — maximum yield
     return { harborShips: harbor, coastalShips: 0, deepSeaShips: ausgesandt }
   } else if (persoenlichkeit === 'kooperativ') {
-    // Deployed ships go to Coastal — gentler on the stock
     return { harborShips: harbor, coastalShips: ausgesandt, deepSeaShips: 0 }
   } else { // rational — always reserve 1 in Harbor, split rest by density
     const adjustedHarbor = Math.max(harbor, Math.min(1, boote))
     const remaining = boote - adjustedHarbor
-    const fishDichte = fischbestand / GAME_CONFIG.maxFischbestand
+    const maxFisch = params?.maxFishPopulation ?? GAME_CONFIG.maxFischbestand
+    const fishDichte = fischbestand / maxFisch
     if (fishDichte > 0.5) {
       return { harborShips: adjustedHarbor, coastalShips: 0, deepSeaShips: remaining }
     } else {
@@ -184,22 +192,23 @@ export function kiZoneAllokierung(persoenlichkeit, boote, ausgesandt, fischbesta
   }
 }
 
-export function kiAusgesandtSchwer(persoenlichkeit, teamName, boote, fischbestand, verlauf, alleTeams) {
+export function kiAusgesandtSchwer(persoenlichkeit, teamName, boote, fischbestand, verlauf, alleTeams, params) {
   const trend = berechneTrend(verlauf)
   const andereGeschaetzt = andereBooteGeschaetzt(teamName, alleTeams)
+  const maxFisch = params?.maxFishPopulation ?? GAME_CONFIG.maxFischbestand
 
-  let optimal = bestResponse(boote, andereGeschaetzt, fischbestand)
+  let optimal = bestResponse(boote, andereGeschaetzt, fischbestand, params)
 
   if (persoenlichkeit === 'gierig') {
     optimal = Math.min(boote, optimal + 1)
-  } else if (persoenlichkeit === 'kooperativ' && trend < -180) {  // trend < -3% of 6000
+  } else if (persoenlichkeit === 'kooperativ' && trend < maxFisch * -0.03) {
     optimal = Math.max(0, optimal - 1)
   }
 
   optimal = Math.round(optimal * rand(0.90, 1.10))
 
-  // Hard collapse prevention: < 900 = 15% of 6000
-  if (fischbestand < 900) {
+  // Hard collapse prevention: < 15% of max
+  if (fischbestand < maxFisch * 0.15) {
     optimal = Math.min(optimal, Math.max(0, Math.floor(boote * 0.2)))
   }
 

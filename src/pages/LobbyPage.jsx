@@ -4,14 +4,17 @@ import {
   generateRoomCode, createRoom, joinRoom, getRoom,
   updateSettings, startGame, leaveRoom,
 } from '../game/lobbyStore'
+import { getAdminSettings, hasNonDefaultSettings } from '../game/adminSettings'
 
 const TEAM_COLORS = ['🔴', '🟡', '🟢', '🔵']
-const AI_PERSONALITIES = ['–', 'Greedy', 'Cooperative', 'Rational']
+const AI_PERSONALITY_LABEL = { gierig: 'Greedy', kooperativ: 'Cooperative', rational: 'Rational' }
 
 function PlayerList({ room, myId }) {
+  const numSlots = room.numTeams || 4
+  const personalities = room.aiPersonalities || [null, 'gierig', 'kooperativ', 'rational']
   return (
     <div className="space-y-2">
-      {[0, 1, 2, 3].map(slot => {
+      {Array.from({ length: numSlots }, (_, slot) => {
         const player = room.players[slot]
         if (player) return (
           <div key={slot} className="flex items-center gap-3 bg-white/10 rounded-xl px-4 py-3">
@@ -24,11 +27,12 @@ function PlayerList({ room, myId }) {
             <span className="text-green-400 text-sm">Connected</span>
           </div>
         )
+        const pLabel = personalities[slot] ? AI_PERSONALITY_LABEL[personalities[slot]] : '–'
         return (
           <div key={slot} className="flex items-center gap-3 bg-white/5 border border-dashed border-white/20 rounded-xl px-4 py-3 text-blue-400">
             <span className="text-xl opacity-30">{TEAM_COLORS[slot]}</span>
             <span className="flex-1 text-sm">
-              {slot === 0 ? 'Waiting for host…' : `🤖 AI Player – ${AI_PERSONALITIES[slot]}`}
+              {slot === 0 ? 'Waiting for host…' : `🤖 AI Player – ${pLabel}`}
             </span>
             <span className="text-xs text-blue-600">replaced when joined</span>
           </div>
@@ -51,7 +55,7 @@ function Layout({ leftContent, rightContent }) {
   )
 }
 
-export default function LobbyPage({ onStart, onBack, initialView = 'create' }) {
+export default function LobbyPage({ onStart, onBack, initialView = 'create', onOpenAdmin }) {
   const [view, setView] = useState(initialView)
   const [playerName, setPlayerName] = useState('')
   const [joinCode, setJoinCode] = useState('')
@@ -92,14 +96,28 @@ export default function LobbyPage({ onStart, onBack, initialView = 'create' }) {
   function doCreate() {
     const name = playerName.trim() || 'Player 1'
     const code = generateRoomCode()
+    const admin = getAdminSettings()
     const result = createRoom({
       code,
       creatorName: name,
-      maxRunden: 20,
-      maxHumanPlayers: 4,
-      schwierigkeitsgrad: 'leicht',
-      startGuthaben: GAME_CONFIG.startGuthaben,
-      startBoote: GAME_CONFIG.initialBoote,
+      maxRunden: admin.maxRunden,
+      maxHumanPlayers: admin.numTeams,
+      schwierigkeitsgrad: admin.schwierigkeitsgrad,
+      startGuthaben: admin.startingCapital,
+      startBoote: admin.startBoote,
+      // All admin params forwarded to room (lobbyStore spreads ...adminParams)
+      numTeams: admin.numTeams,
+      startingCapital: admin.startingCapital,
+      fishPrice: admin.fishPrice,
+      newShipPrice: admin.newShipPrice,
+      interestRate: admin.interestRate,
+      operatingCostPerShip: admin.operatingCostPerShip,
+      maxFishPopulation: admin.maxFishPopulation,
+      startingFishStock: admin.startingFishStock,
+      fishReproductionRate: admin.fishReproductionRate,
+      aiPersonalities: admin.aiPersonalities,
+      showFishStock: admin.showFishStock,
+      showOtherCatches: admin.showOtherCatches,
     })
     setRoom(result.room)
     setMyId(result.myId)
@@ -284,9 +302,21 @@ export default function LobbyPage({ onStart, onBack, initialView = 'create' }) {
       </div>
 
       <div className="w-[420px] flex flex-col justify-center px-10 py-8 bg-blue-950/60 border-l border-white/10 gap-4">
-        <div>
-          <h2 className="text-2xl font-bold mb-1">Settings</h2>
-          <p className="text-blue-300 text-sm">You are host – configure the game.</p>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h2 className="text-2xl font-bold mb-1">Settings</h2>
+            <p className="text-blue-300 text-sm">You are host – configure the game.</p>
+            {hasNonDefaultSettings() && (
+              <div className="mt-1.5 text-xs text-yellow-300 bg-yellow-500/15 border border-yellow-400/30 rounded-lg px-2 py-1 inline-block">
+                Custom instructor settings active
+              </div>
+            )}
+          </div>
+          {onOpenAdmin && (
+            <button onClick={onOpenAdmin} className="text-blue-500 hover:text-blue-300 text-xs transition-colors flex-none">
+              ⚙ Instructor
+            </button>
+          )}
         </div>
 
         <div>
@@ -320,8 +350,8 @@ export default function LobbyPage({ onStart, onBack, initialView = 'create' }) {
           <div className="grid grid-cols-3 gap-2">
             {[3000, 5000, 8000].map(n => (
               <button key={n}
-                onClick={() => changeSetting('startGuthaben', n)}
-                className={`py-2 rounded-xl font-bold text-xs transition-colors ${(room.startGuthaben || GAME_CONFIG.startGuthaben) === n ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-blue-200'}`}>
+                onClick={() => changeSetting('startingCapital', n)}
+                className={`py-2 rounded-xl font-bold text-xs transition-colors ${(room.startingCapital || room.startGuthaben || GAME_CONFIG.startGuthaben) === n ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-blue-200'}`}>
                 {(n / 1000).toLocaleString()}k€
               </button>
             ))}

@@ -80,8 +80,6 @@ if (import.meta.env.DEV) {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function fischDichte(bestand) { return bestand / GAME_CONFIG.maxFischbestand }
-
 const PERSOENLICHKEIT_LABEL = {
     gierig:     'Greedy',
     kooperativ: 'Cooperative',
@@ -128,22 +126,22 @@ function loeseAuktion(teams, sellerIdx, anzahlAngebote, fischbestand, marketShip
     return { teams: t, auctionEvents }
 }
 
-function kiTeamAktionen(team, fischbestand, verlauf, alleTeams, schwierigkeit, marketShipPrice) {
+function kiTeamAktionen(team, fischbestand, verlauf, alleTeams, schwierigkeit, marketShipPrice, params) {
     let result
     if (schwierigkeit === 'schwer') {
-        const booteResult = kiBootAktionSchwer(team, fischbestand, verlauf, alleTeams, marketShipPrice)
+        const booteResult = kiBootAktionSchwer(team, fischbestand, verlauf, alleTeams, marketShipPrice, params)
         result = {
             ...booteResult,
             ausgesandteBoote: kiAusgesandtSchwer(
                 team.persoenlichkeit, team.name, booteResult.fleet,
-                fischbestand, verlauf, alleTeams
+                fischbestand, verlauf, alleTeams, params
             ),
         }
     } else {
-        const booteResult = kiBootAktionLeicht(team, marketShipPrice)
-        result = { ...booteResult, ausgesandteBoote: kiAusgesandtLeicht(booteResult.boote) }
+        const booteResult = kiBootAktionLeicht(team, marketShipPrice, params)
+        result = { ...booteResult, ausgesandteBoote: kiAusgesandtLeicht(booteResult.fleet) }
     }
-    const zones = kiZoneAllokierung(team.persoenlichkeit || 'kooperativ', result.boote, result.ausgesandteBoote, fischbestand)
+    const zones = kiZoneAllokierung(team.persoenlichkeit || 'kooperativ', result.fleet, result.ausgesandteBoote, fischbestand, params)
     return { ...result, ...zones }
 }
 
@@ -161,6 +159,12 @@ function kiTeamAktionen(team, fischbestand, verlauf, alleTeams, schwierigkeit, m
 function simuliereRunde(state, humanDecisions, schwierigkeit) {
     const marketShipPrice = state.marketShipPrice || GAME_CONFIG.auctionPreis
     const maxRunden = state.maxRunden || GAME_CONFIG.maxRunden
+    const params = state.params
+    const fishPrice = params?.fishPrice ?? GAME_CONFIG.fischPreis
+    const newShipPrice = params?.newShipPrice ?? GAME_CONFIG.bootKosten
+    const interestRate = params?.interestRate ?? GAME_CONFIG.zinsRate
+    const opCostPerShip = params?.operatingCostPerShip ?? GAME_CONFIG.betriebskosten
+    const maxFisch = params?.maxFishPopulation ?? GAME_CONFIG.maxFischbestand
 
     // ── Deliver ships ordered last round (MIT: delivered at START of new year) ──
     const roundDeliveries = []
@@ -195,7 +199,7 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
                 ausgesandteBoote: coastal + deepSea,
             }
         }
-        return { ...team, ...kiTeamAktionen(team, state.fischbestand, state.verlauf, teamsNachLieferung, schwierigkeit, marketShipPrice) }
+        return { ...team, ...kiTeamAktionen(team, state.fischbestand, state.verlauf, teamsNachLieferung, schwierigkeit, marketShipPrice, params) }
     })
 
     // ONE weather roll per round — same value used for all teams (MIT spec)
@@ -203,7 +207,7 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
 
     // ── Fish catch: per-team zone calculation with weather factor ──
     // Formula: teamCatch = (coastalShips × 15 + deepSeaShips × 25) × sqrt(density) × weatherFactor
-    const dichte = state.fischbestand / GAME_CONFIG.maxFischbestand
+    const dichte = state.fischbestand / maxFisch
     const sqrtDichte = Math.sqrt(Math.max(0, dichte))
     const teamCatches = teamsNachEntscheidung.map(t => {
         const coastal = Math.round((t.coastalShips || 0) * 15 * sqrtDichte * wetterfaktor)
@@ -215,7 +219,7 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         ? state.fischbestand / rawTotalCatch
         : 1
     const gesamtFang = Math.round(Math.min(rawTotalCatch, state.fischbestand))
-    const neuerFischbestand = berechneFischbestand(state.fischbestand, gesamtFang)
+    const neuerFischbestand = berechneFischbestand(state.fischbestand, gesamtFang, params)
 
     // ── Steps 3–6 per team ──
     let teamsNachRunde = teamsNachEntscheidung.map((team, index) => {
@@ -228,7 +232,7 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
 
         // Step 3: Operating costs — ALL ships in fleet (Harbor, Coastal, Deep Sea per MIT spec)
         const deployedShips = team.fleet
-        const opCosts = deployedShips * GAME_CONFIG.betriebskosten
+        const opCosts = deployedShips * opCostPerShip
         balance -= opCosts
         minBalance = Math.min(minBalance, balance)
 
@@ -237,19 +241,19 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         const coastalFang = Math.round(catches.coastal * capFactor)
         const deepSeaFang = Math.round(catches.deepSea * capFactor)
         const fang = coastalFang + deepSeaFang
-        const fishRevenue = Math.round(fang * GAME_CONFIG.fischPreis)
+        const fishRevenue = Math.round(fang * fishPrice)
         balance += fishRevenue
         minBalance = Math.min(minBalance, balance)   // fish income is positive; min won't change
 
         // Step 5: Interest on MINIMUM balance reached during the year
-        const zinsen = Math.round(minBalance * GAME_CONFIG.zinsRate)
+        const zinsen = Math.round(minBalance * interestRate)
         balance += zinsen
 
         // Step 6: New ship orders — paid now, ships arrive at start of NEXT round
         const maxOrder = Math.ceil(team.fleet / 2)
-        const canAfford = balance >= GAME_CONFIG.bootKosten ? Math.floor(balance / GAME_CONFIG.bootKosten) : 0
+        const canAfford = balance >= newShipPrice ? Math.floor(balance / newShipPrice) : 0
         const actualOrder = Math.max(0, Math.min(shipsOrdered, maxOrder, canAfford))
-        const orderCost = actualOrder * GAME_CONFIG.bootKosten
+        const orderCost = actualOrder * newShipPrice
         balance -= orderCost
 
         if (import.meta.env.DEV) {
@@ -257,7 +261,7 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
             console.log(`  [${team.name}] Step 3 - After operating costs: ${(startBalance - opCosts).toLocaleString()}€  (−${opCosts}€, ${deployedShips} ships in fleet)`)
             console.log(`  [${team.name}] Step 4 - After fish sales:      ${(startBalance - opCosts + fishRevenue).toLocaleString()}€  (+${fishRevenue}€, ${fang} fish)`)
             console.log(`  [${team.name}] Step 5 - Min balance was: ${minBalance.toLocaleString()}€  Interest: ${zinsen >= 0 ? '+' : ''}${zinsen.toLocaleString()}€`)
-            console.log(`  [${team.name}] Step 6 - After ship orders:     ${balance.toLocaleString()}€  (${actualOrder} × 300€ ordered)`)
+            console.log(`  [${team.name}] Step 6 - After ship orders:     ${balance.toLocaleString()}€  (${actualOrder} × ${newShipPrice}€ ordered)`)
         }
 
         return {
@@ -282,6 +286,7 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
                 zinsen,
                 actualOrder,
                 orderCost,
+                newShipPrice,
                 finalBalance: balance,
             },
             netWorth: berechneNetWorth(balance, team.fleet, marketShipPrice),
@@ -353,6 +358,10 @@ function GamePage({ gameState, setGameState }) {
     const maxRunden = gameState.maxRunden || GAME_CONFIG.maxRunden
     const schwierigkeit = gameState.schwierigkeitsgrad || 'leicht'
     const marketShipPrice = gameState.marketShipPrice || GAME_CONFIG.auctionPreis
+    const showFishStock = gameState.params?.showFishStock ?? true
+    const showOtherCatches = gameState.params?.showOtherCatches ?? true
+    const newShipPriceUI = gameState.params?.newShipPrice ?? GAME_CONFIG.bootKosten
+    const maxFischUI = gameState.params?.maxFishPopulation ?? GAME_CONFIG.maxFischbestand
 
     // All human teams in slot order
     const humanTeams = gameState.teams
@@ -524,7 +533,7 @@ function GamePage({ gameState, setGameState }) {
 
                         {/* Per-team round summary breakdown */}
                         <div className="space-y-2 mb-3">
-                            {rundenErgebnis.teams.map(team => {
+                            {(showOtherCatches ? rundenErgebnis.teams : rundenErgebnis.teams.filter(t => !t.istKI)).map(team => {
                                 const s = team.roundSummary
                                 if (!s) return null
                                 return (
@@ -539,7 +548,7 @@ function GamePage({ gameState, setGameState }) {
                                             <div>Fish sales: <span className="text-green-300">+{s.fishRevenue.toLocaleString()}€</span></div>
                                             <div>Minimum balance this round: <span className="text-yellow-300">{s.minBalance.toLocaleString()}€</span></div>
                                             <div>{s.zinsen >= 0 ? 'Interest earned:' : 'Interest charged:'} <span className={s.zinsen >= 0 ? 'text-green-300' : 'text-red-300'}>{s.zinsen >= 0 ? '+' : ''}{s.zinsen.toLocaleString()}€</span></div>
-                                            <div>Ship orders ({s.actualOrder} × 300€): <span className="text-red-300">−{s.orderCost.toLocaleString()}€</span></div>
+                                            <div>Ship orders ({s.actualOrder} × {(s.newShipPrice ?? newShipPriceUI).toLocaleString()}€): <span className="text-red-300">−{s.orderCost.toLocaleString()}€</span></div>
                                         </div>
                                         <div className="mt-1 pt-1 border-t border-white/10 grid grid-cols-3 gap-x-2 text-xs text-blue-300 leading-relaxed">
                                             <div>Coastal ({s.coastalShips}): {s.coastalFang} fish</div>
@@ -582,7 +591,7 @@ function GamePage({ gameState, setGameState }) {
                             </div>
                         </div>
 
-                        {rundenErgebnis.neuerFischbestand < GAME_CONFIG.maxFischbestand * 0.40 && (
+                        {rundenErgebnis.neuerFischbestand < maxFischUI * 0.40 && (
                             <div className="bg-orange-500/20 border border-orange-400/40 rounded-lg p-2.5 mb-3 text-xs text-orange-200 text-center">
                                 <strong>Warning:</strong> Fish stock below 40%!
                             </div>
@@ -623,25 +632,30 @@ function GamePage({ gameState, setGameState }) {
                 {/* Left: fish stock bar + graph */}
                 <div className="flex flex-col gap-2 min-h-0">
                     {(() => {
-                        const dichte = fischDichte(gameState.fischbestand)
+                        const dichte = gameState.fischbestand / maxFischUI
                         const pct = Math.round(dichte * 100)
                         return (
                             <div className={`flex-none bg-white/10 rounded-xl px-3 py-2 ${dichte <= 0.30 ? 'pulse-critical' : ''}`}>
                                 <div className="flex justify-between items-center mb-1">
                                     <span className="font-bold text-sm">Fish Stock</span>
-                                    <span className="font-bold text-sm">{gameState.fischbestand.toLocaleString()} / {GAME_CONFIG.maxFischbestand.toLocaleString()}</span>
+                                    {showFishStock
+                                        ? <span className="font-bold text-sm">{gameState.fischbestand.toLocaleString()} / {maxFischUI.toLocaleString()}</span>
+                                        : <span className="font-bold text-sm text-blue-400">Hidden by instructor</span>
+                                    }
                                 </div>
                                 <div className="w-full bg-white/20 rounded-full h-2.5 overflow-hidden mb-1">
                                     <div
                                         className="h-2.5 rounded-full fish-bar-transition"
                                         style={{
-                                            width: `${pct}%`,
-                                            backgroundColor: dichte > 0.60 ? '#22c55e' : dichte > 0.30 ? '#f59e0b' : '#ef4444'
+                                            width: showFishStock ? `${pct}%` : '100%',
+                                            backgroundColor: showFishStock
+                                                ? (dichte > 0.60 ? '#22c55e' : dichte > 0.30 ? '#f59e0b' : '#ef4444')
+                                                : '#3b82f6'
                                         }}
                                     />
                                 </div>
-                                <div className={`text-xs ${dichte > 0.60 ? 'text-green-300' : dichte > 0.30 ? 'text-yellow-300' : 'text-red-300'}`}>
-                                    {dichte > 0.60 ? 'Healthy' : dichte > 0.30 ? 'Endangered' : 'Critical!'}
+                                <div className={`text-xs ${showFishStock ? (dichte > 0.60 ? 'text-green-300' : dichte > 0.30 ? 'text-yellow-300' : 'text-red-300') : 'text-blue-400'}`}>
+                                    {showFishStock ? (dichte > 0.60 ? 'Healthy' : dichte > 0.30 ? 'Endangered' : 'Critical!') : 'Observe catch rates to estimate stock'}
                                 </div>
                             </div>
                         )
@@ -780,7 +794,7 @@ function GamePage({ gameState, setGameState }) {
                                     {/* New ship order: paid after income, delivered next round (MIT Step 6) */}
                                     <div className="bg-blue-500/20 border border-blue-400/20 rounded-xl px-2.5 py-2">
                                         <div className="text-xs font-bold text-blue-200 mb-0.5">Order New Ships</div>
-                                        <div className="text-xs text-blue-400 mb-1.5">300€ each · next round · max: {maxShipOrder}</div>
+                                        <div className="text-xs text-blue-400 mb-1.5">{newShipPriceUI.toLocaleString()}€ each · next round · max: {maxShipOrder}</div>
                                         <div className="flex items-center gap-1 flex-wrap">
                                             {Array.from({ length: maxShipOrder + 1 }, (_, i) => (
                                                 <button
@@ -794,7 +808,7 @@ function GamePage({ gameState, setGameState }) {
                                                 >{i}</button>
                                             ))}
                                             {safeShipsOrdered > 0 && (
-                                                <span className="text-xs text-blue-300 ml-0.5">−{(safeShipsOrdered * GAME_CONFIG.bootKosten).toLocaleString()}€</span>
+                                                <span className="text-xs text-blue-300 ml-0.5">−{(safeShipsOrdered * newShipPriceUI).toLocaleString()}€</span>
                                             )}
                                         </div>
                                     </div>
