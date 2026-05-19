@@ -4,12 +4,13 @@ import {
     GAME_CONFIG, berechneFischbestand, berechneNetWorth,
     kiBootAktionLeicht, kiAusgesandtLeicht,
     kiBootAktionSchwer, kiAusgesandtSchwer,
-    erzeugeMarktereignis,
+    erzeugeMarktereignis, kiZoneAllokierung,
 } from '../game/fishLogic'
 
 // ─── MIT Order Verification Test (DEV only) ───────────────────────────────────
 // Scenario: team starts with $5000, buys 1 ship at auction ($500) → balance $4500, fleet 4
-// Step 3: op costs  4 ships × $75 = $300  → balance $4200, min $4200
+// All 4 ships deployed (coastal + deep sea), 0 in harbor
+// Step 3: op costs  4 deployed × $75 = $300  → balance $4200, min $4200
 // Step 4: fish      50 fish × $20 = $1000 → balance $5200, min stays $4200
 // Step 5: interest  $4200 × 2%   = $84   → balance $5284
 // Step 6: orders    2 ships × $300 = $600  → balance $4684, shipsInDelivery = 2
@@ -18,14 +19,14 @@ if (import.meta.env.DEV) {
     ;(function verifyMITOrder() {
         const startBalance = 4500   // after buying 1 ship at auction ($5000 − $500)
         const fleet = 4             // 3 original + 1 bought at auction
-        const deployed = 4
+        const deployedShips = 4     // all in coastal + deep sea, none in harbor
         const fang = 50
         const shipsOrdered = 2
 
         let balance = startBalance
         let minBalance = balance
 
-        const opCosts = fleet * GAME_CONFIG.betriebskosten   // ALL ships
+        const opCosts = deployedShips * GAME_CONFIG.betriebskosten   // deployed ships only
         balance -= opCosts
         minBalance = Math.min(minBalance, balance)
 
@@ -44,7 +45,7 @@ if (import.meta.env.DEV) {
         const pass = opCosts === 300 && minBalance === 4200 && zinsen === 84 && balance === 4684 && actualOrder === 2
         console.log('[MIT Order Test]')
         console.log(`  Start balance (after auction buy): ${startBalance}€  ← $5000 − $500`)
-        console.log(`  Op costs (${fleet} ships × ${GAME_CONFIG.betriebskosten}€): −${opCosts}€  → balance ${4500 - opCosts}€`)
+        console.log(`  Op costs (${deployedShips} deployed × ${GAME_CONFIG.betriebskosten}€): −${opCosts}€  → balance ${4500 - opCosts}€`)
         console.log(`  Fish revenue (${fang} × ${GAME_CONFIG.fischPreis}€): +${fishRevenue}€  → balance ${4500 - opCosts + fishRevenue}€`)
         console.log(`  Minimum balance: ${minBalance}€  (reached after op costs)`)
         console.log(`  Interest (${minBalance} × 2%): +${zinsen}€  → balance ${4500 - opCosts + fishRevenue + zinsen}€`)
@@ -106,29 +107,33 @@ function loeseAuktion(teams, sellerIdx, anzahlAngebote, fischbestand, marketShip
 }
 
 function kiTeamAktionen(team, fischbestand, verlauf, alleTeams, schwierigkeit, marketShipPrice) {
+    let result
     if (schwierigkeit === 'schwer') {
         const booteResult = kiBootAktionSchwer(team, fischbestand, verlauf, alleTeams, marketShipPrice)
-        return {
+        result = {
             ...booteResult,
             ausgesandteBoote: kiAusgesandtSchwer(
                 team.persoenlichkeit, team.name, booteResult.boote,
                 fischbestand, verlauf, alleTeams
             ),
         }
+    } else {
+        const booteResult = kiBootAktionLeicht(team, marketShipPrice)
+        result = { ...booteResult, ausgesandteBoote: kiAusgesandtLeicht(booteResult.boote) }
     }
-    const booteResult = kiBootAktionLeicht(team, marketShipPrice)
-    return { ...booteResult, ausgesandteBoote: kiAusgesandtLeicht(booteResult.boote) }
+    const zones = kiZoneAllokierung(team.persoenlichkeit || 'kooperativ', result.boote, result.ausgesandteBoote, fischbestand)
+    return { ...result, ...zones }
 }
 
 // ─── Core round simulation — MIT order of debits & credits ───────────────────
 //
-// humanDecisions: { [slotIndex]: { ausgesandt, boatsOffered, shipsOrdered } }
+// humanDecisions: { [slotIndex]: { harbor, coastal, deepSea, boatsOffered, shipsOrdered } }
 //
 // MIT Step sequence within a round:
 //   (Ship deliveries from last round happen first)
 //   Step 2: Auction buy/sell — already reflected in team.guthaben on entry
-//   Step 3: Operating costs — ALL ships in fleet (Harbor + Coastal + Deep Sea)
-//   Step 4: Fish catch & sales revenue
+//   Step 3: Operating costs — Coastal + Deep Sea ships only (Harbor ships are free)
+//   Step 4: Fish catch & sales revenue (zone-based: coastal 15/ship, deep sea 25/ship)
 //   Step 5: Interest on MINIMUM balance reached during Steps 2–4
 //   Step 6: New ship orders — paid now, delivered at start of NEXT round
 function simuliereRunde(state, humanDecisions, schwierigkeit) {
@@ -148,19 +153,38 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
     // ── Step 2: Fleet decisions (AI buy/sell + human pre-round sells already applied) ──
     const teamsNachEntscheidung = teamsNachLieferung.map((team, index) => {
         if (!team.istKI) {
-            const d = humanDecisions[index] || { ausgesandt: 0, boatsOffered: 0, shipsOrdered: 0 }
-            return { ...team, ausgesandteBoote: d.ausgesandt }
+            const d = humanDecisions[index] || { harbor: 0, coastal: 0, deepSea: 0, boatsOffered: 0, shipsOrdered: 0 }
+            const harbor = d.harbor || 0
+            const coastal = d.coastal || 0
+            const deepSea = d.deepSea || 0
+            return {
+                ...team,
+                harborBoote: harbor,
+                coastalBoote: coastal,
+                deepSeaBoote: deepSea,
+                ausgesandteBoote: coastal + deepSea,
+            }
         }
         return { ...team, ...kiTeamAktionen(team, state.fischbestand, state.verlauf, teamsNachLieferung, schwierigkeit, marketShipPrice) }
     })
 
-    const marktereignis = erzeugeMarktereignis()
+    // ONE weather roll per round — same value used for all teams (MIT spec)
+    const wetterfaktor = erzeugeMarktereignis()
 
-    // ── Fish catch (shared pool) ──
-    const gesamteBoote = teamsNachEntscheidung.reduce((sum, t) => sum + t.ausgesandteBoote, 0)
+    // ── Fish catch: per-team zone calculation with weather factor ──
+    // Formula: teamCatch = (coastalShips × 15 + deepSeaShips × 25) × sqrt(density) × weatherFactor
     const dichte = state.fischbestand / GAME_CONFIG.maxFischbestand
-    const eff = 25 * Math.sqrt(Math.max(0, dichte))
-    const gesamtFang = gesamteBoote > 0 ? Math.round(Math.min(gesamteBoote * eff, state.fischbestand)) : 0
+    const sqrtDichte = Math.sqrt(Math.max(0, dichte))
+    const teamCatches = teamsNachEntscheidung.map(t => {
+        const coastal = Math.round((t.coastalBoote || 0) * 15 * sqrtDichte * wetterfaktor)
+        const deepSea = Math.round((t.deepSeaBoote || 0) * 25 * sqrtDichte * wetterfaktor)
+        return { coastal, deepSea, total: coastal + deepSea }
+    })
+    const rawTotalCatch = teamCatches.reduce((sum, c) => sum + c.total, 0)
+    const capFactor = rawTotalCatch > 0 && rawTotalCatch > state.fischbestand
+        ? state.fischbestand / rawTotalCatch
+        : 1
+    const gesamtFang = Math.round(Math.min(rawTotalCatch, state.fischbestand))
     const neuerFischbestand = berechneFischbestand(state.fischbestand, gesamtFang)
 
     // ── Steps 3–6 per team ──
@@ -172,16 +196,18 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         let balance = startBalance
         let minBalance = balance
 
-        // Step 3: Operating costs — ALL ships in fleet (MIT: Harbor + Coastal + Deep Sea)
-        const opCosts = team.boote * GAME_CONFIG.betriebskosten
+        // Step 3: Operating costs — ONLY Coastal + Deep Sea ships; Harbor ships are free
+        const deployedShips = (team.coastalBoote || 0) + (team.deepSeaBoote || 0)
+        const opCosts = deployedShips * GAME_CONFIG.betriebskosten
         balance -= opCosts
         minBalance = Math.min(minBalance, balance)
 
-        // Step 4: Fish catch & sales revenue
-        const anteil = gesamteBoote > 0 ? team.ausgesandteBoote / gesamteBoote : 0
-        const varianz = 0.85 + Math.random() * 0.30
-        const fang = Math.round(gesamtFang * anteil * varianz)
-        const fishRevenue = Math.round(fang * GAME_CONFIG.fischPreis * marktereignis)
+        // Step 4: Fish catch & sales revenue (zone-based, capped proportionally)
+        const catches = teamCatches[index]
+        const coastalFang = Math.round(catches.coastal * capFactor)
+        const deepSeaFang = Math.round(catches.deepSea * capFactor)
+        const fang = coastalFang + deepSeaFang
+        const fishRevenue = Math.round(fang * GAME_CONFIG.fischPreis)
         balance += fishRevenue
         minBalance = Math.min(minBalance, balance)   // fish income is positive; min won't change
 
@@ -205,7 +231,14 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
             roundSummary: {
                 startBalance,
                 opCosts,
+                deployedShips,
+                harborShips: team.harborBoote || 0,
+                coastalShips: team.coastalBoote || 0,
+                deepSeaShips: team.deepSeaBoote || 0,
+                coastalFang,
+                deepSeaFang,
                 fang,
+                wetterfaktor,
                 fishRevenue,
                 minBalance,
                 zinsen,
@@ -235,7 +268,7 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         netWorth: berechneNetWorth(team.guthaben, team.boote, neuerMarktpreis),
     }))
 
-    const verlaufEintrag = { runde: state.runde, fischbestand: state.fischbestand, gesamtFang, preisMultiplikator: marktereignis }
+    const verlaufEintrag = { runde: state.runde, fischbestand: state.fischbestand, gesamtFang, wetterfaktor }
     finalTeams.forEach(team => { verlaufEintrag[team.name] = team.netWorth })
 
     const neueAuctionHistory = allAuctionEvents.some(e => e.erfolg)
@@ -252,6 +285,8 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         auctionHistory: neueAuctionHistory,
         letzteAuktionEvents: allAuctionEvents,
         roundDeliveries,
+        letzterWetterfaktor: wetterfaktor,
+        letzterGesamtFang: gesamtFang,
         phase: state.runde >= maxRunden ? 'ende' : 'entscheidung',
     }
 }
@@ -260,7 +295,12 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
 
 function GamePage({ gameState, setGameState }) {
     const [humanDecisions, setHumanDecisions] = useState({})
-    const [currentAusgesandt, setCurrentAusgesandt] = useState(1)
+    const [currentHarbor, setCurrentHarbor] = useState(0)
+    const [currentCoastal, setCurrentCoastal] = useState(0)
+    const [currentDeepSea, setCurrentDeepSea] = useState(() => {
+        const firstHuman = gameState.teams.find(t => !t.istKI)
+        return firstHuman ? firstHuman.boote : 0
+    })
     const [currentBoatsOffered, setCurrentBoatsOffered] = useState(0)
     const [currentShipsOrdered, setCurrentShipsOrdered] = useState(0)
     const [showHandoff, setShowHandoff] = useState(false)
@@ -286,19 +326,31 @@ function GamePage({ gameState, setGameState }) {
         ? humanTeams[activeEntryIdx + 1]
         : null
 
-    const safeAusgesandt = Math.min(currentAusgesandt, activeTeam ? activeTeam.boote : 1)
+    const fleetSize = activeTeam ? activeTeam.boote : 0
+    const totalAllocated = currentHarbor + currentCoastal + currentDeepSea
+    const allAllocated = totalAllocated === fleetSize
     const maxShipOrder = activeTeam ? Math.ceil(activeTeam.boote / 2) : 0
     const safeShipsOrdered = Math.min(currentShipsOrdered, maxShipOrder)
 
     // Sell ship instantly at market price (Step 2 auction sale — immediate)
     function handleBootVerkaufen() {
         if (activeSlot === null || activeTeam.boote <= 1) return
+        const neueBoote = activeTeam.boote - 1
+        // Shrink zone allocation to match new fleet — reduce deepSea first, then coastal, then harbor
+        let h = currentHarbor, c = currentCoastal, d = currentDeepSea
+        if (h + c + d > neueBoote) {
+            if (d > 0) d--
+            else if (c > 0) c--
+            else h--
+        }
+        setCurrentHarbor(h)
+        setCurrentCoastal(c)
+        setCurrentDeepSea(d)
         setGameState({
             ...gameState,
             teams: gameState.teams.map((team, i) => {
                 if (i !== activeSlot) return team
                 const neuesGuthaben = team.guthaben + marketShipPrice
-                const neueBoote = team.boote - 1
                 return { ...team, boote: neueBoote, guthaben: neuesGuthaben, netWorth: berechneNetWorth(neuesGuthaben, neueBoote, marketShipPrice) }
             })
         })
@@ -308,15 +360,32 @@ function GamePage({ gameState, setGameState }) {
         if (activeSlot === null) return
         const newDecisions = {
             ...humanDecisions,
-            [activeSlot]: { ausgesandt: safeAusgesandt, boatsOffered: currentBoatsOffered, shipsOrdered: safeShipsOrdered }
+            [activeSlot]: {
+                harbor: currentHarbor,
+                coastal: currentCoastal,
+                deepSea: currentDeepSea,
+                boatsOffered: currentBoatsOffered,
+                shipsOrdered: safeShipsOrdered,
+            }
         }
         const allDone = humanTeams.every(t => newDecisions[t.slotIndex] !== undefined)
 
         if (allDone) {
             resolveRound(newDecisions)
+            setCurrentHarbor(0)
+            setCurrentCoastal(0)
+            setCurrentDeepSea(0)
         } else {
             setHumanDecisions(newDecisions)
-            setCurrentAusgesandt(1)
+            // Reset zone allocator for the next player's fleet
+            if (nextEntry) {
+                const nextTeam = gameState.teams[nextEntry.slotIndex]
+                setCurrentDeepSea(nextTeam.boote)
+            } else {
+                setCurrentDeepSea(0)
+            }
+            setCurrentHarbor(0)
+            setCurrentCoastal(0)
             setCurrentBoatsOffered(0)
             setCurrentShipsOrdered(0)
             if (humanTeams.length > 1) setShowHandoff(true)
@@ -328,8 +397,11 @@ function GamePage({ gameState, setGameState }) {
         setRundenErgebnis({
             runde: gameState.runde,
             teams: nachRunde.teams,
+            alterFischbestand: gameState.fischbestand,
             fischDelta: nachRunde.fischbestand - gameState.fischbestand,
             neuerFischbestand: nachRunde.fischbestand,
+            wetterfaktor: nachRunde.letzterWetterfaktor,
+            gesamtFang: nachRunde.letzterGesamtFang,
             auctionEvents: nachRunde.letzteAuktionEvents || [],
             roundDeliveries: nachRunde.roundDeliveries || [],
             gameStateNachRunde: nachRunde,
@@ -338,10 +410,14 @@ function GamePage({ gameState, setGameState }) {
 
     function handleWeiter() {
         if (!rundenErgebnis) return
-        setGameState(rundenErgebnis.gameStateNachRunde)
+        const newState = rundenErgebnis.gameStateNachRunde
+        const firstHumanTeam = newState.teams.find(t => !t.istKI)
+        setGameState(newState)
         setRundenErgebnis(null)
         setHumanDecisions({})
-        setCurrentAusgesandt(1)
+        setCurrentHarbor(0)
+        setCurrentCoastal(0)
+        setCurrentDeepSea(firstHumanTeam ? firstHumanTeam.boote : 0)
         setCurrentBoatsOffered(0)
         setCurrentShipsOrdered(0)
     }
@@ -351,7 +427,10 @@ function GamePage({ gameState, setGameState }) {
         while (state.runde <= maxRunden && state.fischbestand > 0) {
             const decisions = {}
             state.teams.forEach((team, idx) => {
-                if (!team.istKI) decisions[idx] = { ausgesandt: Math.max(1, Math.floor(team.boote * 0.6)), boatsOffered: 0, shipsOrdered: 0 }
+                if (!team.istKI) {
+                    const deployed = Math.max(1, Math.floor(team.boote * 0.6))
+                    decisions[idx] = { harbor: team.boote - deployed, coastal: 0, deepSea: deployed, boatsOffered: 0, shipsOrdered: 0 }
+                }
             })
             state = simuliereRunde(state, decisions, schwierigkeit)
         }
@@ -412,11 +491,16 @@ function GamePage({ gameState, setGameState }) {
                                         </div>
                                         <div className="grid grid-cols-2 gap-x-3 text-xs text-blue-200 leading-relaxed">
                                             <div>Start balance: <span className="text-white">{s.startBalance.toLocaleString()}€</span></div>
-                                            <div>Op costs ({team.boote} ships): <span className="text-red-300">−{s.opCosts.toLocaleString()}€</span></div>
+                                            <div>Op costs ({s.deployedShips} deployed): <span className="text-red-300">−{s.opCosts.toLocaleString()}€</span></div>
                                             <div>Fish sales: <span className="text-green-300">+{s.fishRevenue.toLocaleString()}€</span></div>
                                             <div>Min balance: <span className="text-yellow-300">{s.minBalance.toLocaleString()}€</span></div>
                                             <div>Interest (2%): <span className={s.zinsen >= 0 ? 'text-green-300' : 'text-red-300'}>{s.zinsen >= 0 ? '+' : ''}{s.zinsen.toLocaleString()}€</span></div>
                                             <div>Ship orders ({s.actualOrder} × 300€): <span className="text-red-300">−{s.orderCost.toLocaleString()}€</span></div>
+                                        </div>
+                                        <div className="mt-1 pt-1 border-t border-white/10 grid grid-cols-3 gap-x-2 text-xs text-blue-300 leading-relaxed">
+                                            <div>Coastal ({s.coastalShips}): {s.coastalFang} fish</div>
+                                            <div>Deep Sea ({s.deepSeaShips}): {s.deepSeaFang} fish</div>
+                                            <div>Harbor ({s.harborShips}): resting</div>
                                         </div>
                                         <div className="mt-1.5 pt-1.5 border-t border-white/10 flex justify-between items-center">
                                             <span className="text-xs font-bold">Final balance: {s.finalBalance.toLocaleString()}€</span>
@@ -443,9 +527,15 @@ function GamePage({ gameState, setGameState }) {
                             </div>
                         )}
 
-                        {/* Fish stock delta */}
-                        <div className={`rounded-lg p-2.5 mb-3 text-center font-bold text-sm ${rundenErgebnis.fischDelta < 0 ? 'bg-red-500/20 text-red-200' : 'bg-green-500/20 text-green-200'}`}>
-                            Fish stock: {rundenErgebnis.fischDelta > 0 ? '+' : ''}{rundenErgebnis.fischDelta.toLocaleString()} → now {rundenErgebnis.neuerFischbestand.toLocaleString()} / {GAME_CONFIG.maxFischbestand.toLocaleString()}
+                        {/* Catch summary + fish stock */}
+                        <div className={`rounded-lg p-2.5 mb-3 ${rundenErgebnis.fischDelta < 0 ? 'bg-red-500/20' : 'bg-green-500/20'}`}>
+                            <div className="grid grid-cols-2 gap-x-3 text-xs leading-relaxed mb-1.5">
+                                <div className="text-blue-200">Total catch: <span className="text-white font-bold">{(rundenErgebnis.gesamtFang || 0).toLocaleString()} fish</span></div>
+                                <div className="text-blue-200">Weather: <span className="text-white font-bold">{rundenErgebnis.wetterfaktor != null ? rundenErgebnis.wetterfaktor.toFixed(2) : '—'}×</span></div>
+                            </div>
+                            <div className={`font-bold text-sm text-center ${rundenErgebnis.fischDelta < 0 ? 'text-red-200' : 'text-green-200'}`}>
+                                Fish stock: {rundenErgebnis.alterFischbestand.toLocaleString()} → {rundenErgebnis.neuerFischbestand.toLocaleString()} ({rundenErgebnis.fischDelta > 0 ? '+' : ''}{rundenErgebnis.fischDelta.toLocaleString()})
+                            </div>
                         </div>
 
                         {rundenErgebnis.neuerFischbestand < GAME_CONFIG.maxFischbestand * 0.40 && (
@@ -565,7 +655,6 @@ function GamePage({ gameState, setGameState }) {
                             <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2">
                                 <div>
                                     <h2 className="font-bold text-sm">{activeTeam.name} – Your Decision</h2>
-                                    <p className="text-blue-200 text-xs">How many ships to deploy? (max. {activeTeam.boote})</p>
                                 </div>
 
                                 {/* Ship delivery notice */}
@@ -575,21 +664,62 @@ function GamePage({ gameState, setGameState }) {
                                     </div>
                                 )}
 
-                                {/* Ships deployed counter */}
-                                <div className="flex items-center gap-3">
-                                    <button
-                                        onClick={() => setCurrentAusgesandt(Math.max(0, safeAusgesandt - 1))}
-                                        className="bg-white/20 hover:bg-white/30 w-9 h-9 rounded-full text-lg font-bold flex items-center justify-center shrink-0"
-                                    >−</button>
-                                    <div
-                                        className="font-bold w-12 text-center text-white"
-                                        style={{ fontSize: 'clamp(1.25rem, 2.5vh, 2rem)' }}
-                                    >{safeAusgesandt}</div>
-                                    <button
-                                        onClick={() => setCurrentAusgesandt(Math.min(activeTeam.boote, safeAusgesandt + 1))}
-                                        className="bg-white/20 hover:bg-white/30 w-9 h-9 rounded-full text-lg font-bold flex items-center justify-center shrink-0"
-                                    >+</button>
-                                    <div className="text-blue-200 text-xs">of {activeTeam.boote} ships deployed</div>
+                                {/* Zone deployment allocator */}
+                                <div className="bg-white/5 rounded-lg p-2.5">
+                                    <div className="flex justify-between items-center mb-1.5">
+                                        <span className="text-xs font-bold text-blue-200">Deploy {fleetSize} ships:</span>
+                                        <span className={`text-xs font-bold ${allAllocated ? 'text-green-300' : 'text-yellow-300'}`}>
+                                            {totalAllocated} / {fleetSize}
+                                        </span>
+                                    </div>
+                                    {/* Harbor */}
+                                    <div className="flex items-center gap-1.5 mb-1.5">
+                                        <span className="text-xs w-16 text-blue-300">Harbor</span>
+                                        <button
+                                            onClick={() => setCurrentHarbor(Math.max(0, currentHarbor - 1))}
+                                            disabled={currentHarbor === 0}
+                                            className="bg-white/20 hover:bg-white/30 disabled:opacity-30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0"
+                                        >−</button>
+                                        <span className="w-5 text-center font-bold text-sm">{currentHarbor}</span>
+                                        <button
+                                            onClick={() => setCurrentHarbor(currentHarbor + 1)}
+                                            disabled={allAllocated}
+                                            className="bg-white/20 hover:bg-white/30 disabled:opacity-30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0"
+                                        >+</button>
+                                        <span className="text-xs text-gray-400">no cost, no catch</span>
+                                    </div>
+                                    {/* Coastal */}
+                                    <div className="flex items-center gap-1.5 mb-1.5">
+                                        <span className="text-xs w-16 text-blue-300">Coastal</span>
+                                        <button
+                                            onClick={() => setCurrentCoastal(Math.max(0, currentCoastal - 1))}
+                                            disabled={currentCoastal === 0}
+                                            className="bg-white/20 hover:bg-white/30 disabled:opacity-30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0"
+                                        >−</button>
+                                        <span className="w-5 text-center font-bold text-sm">{currentCoastal}</span>
+                                        <button
+                                            onClick={() => setCurrentCoastal(currentCoastal + 1)}
+                                            disabled={allAllocated}
+                                            className="bg-white/20 hover:bg-white/30 disabled:opacity-30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0"
+                                        >+</button>
+                                        <span className="text-xs text-blue-300">max 15 fish/ship</span>
+                                    </div>
+                                    {/* Deep Sea */}
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-xs w-16 text-yellow-300">Deep Sea</span>
+                                        <button
+                                            onClick={() => setCurrentDeepSea(Math.max(0, currentDeepSea - 1))}
+                                            disabled={currentDeepSea === 0}
+                                            className="bg-white/20 hover:bg-white/30 disabled:opacity-30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0"
+                                        >−</button>
+                                        <span className="w-5 text-center font-bold text-sm">{currentDeepSea}</span>
+                                        <button
+                                            onClick={() => setCurrentDeepSea(currentDeepSea + 1)}
+                                            disabled={allAllocated}
+                                            className="bg-white/20 hover:bg-white/30 disabled:opacity-30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0"
+                                        >+</button>
+                                        <span className="text-xs text-yellow-300">max 25 fish/ship</span>
+                                    </div>
                                 </div>
 
                                 {/* Sell ship (instant auction sale) + New ship order */}
@@ -605,20 +735,22 @@ function GamePage({ gameState, setGameState }) {
 
                                     {/* New ship order: paid after income, delivered next round (MIT Step 6) */}
                                     <div className="bg-blue-500/20 border border-blue-400/20 rounded-xl px-2.5 py-2">
-                                        <div className="text-xs font-bold text-blue-200 mb-1">Order New Ships</div>
-                                        <div className="text-xs text-blue-400 mb-1.5">300€ each · paid after income · max {maxShipOrder}</div>
-                                        <div className="flex items-center gap-1.5">
-                                            <button
-                                                onClick={() => setCurrentShipsOrdered(Math.max(0, safeShipsOrdered - 1))}
-                                                className="bg-white/20 hover:bg-white/30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0"
-                                            >−</button>
-                                            <div className="text-base font-bold w-6 text-center">{safeShipsOrdered}</div>
-                                            <button
-                                                onClick={() => setCurrentShipsOrdered(Math.min(maxShipOrder, safeShipsOrdered + 1))}
-                                                className="bg-white/20 hover:bg-white/30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0"
-                                            >+</button>
+                                        <div className="text-xs font-bold text-blue-200 mb-0.5">Order New Ships</div>
+                                        <div className="text-xs text-blue-400 mb-1.5">300€ each · next round · max: {maxShipOrder}</div>
+                                        <div className="flex items-center gap-1 flex-wrap">
+                                            {Array.from({ length: maxShipOrder + 1 }, (_, i) => (
+                                                <button
+                                                    key={i}
+                                                    onClick={() => setCurrentShipsOrdered(i)}
+                                                    className={`min-w-[1.75rem] h-7 rounded px-1 font-bold text-sm transition-colors ${
+                                                        safeShipsOrdered === i
+                                                            ? 'bg-blue-500 text-white'
+                                                            : 'bg-white/20 hover:bg-white/30 text-white'
+                                                    }`}
+                                                >{i}</button>
+                                            ))}
                                             {safeShipsOrdered > 0 && (
-                                                <div className="text-xs text-blue-300">−{(safeShipsOrdered * GAME_CONFIG.bootKosten).toLocaleString()}€</div>
+                                                <span className="text-xs text-blue-300 ml-0.5">−{(safeShipsOrdered * GAME_CONFIG.bootKosten).toLocaleString()}€</span>
                                             )}
                                         </div>
                                     </div>

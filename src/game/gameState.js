@@ -43,6 +43,9 @@ function erstelleTeam(name, farbe, istKI, persoenlichkeit, startGuthaben, startB
     guthaben: startGuthaben,
     netWorth: startGuthaben + startBoote * GAME_CONFIG.auctionPreis,
     ausgesandteBoote: 0,
+    harborBoote: 0,
+    coastalBoote: 0,
+    deepSeaBoote: 0,
     letzterFang: 0,
     letzteZinsen: 0,
     shipsInDelivery: 0,   // ships ordered last round; delivered at start of next round (MIT Step 7)

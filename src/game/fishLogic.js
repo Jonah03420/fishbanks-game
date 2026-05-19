@@ -38,7 +38,8 @@ export function berechneFischbestand(aktuellerBestand, gesamtFang) {
   const wachstum = GAME_CONFIG.wachstumsRate
     * aktuellerBestand
     * (1 - aktuellerBestand / GAME_CONFIG.maxFischbestand)
-  return Math.max(0, Math.round(aktuellerBestand - gesamtFang + wachstum))
+  const neuerBestand = aktuellerBestand - gesamtFang + wachstum
+  return Math.min(GAME_CONFIG.maxFischbestand, Math.max(0, Math.round(neuerBestand)))
 }
 
 // Per-team catch: each deployed ship catches based on current fish density.
@@ -56,9 +57,10 @@ export function berechneGewinn(fang, ausgesandteBoote, preisMultiplikator = 1.0)
   return einnahmen - kosten
 }
 
-// Generates a random fish-price multiplier for one round (±20%).
+// Weather factor for one round (±10%), applied to catch per MIT spec.
+// One roll per round, same value used by all teams.
 export function erzeugeMarktereignis() {
-  return rand(0.80, 1.20)
+  return rand(0.90, 1.10)
 }
 
 export function berechneNetWorth(bankBalance, boote, shipPrice) {
@@ -158,6 +160,28 @@ export function kiBootAktionSchwer(team, fischbestand, verlauf, alleTeams, verka
   }
 
   return { boote, guthaben }
+}
+
+// Zone allocation for AI teams based on personality and fish density.
+// Returns { harborBoote, coastalBoote, deepSeaBoote } summing to boote.
+export function kiZoneAllokierung(persoenlichkeit, boote, ausgesandt, fischbestand) {
+  const harbor = boote - ausgesandt
+  if (persoenlichkeit === 'gierig') {
+    // All deployed ships to Deep Sea — maximum yield
+    return { harborBoote: harbor, coastalBoote: 0, deepSeaBoote: ausgesandt }
+  } else if (persoenlichkeit === 'kooperativ') {
+    // Deployed ships go to Coastal — gentler on the stock
+    return { harborBoote: harbor, coastalBoote: ausgesandt, deepSeaBoote: 0 }
+  } else { // rational — always reserve 1 in Harbor, split rest by density
+    const adjustedHarbor = Math.max(harbor, Math.min(1, boote))
+    const remaining = boote - adjustedHarbor
+    const fishDichte = fischbestand / GAME_CONFIG.maxFischbestand
+    if (fishDichte > 0.5) {
+      return { harborBoote: adjustedHarbor, coastalBoote: 0, deepSeaBoote: remaining }
+    } else {
+      return { harborBoote: adjustedHarbor, coastalBoote: remaining, deepSeaBoote: 0 }
+    }
+  }
 }
 
 export function kiAusgesandtSchwer(persoenlichkeit, teamName, boote, fischbestand, verlauf, alleTeams) {
