@@ -706,6 +706,56 @@ function GamePage({ gameState, setGameState }) {
                                         ))}
                                     </div>
 
+                                    {/* Zone Statistics table */}
+                                    {(() => {
+                                        const sqrtD      = Math.sqrt(Math.max(0, fishDichte))
+                                        const fishPrice  = gameState.params?.fishPrice  ?? GAME_CONFIG.fischPreis
+                                        const hCost      = gameState.params?.harborCost  ?? GAME_CONFIG.harborCost
+                                        const cCost      = gameState.params?.coastalCost ?? GAME_CONFIG.coastalCost
+                                        const dCost      = gameState.params?.deepSeaCost ?? GAME_CONFIG.deepSeaCost
+                                        const cCatch     = 15 * sqrtD
+                                        const dCatch     = 25 * sqrtD
+                                        const cRev       = cCatch * fishPrice
+                                        const dRev       = dCatch * fishPrice
+                                        const hProfit    = -hCost
+                                        const cProfit    = cRev - cCost
+                                        const dProfit    = dRev - dCost
+                                        const profitCls  = v => v >= 0 ? 'text-green-300' : 'text-red-300'
+                                        const fmt        = v => v.toFixed(1)
+                                        const rows = [
+                                            { label: 'Expected Catch', h: '0',          c: `${fmt(cCatch)} fish`, d: `${fmt(dCatch)} fish` },
+                                            { label: 'Fish Price',     h: `$${fishPrice}`, c: `$${fishPrice}`,     d: `$${fishPrice}` },
+                                            { label: 'Revenue/Ship',   h: '$0',          c: `$${fmt(cRev)}`,       d: `$${fmt(dRev)}` },
+                                            { label: 'Op Cost/Ship',   h: `$${hCost}`,   c: `$${cCost}`,           d: `$${dCost}` },
+                                        ]
+                                        return (
+                                            <div className="bg-white/5 rounded-lg p-2.5">
+                                                <div className="text-xs font-bold text-blue-200 mb-2">Zone Statistics (at current fish density)</div>
+                                                <div className="grid grid-cols-4 gap-x-2 text-xs mb-1">
+                                                    <div className="text-blue-400"></div>
+                                                    <div className="font-medium text-gray-300 text-center">Harbor</div>
+                                                    <div className="font-medium text-blue-300 text-center">Coastal</div>
+                                                    <div className="font-medium text-yellow-300 text-center">Deep Sea</div>
+                                                </div>
+                                                {rows.map(row => (
+                                                    <div key={row.label} className="grid grid-cols-4 gap-x-2 text-xs leading-5 border-t border-white/5">
+                                                        <div className="text-blue-400">{row.label}</div>
+                                                        <div className="text-center text-blue-100">{row.h}</div>
+                                                        <div className="text-center text-blue-100">{row.c}</div>
+                                                        <div className="text-center text-blue-100">{row.d}</div>
+                                                    </div>
+                                                ))}
+                                                <div className="grid grid-cols-4 gap-x-2 text-xs leading-5 border-t border-white/10 mt-0.5 pt-0.5 font-bold">
+                                                    <div className="text-blue-400">Profit/Ship</div>
+                                                    <div className={`text-center ${profitCls(hProfit)}`}>−${hCost}</div>
+                                                    <div className={`text-center ${profitCls(cProfit)}`}>{cProfit >= 0 ? '+' : ''}${fmt(cProfit)}</div>
+                                                    <div className={`text-center ${profitCls(dProfit)}`}>{dProfit >= 0 ? '+' : ''}${fmt(dProfit)}</div>
+                                                </div>
+                                                <div className="text-xs text-blue-500 mt-1.5">Values based on current fish density: {fishPct}%</div>
+                                            </div>
+                                        )
+                                    })()}
+
                                     {/* Sell + Order */}
                                     <div className="grid grid-cols-2 gap-2">
                                         <button
