@@ -43,11 +43,14 @@ function EndPage({ gameState, onRestart }) {
 
     const maxFisch = gameState.params?.maxFishPopulation ?? GAME_CONFIG.maxFischbestand
     const numTeams = gameState.teams.length
-    const fischScore = (gameState.fischbestand / maxFisch) * 100 * 0.4
-    const rangScore = ((numTeams - spielerRang + 1) / numTeams) * 100 * 0.6
-    const sustainabilityScore = Math.round(fischScore + rangScore)
+    const sustainabilityScore = Math.round((gameState.fischbestand / maxFisch) * 100)
 
     const optimal = berechneOptimalesErgebnis(maxRunden, gameState.params?.startingFishStock ?? GAME_CONFIG.startFischbestand, gameState.params)
+
+    const maxNW = Math.max(...gameState.teams.map(t => t.netWorth), 0)
+    const niceStep = maxNW <= 5000 ? 1000 : maxNW <= 15000 ? 3000 : maxNW <= 50000 ? 10000 : 15000
+    const niceMax = Math.max(niceStep, Math.ceil(maxNW / niceStep) * niceStep)
+    const niceBarTicks = Array.from({ length: 6 }, (_, i) => Math.round(i * niceMax / 5))
 
     let niedrigsterBestand = { runde: 0, wert: Infinity }
     let groessterEinzelAbfall = { runde: 0, delta: 0 }
@@ -63,9 +66,9 @@ function EndPage({ gameState, onRestart }) {
         }
     })
 
-    const scoreColor = sustainabilityScore >= 70 ? 'text-green-400' : sustainabilityScore >= 40 ? 'text-yellow-400' : 'text-red-400'
-    const scoreBg = sustainabilityScore >= 70 ? 'bg-green-500/15' : sustainabilityScore >= 40 ? 'bg-yellow-500/15' : 'bg-red-500/15'
-    const scoreBarColor = sustainabilityScore >= 70 ? '#22c55e' : sustainabilityScore >= 40 ? '#f59e0b' : '#ef4444'
+    const scoreColor = sustainabilityScore > 60 ? 'text-green-400' : sustainabilityScore > 40 ? 'text-yellow-400' : sustainabilityScore > 20 ? 'text-orange-400' : 'text-red-400'
+    const scoreBg = sustainabilityScore > 60 ? 'bg-green-500/15' : sustainabilityScore > 40 ? 'bg-yellow-500/15' : sustainabilityScore > 20 ? 'bg-orange-500/15' : 'bg-red-500/15'
+    const scoreBarColor = sustainabilityScore > 60 ? '#22c55e' : sustainabilityScore > 40 ? '#f59e0b' : sustainabilityScore > 20 ? '#f97316' : '#ef4444'
 
     return (
         <div className="w-full h-full bg-blue-900 text-white flex flex-col overflow-hidden p-4 gap-3">
@@ -108,7 +111,7 @@ function EndPage({ gameState, onRestart }) {
                                 <div className="h-2 rounded-full transition-all duration-1000" style={{ width: `${sustainabilityScore}%`, backgroundColor: scoreBarColor }} />
                             </div>
                             <div className={`text-xs ${scoreColor}`}>
-                                {sustainabilityScore >= 70 ? 'Sustainable' : sustainabilityScore >= 40 ? 'Moderate' : 'Unsustainable'}
+                                {sustainabilityScore > 60 ? 'Sustainable' : sustainabilityScore > 40 ? 'At Risk' : sustainabilityScore > 20 ? 'Unsustainable' : 'Collapsed'}
                             </div>
                         </div>
                     </div>
@@ -164,12 +167,20 @@ function EndPage({ gameState, onRestart }) {
                                 </div>
                             )}
                             {groessterEinzelAbfall.runde > 0 && (
-                                <div className="flex items-start gap-2 bg-orange-500/10 rounded-lg p-2.5">
-                                    <div>
-                                        <div className="font-bold text-xs">Largest Single Decline</div>
-                                        <div className="text-blue-300 text-xs">Round {groessterEinzelAbfall.runde}: −{groessterEinzelAbfall.delta.toLocaleString()} fish in one round</div>
+                                groessterEinzelAbfall.delta > 150 ? (
+                                    <div className="flex items-start gap-2 bg-orange-500/10 rounded-lg p-2.5">
+                                        <div>
+                                            <div className="font-bold text-xs">Largest Single Decline</div>
+                                            <div className="text-blue-300 text-xs">Round {groessterEinzelAbfall.runde}: −{groessterEinzelAbfall.delta.toLocaleString()} fish in one round</div>
+                                        </div>
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="flex items-start gap-2 bg-blue-500/10 rounded-lg p-2.5">
+                                        <div>
+                                            <div className="text-blue-300 text-xs">Stock remained stable – no critical decline recorded</div>
+                                        </div>
+                                    </div>
+                                )
                             )}
                             {gameState.auctionHistory?.length > 0 && (
                                 <div className="flex items-start gap-2 bg-yellow-500/10 rounded-lg p-2.5">
@@ -237,7 +248,7 @@ function EndPage({ gameState, onRestart }) {
                                 <BarChart data={netWorthDaten} margin={{ top: 2, right: 10, left: -10, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                                     <XAxis dataKey="name" stroke="rgba(255,255,255,0.5)" tick={{ fontSize: 10 }} />
-                                    <YAxis stroke="rgba(255,255,255,0.5)" tickFormatter={v => `${Math.round(v / 1000)}k`} tick={{ fontSize: 10 }} width={35} />
+                                    <YAxis stroke="rgba(255,255,255,0.5)" tickFormatter={v => v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)} tick={{ fontSize: 10 }} width={35} domain={[0, niceMax]} ticks={niceBarTicks} />
                                     <Tooltip contentStyle={{ backgroundColor: '#1e3a8a', border: 'none', borderRadius: '8px', fontSize: 11 }} formatter={v => [`${v.toLocaleString()}€`, 'Net Worth']} />
                                     <Bar dataKey="Net Worth" fill="#3b82f6" radius={[3, 3, 0, 0]} />
                                 </BarChart>

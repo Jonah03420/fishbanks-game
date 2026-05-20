@@ -1,5 +1,5 @@
 import FishGraph from '../components/FishGraph'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
     GAME_CONFIG, berechneFischbestand, berechneNetWorth,
     kiBootAktionLeicht, kiAusgesandtLeicht,
@@ -170,6 +170,14 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         return { ...team, ...kiTeamAktionen(team, state.fischbestand, state.verlauf, teamsNachLieferung, schwierigkeit, marketShipPrice, params) }
     })
 
+    // Detect AI ship purchases this round (fleet grew vs. post-delivery fleet)
+    const aiShipPurchases = []
+    teamsNachEntscheidung.forEach((t, i) => {
+        if (t.istKI && t.fleet > teamsNachLieferung[i].fleet) {
+            aiShipPurchases.push({ name: t.name, farbe: t.farbe, count: t.fleet - teamsNachLieferung[i].fleet, price: marketShipPrice })
+        }
+    })
+
     // ONE weather roll per round — same value used for all teams (MIT spec)
     const wetterfaktor = erzeugeMarktereignis()
 
@@ -310,6 +318,7 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         roundDeliveries,
         letzterWetterfaktor: wetterfaktor,
         letzterGesamtFang: gesamtFang,
+        aiShipPurchases,
         phase: state.runde >= maxRunden ? 'ende' : 'entscheidung',
     }
 }
@@ -329,6 +338,8 @@ function GamePage({ gameState, setGameState }) {
     const [showHandoff, setShowHandoff] = useState(false)
     const [rundenErgebnis, setRundenErgebnis] = useState(null)
     const [activeTab, setActiveTab] = useState('dashboard')
+    const [devToast, setDevToast] = useState(false)
+    const devSkipRef = useRef(null)
 
     const maxRunden = gameState.maxRunden || GAME_CONFIG.maxRunden
     const schwierigkeit = gameState.schwierigkeitsgrad || 'leicht'
@@ -432,6 +443,7 @@ function GamePage({ gameState, setGameState }) {
             gesamtFang: nachRunde.letzterGesamtFang,
             auctionEvents: nachRunde.letzteAuktionEvents || [],
             roundDeliveries: nachRunde.roundDeliveries || [],
+            aiShipPurchases: nachRunde.aiShipPurchases || [],
             gameStateNachRunde: nachRunde,
         })
     }
@@ -464,6 +476,22 @@ function GamePage({ gameState, setGameState }) {
         }
         setGameState({ ...state, phase: 'ende' })
     }
+
+    // Keyboard shortcut Ctrl/Cmd+Shift+S triggers full simulation (DEV only)
+    devSkipRef.current = handleDevSkip
+    useEffect(() => {
+        if (!import.meta.env.DEV) return
+        function onKey(e) {
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'S') {
+                e.preventDefault()
+                setDevToast(true)
+                setTimeout(() => setDevToast(false), 2000)
+                devSkipRef.current()
+            }
+        }
+        window.addEventListener('keydown', onKey)
+        return () => window.removeEventListener('keydown', onKey)
+    }, [])
 
     // ── Tab helpers ──────────────────────────────────────────────────────────────
 
@@ -498,6 +526,13 @@ function GamePage({ gameState, setGameState }) {
                 </div>
             )}
 
+            {/* DEV shortcut toast */}
+            {devToast && (
+                <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] bg-gray-800 text-gray-200 text-xs px-4 py-2 rounded-full shadow-xl border border-white/10">
+                    Simulating game…
+                </div>
+            )}
+
             {/* Round result modal */}
             {rundenErgebnis && (
                 <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
@@ -511,6 +546,18 @@ function GamePage({ gameState, setGameState }) {
                                 {rundenErgebnis.roundDeliveries.map((d, i) => (
                                     <div key={i} className="text-xs text-green-200">
                                         {d.farbe} {d.name}: +{d.count} ship{d.count !== 1 ? 's' : ''} delivered
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* AI ship purchases this round */}
+                        {(rundenErgebnis.aiShipPurchases || []).length > 0 && (
+                            <div className="bg-blue-500/15 border border-blue-400/30 rounded-lg p-2.5 mb-4">
+                                <div className="font-bold text-xs text-blue-300 mb-1">AI Ship Purchases</div>
+                                {rundenErgebnis.aiShipPurchases.map((p, i) => (
+                                    <div key={i} className="text-xs text-blue-200">
+                                        {p.farbe} {p.name} purchased {p.count} ship{p.count !== 1 ? 's' : ''} at auction ({p.price.toLocaleString()}€ each)
                                     </div>
                                 ))}
                             </div>
@@ -543,7 +590,7 @@ function GamePage({ gameState, setGameState }) {
                                                 <span className="text-red-300">−{s.opCosts.toLocaleString()}€</span>
                                             </div>
                                             <div className="flex justify-between text-blue-200">
-                                                <span>Fish caught: {s.fang} fish × ${fishP}/fish</span>
+                                                <span>Fish caught: {s.fang} fish × {fishP}€/fish</span>
                                                 <span className="text-green-300">+{s.fishRevenue.toLocaleString()}€</span>
                                             </div>
                                             <div className="flex justify-between text-blue-400 italic">
@@ -689,15 +736,26 @@ function GamePage({ gameState, setGameState }) {
                                             </span>
                                         </div>
                                         {team.istKI && team.persoenlichkeit && (
-                                            <div className="text-xs text-blue-400 mb-0.5">{PERSOENLICHKEIT_LABEL[team.persoenlichkeit] ?? team.persoenlichkeit}</div>
+                                            <div className="text-xs text-blue-400 mb-1">{PERSOENLICHKEIT_LABEL[team.persoenlichkeit] ?? team.persoenlichkeit}</div>
                                         )}
-                                        <div className="text-lg font-bold leading-tight">{team.netWorth.toLocaleString()}€</div>
-                                        <div className="text-xs text-blue-400 mb-1">net worth</div>
-                                        <div className="flex justify-between text-xs mb-0.5">
-                                            <span className="text-blue-200">Balance: <span className="text-white">{team.bankBalance.toLocaleString()}€</span></span>
-                                            <span className="text-blue-300">{team.fleet} ships{(team.shipsInDelivery || 0) > 0 ? <span className="text-green-400"> +{team.shipsInDelivery}</span> : ''}</span>
+                                        <div className="text-xs space-y-0.5 mb-1">
+                                            <div className="flex justify-between">
+                                                <span className="text-blue-300">Balance</span>
+                                                <span className="text-white">{team.bankBalance.toLocaleString()}€</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-blue-300">Fleet</span>
+                                                <span className="text-yellow-300">{team.fleet} × {marketShipPrice.toLocaleString()}€ = {fleetVal.toLocaleString()}€</span>
+                                            </div>
+                                            <div className="border-t border-white/20" />
+                                            <div className="flex justify-between font-bold">
+                                                <span className="text-blue-200">Net Worth</span>
+                                                <span className="text-white text-sm">{team.netWorth.toLocaleString()}€</span>
+                                            </div>
                                         </div>
-                                        <div className="text-xs text-yellow-400/80 mb-0.5">Fleet: {fleetVal.toLocaleString()}€ @ market</div>
+                                        {(team.shipsInDelivery || 0) > 0 && (
+                                            <div className="text-xs text-green-400 mb-0.5">+{team.shipsInDelivery} arriving next round</div>
+                                        )}
                                         {rs && (
                                             <div className="text-xs border-t border-white/10 pt-0.5 mt-0.5 text-blue-400">
                                                 Rnd {gameState.runde - 1}: {rs.fang} fish ·{' '}
@@ -740,18 +798,7 @@ function GamePage({ gameState, setGameState }) {
                         {activeTeam ? (
                             <div className="flex-1 min-h-0 bg-white/10 rounded-xl p-3 flex flex-col gap-2">
 
-                                {/* Header + subtle DEV button */}
-                                <div className="flex justify-between items-center">
-                                    <h2 className="font-bold text-sm">{activeTeam.name} – Ship Allocation</h2>
-                                    {import.meta.env.DEV && (
-                                        <button
-                                            onClick={handleDevSkip}
-                                            className="text-xs text-gray-600 hover:text-gray-400 transition-colors px-1"
-                                        >
-                                            dev: skip →
-                                        </button>
-                                    )}
-                                </div>
+                                <h2 className="font-bold text-sm">{activeTeam.name} – Ship Allocation</h2>
 
                                 {(activeTeam.shipsInDelivery || 0) > 0 && (
                                     <div className="bg-green-500/15 border border-green-400/30 rounded-lg px-2.5 py-1 text-xs text-green-200">
@@ -768,9 +815,9 @@ function GamePage({ gameState, setGameState }) {
                                         </span>
                                     </div>
                                     {[
-                                        { label: 'Harbor',   color: 'text-gray-300',   hint: '$50/ship · no catch',    val: currentHarbor,  set: setCurrentHarbor },
-                                        { label: 'Coastal',  color: 'text-blue-300',   hint: '$150/ship · max 15/ship', val: currentCoastal, set: setCurrentCoastal },
-                                        { label: 'Deep Sea', color: 'text-yellow-300', hint: '$250/ship · max 25/ship', val: currentDeepSea, set: setCurrentDeepSea },
+                                        { label: 'Harbor',   color: 'text-gray-300',   hint: '50€/ship · no catch',    val: currentHarbor,  set: setCurrentHarbor },
+                                        { label: 'Coastal',  color: 'text-blue-300',   hint: '150€/ship · max 15/ship', val: currentCoastal, set: setCurrentCoastal },
+                                        { label: 'Deep Sea', color: 'text-yellow-300', hint: '250€/ship · max 25/ship', val: currentDeepSea, set: setCurrentDeepSea },
                                     ].map(({ label, color, hint, val, set }) => (
                                         <div key={label} className="flex items-center gap-1.5 mb-1 last:mb-0">
                                             <span className={`text-xs w-16 ${color}`}>{label}</span>
@@ -801,10 +848,10 @@ function GamePage({ gameState, setGameState }) {
                                     const pCls      = v => v >= 0 ? 'text-green-300' : 'text-red-300'
                                     const fmt       = v => v.toFixed(1)
                                     const rows = [
-                                        { label: 'Catch/Ship',   h: '0',             c: fmt(cCatch),     d: fmt(dCatch) },
-                                        { label: 'Fish Price',   h: `$${fishPrice}`, c: `$${fishPrice}`, d: `$${fishPrice}` },
-                                        { label: 'Revenue/Ship', h: '$0',            c: `$${fmt(cRev)}`, d: `$${fmt(dRev)}` },
-                                        { label: 'Op Cost/Ship', h: `$${hCost}`,     c: `$${cCost}`,     d: `$${dCost}` },
+                                        { label: 'Catch/Ship',   h: '0',             c: fmt(cCatch),      d: fmt(dCatch) },
+                                        { label: 'Fish Price',   h: `${fishPrice}€`, c: `${fishPrice}€`,  d: `${fishPrice}€` },
+                                        { label: 'Revenue/Ship', h: '0€',            c: `${fmt(cRev)}€`,  d: `${fmt(dRev)}€` },
+                                        { label: 'Op Cost/Ship', h: `${hCost}€`,     c: `${cCost}€`,      d: `${dCost}€` },
                                     ]
                                     return (
                                         <div className="bg-white/5 rounded-lg p-2.5">
@@ -825,9 +872,9 @@ function GamePage({ gameState, setGameState }) {
                                             ))}
                                             <div className="grid grid-cols-4 gap-x-2 text-xs leading-5 border-t border-white/10 mt-0.5 pt-0.5 font-bold">
                                                 <div className="text-blue-400">Profit/Ship</div>
-                                                <div className={`text-center ${pCls(hProfit)}`}>−${hCost}</div>
-                                                <div className={`text-center ${pCls(cProfit)}`}>{cProfit >= 0 ? '+' : ''}${fmt(cProfit)}</div>
-                                                <div className={`text-center ${pCls(dProfit)}`}>{dProfit >= 0 ? '+' : ''}${fmt(dProfit)}</div>
+                                                <div className={`text-center ${pCls(hProfit)}`}>−{hCost}€</div>
+                                                <div className={`text-center ${pCls(cProfit)}`}>{cProfit >= 0 ? '+' : ''}{fmt(cProfit)}€</div>
+                                                <div className={`text-center ${pCls(dProfit)}`}>{dProfit >= 0 ? '+' : ''}{fmt(dProfit)}€</div>
                                             </div>
                                             <div className="text-xs text-blue-500 mt-1">Based on current fish density: {fishPct}%</div>
                                         </div>
@@ -858,16 +905,8 @@ function GamePage({ gameState, setGameState }) {
                                     )
                                 })()}
 
-                                {/* Ship actions: Sell + Order in one row */}
+                                {/* Order New Ships */}
                                 <div className="flex gap-2 items-start">
-                                    <button
-                                        onClick={handleBootVerkaufen}
-                                        disabled={activeTeam.fleet <= 1}
-                                        className="shrink-0 bg-white/15 hover:bg-white/25 disabled:opacity-40 disabled:cursor-not-allowed font-medium py-1.5 px-3 rounded-lg transition-colors text-xs text-blue-100"
-                                    >
-                                        Sell Ship<br />
-                                        <span className="text-blue-400 font-normal">market: {marketShipPrice.toLocaleString()}€</span>
-                                    </button>
                                     <div className="flex-1 bg-blue-500/20 border border-blue-400/20 rounded-lg px-2.5 py-1.5">
                                         <div className="text-xs font-bold text-blue-200 mb-1">
                                             Order New Ships
@@ -1001,7 +1040,7 @@ function GamePage({ gameState, setGameState }) {
                         </div>
 
                         {/* Right column: Fish stock + Graph + Fishery Data */}
-                        <div className="w-72 flex-none flex flex-col gap-3">
+                        <div className="w-[35%] flex-none flex flex-col gap-3">
 
                             {/* Fish stock bar */}
                             <div className={`bg-white/10 rounded-xl px-3 py-2 ${fishDichte <= 0.30 ? 'pulse-critical' : ''}`}>
@@ -1029,7 +1068,7 @@ function GamePage({ gameState, setGameState }) {
                             </div>
 
                             {/* FishGraph */}
-                            <div className="bg-white/10 rounded-xl p-2" style={{ height: 220 }}>
+                            <div className="bg-white/10 rounded-xl p-2" style={{ height: 300 }}>
                                 <FishGraph verlauf={gameState.verlauf} />
                             </div>
 
@@ -1037,23 +1076,23 @@ function GamePage({ gameState, setGameState }) {
                             <div className="bg-white/10 rounded-xl p-3">
                                 <h3 className="font-bold text-sm mb-2">Fishery Data</h3>
                                 {gameState.verlauf.length === 0 ? (
-                                    <p className="text-xs text-blue-400">No data yet – complete the first round.</p>
+                                    <p className="text-sm text-blue-400">No data yet – complete the first round.</p>
                                 ) : (
-                                    <table className="w-full text-xs border-collapse">
+                                    <table className="w-full text-sm border-collapse">
                                         <thead>
                                             <tr className="text-blue-400 border-b border-white/10">
-                                                <th className="text-left py-1 pr-2 font-medium">Rnd</th>
-                                                <th className="text-right py-1 px-1 font-medium">Stock</th>
-                                                <th className="text-right py-1 px-1 font-medium">Catch</th>
-                                                <th className="text-right py-1 pl-1 font-medium">Growth</th>
+                                                <th className="text-left py-1.5 pr-3 font-medium">Rnd</th>
+                                                <th className="text-right py-1.5 px-2 font-medium">Stock</th>
+                                                <th className="text-right py-1.5 px-2 font-medium">Catch</th>
+                                                <th className="text-right py-1.5 pl-2 font-medium">Growth</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr className="border-b border-white/5 text-blue-500">
-                                                <td className="py-0.5 pr-2">Start</td>
-                                                <td className="py-0.5 px-1 text-right">{(gameState.params?.startingFishStock ?? GAME_CONFIG.startFischbestand).toLocaleString()}</td>
-                                                <td className="py-0.5 px-1 text-right">—</td>
-                                                <td className="py-0.5 pl-1 text-right">—</td>
+                                                <td className="py-1 pr-3">Start</td>
+                                                <td className="py-1 px-2 text-right">{(gameState.params?.startingFishStock ?? GAME_CONFIG.startFischbestand).toLocaleString()}</td>
+                                                <td className="py-1 px-2 text-right">—</td>
+                                                <td className="py-1 pl-2 text-right">—</td>
                                             </tr>
                                             {gameState.verlauf.map((v, i) => {
                                                 const fishAfter = i + 1 < gameState.verlauf.length
@@ -1062,10 +1101,10 @@ function GamePage({ gameState, setGameState }) {
                                                 const growth = fishAfter - v.fischbestand + v.gesamtFang
                                                 return (
                                                     <tr key={i} className={`border-b border-white/5 ${i % 2 !== 0 ? 'bg-white/5' : ''}`}>
-                                                        <td className="py-0.5 pr-2 text-blue-400">{v.runde}</td>
-                                                        <td className="py-0.5 px-1 text-right">{v.fischbestand.toLocaleString()}</td>
-                                                        <td className="py-0.5 px-1 text-right text-red-300">{v.gesamtFang.toLocaleString()}</td>
-                                                        <td className={`py-0.5 pl-1 text-right ${growth >= 0 ? 'text-green-300' : 'text-red-300'}`}>
+                                                        <td className="py-1 pr-3 text-blue-400">{v.runde}</td>
+                                                        <td className="py-1 px-2 text-right">{v.fischbestand.toLocaleString()}</td>
+                                                        <td className="py-1 px-2 text-right text-red-300">{v.gesamtFang.toLocaleString()}</td>
+                                                        <td className={`py-1 pl-2 text-right ${growth >= 0 ? 'text-green-300' : 'text-red-300'}`}>
                                                             {growth >= 0 ? '+' : ''}{growth.toLocaleString()}
                                                         </td>
                                                     </tr>
@@ -1086,67 +1125,99 @@ function GamePage({ gameState, setGameState }) {
                         {/* Ship market summary */}
                         <div className="bg-white/10 rounded-xl p-3">
                             <h3 className="font-bold text-sm mb-2">Ship Market</h3>
-                            <div className="grid grid-cols-2 gap-3 text-sm mb-2">
+                            <div className="grid grid-cols-2 gap-3 text-sm mb-3">
                                 <div className="bg-white/5 rounded-lg p-2.5">
                                     <div className="text-xs text-blue-300 mb-0.5">Current market price</div>
                                     <div className="text-xl font-bold text-yellow-300">{marketShipPrice.toLocaleString()}€</div>
-                                    <div className="text-xs text-blue-400 mt-0.5">sell instantly via "Sell Ship" in Dashboard</div>
+                                    <div className="text-xs text-blue-400 mt-0.5">per ship · buy or sell instantly</div>
                                 </div>
                                 <div className="bg-white/5 rounded-lg p-2.5">
                                     <div className="text-xs text-blue-300 mb-0.5">New ship (shipyard)</div>
                                     <div className="text-xl font-bold text-blue-300">{newShipPriceUI.toLocaleString()}€</div>
-                                    <div className="text-xs text-blue-400 mt-0.5">ordered in Dashboard · arrives next round</div>
+                                    <div className="text-xs text-blue-400 mt-0.5">{newShipPriceUI.toLocaleString()}€ each · arrives next round</div>
                                 </div>
                             </div>
                             {activeTeam && (
-                                <div className="text-xs text-blue-400 space-y-0.5">
-                                    <div>Max order this round: <span className="text-white font-medium">{Math.ceil(activeTeam.fleet / 2)} ships</span> (½ of your fleet of {activeTeam.fleet})</div>
-                                    {(activeTeam.shipsInDelivery || 0) > 0 && (
-                                        <div className="text-green-400">{activeTeam.shipsInDelivery} ship{activeTeam.shipsInDelivery !== 1 ? 's' : ''} from your order arriving this round</div>
-                                    )}
-                                </div>
+                                <>
+                                    <div className="grid grid-cols-2 gap-3 mb-2">
+                                        {/* Instant Sale */}
+                                        <div className="bg-white/5 border border-white/10 rounded-lg p-2.5">
+                                            <div className="text-xs font-bold text-blue-200 mb-2">Instant Sale</div>
+                                            <button
+                                                onClick={handleBootVerkaufen}
+                                                disabled={activeTeam.fleet <= 1}
+                                                className="w-full bg-white/15 hover:bg-white/25 disabled:opacity-40 disabled:cursor-not-allowed font-medium py-1.5 px-2 rounded-lg transition-colors text-xs text-blue-100 border border-white/10 mb-1.5"
+                                            >
+                                                Sell 1 Ship – receive {marketShipPrice.toLocaleString()}€ instantly
+                                                {activeTeam.fleet <= 1 && <span className="block text-xs text-blue-400 mt-0.5">(min. 1 ship)</span>}
+                                            </button>
+                                            <div className="text-xs text-blue-400">Sell at current market price immediately.</div>
+                                        </div>
+
+                                        {/* Auction */}
+                                        <div className="bg-white/5 border border-white/10 rounded-lg p-2.5">
+                                            <div className="text-xs font-bold text-blue-200 mb-2">Auction</div>
+                                            {activeTeam.fleet > 1 ? (
+                                                <>
+                                                    <div className="flex items-center gap-2 mb-1.5">
+                                                        <button onClick={() => setCurrentBoatsOffered(Math.max(0, currentBoatsOffered - 1))}
+                                                            className="bg-white/20 hover:bg-white/30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0">−</button>
+                                                        <div className="text-base font-bold w-6 text-center">{currentBoatsOffered}</div>
+                                                        <button onClick={() => setCurrentBoatsOffered(Math.min(activeTeam.fleet - 1, currentBoatsOffered + 1))}
+                                                            className="bg-white/20 hover:bg-white/30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0">+</button>
+                                                        <span className="text-xs text-blue-300">ships offered</span>
+                                                    </div>
+                                                    <div className="text-xs text-blue-400">Offer ships to other teams. Bidding happens each round. Higher price possible but not guaranteed.</div>
+                                                </>
+                                            ) : (
+                                                <div className="text-xs text-blue-500">Need at least 2 ships to offer at auction.</div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="text-xs text-blue-400 space-y-0.5">
+                                        <div>Max order this round: <span className="text-white font-medium">{Math.ceil(activeTeam.fleet / 2)} ships</span> (½ of your fleet of {activeTeam.fleet})</div>
+                                        {(activeTeam.shipsInDelivery || 0) > 0 && (
+                                            <div className="text-green-400">{activeTeam.shipsInDelivery} ship{activeTeam.shipsInDelivery !== 1 ? 's' : ''} from your order arriving this round</div>
+                                        )}
+                                    </div>
+                                </>
                             )}
                         </div>
 
-                        {/* Offer Ships at Auction */}
-                        {activeTeam && activeTeam.fleet > 1 && (
-                            <div className="bg-white/10 rounded-xl p-3">
-                                <h3 className="font-bold text-sm mb-2">Offer Ships at Auction</h3>
-                                <div className="flex items-center gap-2">
-                                    <button onClick={() => setCurrentBoatsOffered(Math.max(0, currentBoatsOffered - 1))}
-                                        className="bg-white/20 hover:bg-white/30 w-7 h-7 rounded-full font-bold text-sm flex items-center justify-center shrink-0">−</button>
-                                    <div className="text-lg font-bold w-7 text-center">{currentBoatsOffered}</div>
-                                    <button onClick={() => setCurrentBoatsOffered(Math.min(activeTeam.fleet - 1, currentBoatsOffered + 1))}
-                                        className="bg-white/20 hover:bg-white/30 w-7 h-7 rounded-full font-bold text-sm flex items-center justify-center shrink-0">+</button>
-                                    <div className="text-xs text-blue-300">ships offered · min. 150€ starting bid · result shown in round summary</div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Fleet overview */}
+                        {/* Fleet overview — sorted by net worth */}
                         <div className="bg-white/10 rounded-xl p-3">
                             <h3 className="font-bold text-sm mb-2">Fleet Overview</h3>
-                            <div className="grid grid-cols-5 gap-x-2 text-xs text-blue-400 font-medium px-3 py-1 mb-1 border-b border-white/10">
+                            <div className="grid grid-cols-6 gap-x-2 text-xs text-blue-400 font-medium px-3 py-1 mb-1 border-b border-white/10">
+                                <div>Rank</div>
                                 <div>Team</div>
                                 <div className="text-center">Ships</div>
                                 <div className="text-right">Fleet Value</div>
                                 <div className="text-right">Balance</div>
                                 <div className="text-right">Net Worth</div>
                             </div>
-                            <div className="space-y-1">
-                                {gameState.teams.map(team => {
-                                    const fleetValue = team.fleet * marketShipPrice
-                                    return (
-                                        <div key={team.name} className="grid grid-cols-5 gap-x-2 text-xs bg-white/5 rounded-lg px-3 py-1.5 items-center">
-                                            <div className="font-bold truncate">{team.farbe} {team.name} {team.istKI ? '🤖' : ''}</div>
-                                            <div className="text-center text-blue-200">{team.fleet}{(team.shipsInDelivery || 0) > 0 ? <span className="text-green-400"> +{team.shipsInDelivery}</span> : ''}</div>
-                                            <div className="text-right text-yellow-300">{fleetValue.toLocaleString()}€</div>
-                                            <div className="text-right text-blue-200">{team.bankBalance.toLocaleString()}€</div>
-                                            <div className="text-right text-white font-bold">{team.netWorth.toLocaleString()}€</div>
-                                        </div>
-                                    )
-                                })}
-                            </div>
+                            {(() => {
+                                const ranked = [...gameState.teams].sort((a, b) => b.netWorth - a.netWorth)
+                                const RANKS = ['1st', '2nd', '3rd', '4th', '5th']
+                                return (
+                                    <div className="space-y-1">
+                                        {ranked.map((team, rankIdx) => {
+                                            const fleetValue = team.fleet * marketShipPrice
+                                            const isLeader = rankIdx === 0
+                                            return (
+                                                <div key={team.name} className={`grid grid-cols-6 gap-x-2 text-xs rounded-lg px-3 py-1.5 items-center ${isLeader ? 'bg-yellow-500/15 border border-yellow-400/20' : 'bg-white/5'}`}>
+                                                    <div className={`font-bold ${isLeader ? 'text-yellow-300' : 'text-blue-500'}`}>{RANKS[rankIdx] ?? `${rankIdx + 1}th`}</div>
+                                                    <div className={`font-bold truncate ${isLeader ? 'text-yellow-100' : ''}`}>{team.farbe} {team.name} {team.istKI ? '🤖' : ''}</div>
+                                                    <div className="text-center text-blue-200">{team.fleet}{(team.shipsInDelivery || 0) > 0 ? <span className="text-green-400"> +{team.shipsInDelivery}</span> : ''}</div>
+                                                    <div className="text-right text-yellow-300">{fleetValue.toLocaleString()}€</div>
+                                                    <div className="text-right text-blue-200">{team.bankBalance.toLocaleString()}€</div>
+                                                    <div className={`text-right font-bold ${isLeader ? 'text-yellow-200' : 'text-white'}`}>{team.netWorth.toLocaleString()}€</div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                )
+                            })()}
                         </div>
 
                         {/* Auction history */}
