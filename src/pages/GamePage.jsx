@@ -624,201 +624,176 @@ function GamePage({ gameState, setGameState }) {
 
                 {/* ── Tab 1: Dashboard ──────────────────────────────────────────── */}
                 {activeTab === 'dashboard' && (
-                    <div className="p-3 flex flex-col gap-3 h-full">
+                    <div className="p-3 flex flex-col gap-2 h-full">
 
-                        {/* Net worth grid */}
-                        <div className="grid grid-cols-2 gap-2">
+                        {/* Team cards — single compact row */}
+                        <div className="flex-none flex gap-2">
                             {gameState.teams.map((team, index) => {
                                 const isActive = index === activeSlot
                                 const hasSubmitted = !team.istKI && humanDecisions[index] !== undefined
                                 return (
                                     <div
                                         key={team.name}
-                                        className={`rounded-xl px-3 py-2 transition-all ${
+                                        className={`flex-1 rounded-xl px-2.5 py-2 transition-all ${
                                             isActive ? 'bg-green-600/80 ring-2 ring-green-400' :
                                             hasSubmitted ? 'bg-green-900/50' :
                                             'bg-white/10'
                                         }`}
                                     >
-                                        <div className="flex justify-between items-start">
-                                            <span className="font-bold text-xs">{team.farbe} {team.name}</span>
-                                            <span className="text-xs opacity-70">
+                                        <div className="flex justify-between items-center">
+                                            <span className="font-bold text-xs truncate">{team.farbe} {team.name}</span>
+                                            <span className="text-xs opacity-60 shrink-0 ml-1">
                                                 {team.istKI ? '🤖' : hasSubmitted ? '✓' : isActive ? '' : '…'}
                                             </span>
                                         </div>
-                                        {team.persoenlichkeit && (
-                                            <div className="text-xs text-blue-300">{PERSOENLICHKEIT_LABEL[team.persoenlichkeit]}</div>
-                                        )}
-                                        <div className="text-xs text-blue-200">Balance: {team.bankBalance.toLocaleString()}€</div>
-                                        <div className="text-xs text-blue-200">Fleet: {team.fleet} ships × {marketShipPrice.toLocaleString()}€</div>
-                                        <div className="text-xs font-bold">Net Worth: {team.netWorth.toLocaleString()}€</div>
-                                        {team.letzterFang > 0 && (
-                                            <div className="text-xs text-blue-300">Catch: {team.letzterFang} | Interest: {team.letzteZinsen >= 0 ? '+' : ''}{team.letzteZinsen}€</div>
-                                        )}
-                                        {(team.shipsInDelivery || 0) > 0 && (
-                                            <div className="text-xs text-green-300">+{team.shipsInDelivery} arriving next round</div>
-                                        )}
+                                        <div className="text-sm font-bold leading-tight mt-0.5">{team.netWorth.toLocaleString()}€</div>
+                                        <div className="text-xs text-blue-300">{team.fleet} ships{(team.shipsInDelivery || 0) > 0 ? ` +${team.shipsInDelivery}` : ''}</div>
                                     </div>
                                 )
                             })}
                         </div>
 
-                        {/* Ship allocation + decision panel */}
+                        {/* Decision panel */}
                         {activeTeam ? (
-                            <div className="flex-1 bg-white/10 rounded-xl p-3 flex flex-col gap-2">
-                                <div className="flex-1 overflow-y-auto flex flex-col gap-2">
+                            <div className="flex-1 min-h-0 bg-white/10 rounded-xl p-3 flex flex-col gap-2">
+
+                                {/* Header + subtle DEV button */}
+                                <div className="flex justify-between items-center">
                                     <h2 className="font-bold text-sm">{activeTeam.name} – Ship Allocation</h2>
-
-                                    {(activeTeam.shipsInDelivery || 0) > 0 && (
-                                        <div className="bg-green-500/15 border border-green-400/30 rounded-lg px-2.5 py-1.5 text-xs text-green-200">
-                                            {activeTeam.shipsInDelivery} ship{activeTeam.shipsInDelivery !== 1 ? 's' : ''} arriving this round from last round's order
-                                        </div>
-                                    )}
-
-                                    {/* Zone allocator */}
-                                    <div className="bg-white/5 rounded-lg p-2.5">
-                                        <div className="flex justify-between items-center mb-2">
-                                            <span className="text-xs font-bold text-blue-200">Deploy {fleetSize} ships:</span>
-                                            <span className={`text-xs font-bold ${allAllocated ? 'text-green-300' : 'text-yellow-300'}`}>
-                                                {totalAllocated} / {fleetSize}
-                                            </span>
-                                        </div>
-                                        {[
-                                            { label: 'Harbor',   color: 'text-gray-300',   hint: '$50/ship · no catch',    val: currentHarbor,   set: setCurrentHarbor },
-                                            { label: 'Coastal',  color: 'text-blue-300',   hint: '$150/ship · max 15/ship', val: currentCoastal,  set: setCurrentCoastal },
-                                            { label: 'Deep Sea', color: 'text-yellow-300', hint: '$250/ship · max 25/ship', val: currentDeepSea,  set: setCurrentDeepSea },
-                                        ].map(({ label, color, hint, val, set }) => (
-                                            <div key={label} className="flex items-center gap-1.5 mb-1.5 last:mb-0">
-                                                <span className={`text-xs w-16 ${color}`}>{label}</span>
-                                                <button
-                                                    onClick={() => set(Math.max(0, val - 1))}
-                                                    disabled={val === 0}
-                                                    className="bg-white/20 hover:bg-white/30 disabled:opacity-30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0"
-                                                >−</button>
-                                                <span className="w-5 text-center font-bold text-sm">{val}</span>
-                                                <button
-                                                    onClick={() => set(val + 1)}
-                                                    disabled={allAllocated}
-                                                    className="bg-white/20 hover:bg-white/30 disabled:opacity-30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0"
-                                                >+</button>
-                                                <span className={`text-xs ${color} opacity-70`}>{hint}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    {/* Zone Statistics table */}
-                                    {(() => {
-                                        const sqrtD      = Math.sqrt(Math.max(0, fishDichte))
-                                        const fishPrice  = gameState.params?.fishPrice  ?? GAME_CONFIG.fischPreis
-                                        const hCost      = gameState.params?.harborCost  ?? GAME_CONFIG.harborCost
-                                        const cCost      = gameState.params?.coastalCost ?? GAME_CONFIG.coastalCost
-                                        const dCost      = gameState.params?.deepSeaCost ?? GAME_CONFIG.deepSeaCost
-                                        const cCatch     = 15 * sqrtD
-                                        const dCatch     = 25 * sqrtD
-                                        const cRev       = cCatch * fishPrice
-                                        const dRev       = dCatch * fishPrice
-                                        const hProfit    = -hCost
-                                        const cProfit    = cRev - cCost
-                                        const dProfit    = dRev - dCost
-                                        const profitCls  = v => v >= 0 ? 'text-green-300' : 'text-red-300'
-                                        const fmt        = v => v.toFixed(1)
-                                        const rows = [
-                                            { label: 'Expected Catch', h: '0',          c: `${fmt(cCatch)} fish`, d: `${fmt(dCatch)} fish` },
-                                            { label: 'Fish Price',     h: `$${fishPrice}`, c: `$${fishPrice}`,     d: `$${fishPrice}` },
-                                            { label: 'Revenue/Ship',   h: '$0',          c: `$${fmt(cRev)}`,       d: `$${fmt(dRev)}` },
-                                            { label: 'Op Cost/Ship',   h: `$${hCost}`,   c: `$${cCost}`,           d: `$${dCost}` },
-                                        ]
-                                        return (
-                                            <div className="bg-white/5 rounded-lg p-2.5">
-                                                <div className="text-xs font-bold text-blue-200 mb-2">Zone Statistics (at current fish density)</div>
-                                                <div className="grid grid-cols-4 gap-x-2 text-xs mb-1">
-                                                    <div className="text-blue-400"></div>
-                                                    <div className="font-medium text-gray-300 text-center">Harbor</div>
-                                                    <div className="font-medium text-blue-300 text-center">Coastal</div>
-                                                    <div className="font-medium text-yellow-300 text-center">Deep Sea</div>
-                                                </div>
-                                                {rows.map(row => (
-                                                    <div key={row.label} className="grid grid-cols-4 gap-x-2 text-xs leading-5 border-t border-white/5">
-                                                        <div className="text-blue-400">{row.label}</div>
-                                                        <div className="text-center text-blue-100">{row.h}</div>
-                                                        <div className="text-center text-blue-100">{row.c}</div>
-                                                        <div className="text-center text-blue-100">{row.d}</div>
-                                                    </div>
-                                                ))}
-                                                <div className="grid grid-cols-4 gap-x-2 text-xs leading-5 border-t border-white/10 mt-0.5 pt-0.5 font-bold">
-                                                    <div className="text-blue-400">Profit/Ship</div>
-                                                    <div className={`text-center ${profitCls(hProfit)}`}>−${hCost}</div>
-                                                    <div className={`text-center ${profitCls(cProfit)}`}>{cProfit >= 0 ? '+' : ''}${fmt(cProfit)}</div>
-                                                    <div className={`text-center ${profitCls(dProfit)}`}>{dProfit >= 0 ? '+' : ''}${fmt(dProfit)}</div>
-                                                </div>
-                                                <div className="text-xs text-blue-500 mt-1.5">Values based on current fish density: {fishPct}%</div>
-                                            </div>
-                                        )
-                                    })()}
-
-                                    {/* Sell + Order */}
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <button
-                                            onClick={handleBootVerkaufen}
-                                            disabled={activeTeam.fleet <= 1}
-                                            className="bg-orange-500 hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed font-bold py-2 rounded-xl transition-colors text-xs"
-                                        >
-                                            Sell Ship<br />
-                                            <span className="font-normal">{marketShipPrice.toLocaleString()}€ (instant)</span>
-                                        </button>
-                                        <div className="bg-blue-500/20 border border-blue-400/20 rounded-xl px-2.5 py-2">
-                                            <div className="text-xs font-bold text-blue-200 mb-0.5">Order New Ships</div>
-                                            <div className="text-xs text-blue-400 mb-1.5">{newShipPriceUI.toLocaleString()}€ each · next round · max: {maxShipOrder}</div>
-                                            <div className="flex items-center gap-1 flex-wrap">
-                                                {Array.from({ length: maxShipOrder + 1 }, (_, i) => (
-                                                    <button
-                                                        key={i}
-                                                        onClick={() => setCurrentShipsOrdered(i)}
-                                                        className={`min-w-[1.75rem] h-7 rounded px-1 font-bold text-sm transition-colors ${
-                                                            safeShipsOrdered === i
-                                                                ? 'bg-blue-500 text-white'
-                                                                : 'bg-white/20 hover:bg-white/30 text-white'
-                                                        }`}
-                                                    >{i}</button>
-                                                ))}
-                                                {safeShipsOrdered > 0 && (
-                                                    <span className="text-xs text-blue-300 ml-0.5">−{(safeShipsOrdered * newShipPriceUI).toLocaleString()}€</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Auction offer */}
-                                    {activeTeam.fleet > 1 && (
-                                        <div className="bg-yellow-500/10 border border-yellow-400/20 rounded-lg px-3 py-2">
-                                            <div className="text-xs text-yellow-300 font-bold mb-1">Offer Ships at Auction</div>
-                                            <div className="flex items-center gap-2">
-                                                <button onClick={() => setCurrentBoatsOffered(Math.max(0, currentBoatsOffered - 1))} className="bg-white/20 hover:bg-white/30 w-7 h-7 rounded-full font-bold text-sm flex items-center justify-center shrink-0">−</button>
-                                                <div className="text-lg font-bold w-7 text-center">{currentBoatsOffered}</div>
-                                                <button onClick={() => setCurrentBoatsOffered(Math.min(activeTeam.fleet - 1, currentBoatsOffered + 1))} className="bg-white/20 hover:bg-white/30 w-7 h-7 rounded-full font-bold text-sm flex items-center justify-center shrink-0">+</button>
-                                                <div className="text-xs text-blue-300">min. 150€ starting bid</div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="flex-none flex flex-col gap-1.5">
                                     {import.meta.env.DEV && (
-                                        <button onClick={handleDevSkip} className="w-full bg-purple-600 hover:bg-purple-500 font-bold py-1.5 rounded-xl transition-colors text-xs">
-                                            DEV: Simulate Game
+                                        <button
+                                            onClick={handleDevSkip}
+                                            className="text-xs text-gray-600 hover:text-gray-400 transition-colors px-1"
+                                        >
+                                            dev: skip →
                                         </button>
                                     )}
-                                    <button
-                                        onClick={handleSubmit}
-                                        disabled={!allAllocated}
-                                        className="w-full bg-green-500 hover:bg-green-400 disabled:opacity-50 disabled:cursor-not-allowed font-bold py-2.5 rounded-xl text-sm transition-colors"
-                                    >
-                                        {allAllocated ? 'Confirm Round' : `Allocate all ${fleetSize} ships first`}
-                                    </button>
                                 </div>
+
+                                {(activeTeam.shipsInDelivery || 0) > 0 && (
+                                    <div className="bg-green-500/15 border border-green-400/30 rounded-lg px-2.5 py-1 text-xs text-green-200">
+                                        {activeTeam.shipsInDelivery} ship{activeTeam.shipsInDelivery !== 1 ? 's' : ''} arriving this round from last round's order
+                                    </div>
+                                )}
+
+                                {/* Zone allocator */}
+                                <div className="bg-white/5 rounded-lg p-2.5">
+                                    <div className="flex justify-between items-center mb-1.5">
+                                        <span className="text-xs font-bold text-blue-200">Deploy {fleetSize} ships:</span>
+                                        <span className={`text-xs font-bold ${allAllocated ? 'text-green-300' : 'text-yellow-300'}`}>
+                                            {totalAllocated} / {fleetSize}
+                                        </span>
+                                    </div>
+                                    {[
+                                        { label: 'Harbor',   color: 'text-gray-300',   hint: '$50/ship · no catch',    val: currentHarbor,  set: setCurrentHarbor },
+                                        { label: 'Coastal',  color: 'text-blue-300',   hint: '$150/ship · max 15/ship', val: currentCoastal, set: setCurrentCoastal },
+                                        { label: 'Deep Sea', color: 'text-yellow-300', hint: '$250/ship · max 25/ship', val: currentDeepSea, set: setCurrentDeepSea },
+                                    ].map(({ label, color, hint, val, set }) => (
+                                        <div key={label} className="flex items-center gap-1.5 mb-1 last:mb-0">
+                                            <span className={`text-xs w-16 ${color}`}>{label}</span>
+                                            <button onClick={() => set(Math.max(0, val - 1))} disabled={val === 0}
+                                                className="bg-white/20 hover:bg-white/30 disabled:opacity-30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0">−</button>
+                                            <span className="w-5 text-center font-bold text-sm">{val}</span>
+                                            <button onClick={() => set(val + 1)} disabled={allAllocated}
+                                                className="bg-white/20 hover:bg-white/30 disabled:opacity-30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0">+</button>
+                                            <span className={`text-xs ${color} opacity-70`}>{hint}</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Zone Statistics table */}
+                                {(() => {
+                                    const sqrtD     = Math.sqrt(Math.max(0, fishDichte))
+                                    const fishPrice = gameState.params?.fishPrice   ?? GAME_CONFIG.fischPreis
+                                    const hCost     = gameState.params?.harborCost  ?? GAME_CONFIG.harborCost
+                                    const cCost     = gameState.params?.coastalCost ?? GAME_CONFIG.coastalCost
+                                    const dCost     = gameState.params?.deepSeaCost ?? GAME_CONFIG.deepSeaCost
+                                    const cCatch    = 15 * sqrtD
+                                    const dCatch    = 25 * sqrtD
+                                    const cRev      = cCatch * fishPrice
+                                    const dRev      = dCatch * fishPrice
+                                    const hProfit   = -hCost
+                                    const cProfit   = cRev - cCost
+                                    const dProfit   = dRev - dCost
+                                    const pCls      = v => v >= 0 ? 'text-green-300' : 'text-red-300'
+                                    const fmt       = v => v.toFixed(1)
+                                    const rows = [
+                                        { label: 'Catch/Ship',   h: '0',             c: fmt(cCatch),     d: fmt(dCatch) },
+                                        { label: 'Fish Price',   h: `$${fishPrice}`, c: `$${fishPrice}`, d: `$${fishPrice}` },
+                                        { label: 'Revenue/Ship', h: '$0',            c: `$${fmt(cRev)}`, d: `$${fmt(dRev)}` },
+                                        { label: 'Op Cost/Ship', h: `$${hCost}`,     c: `$${cCost}`,     d: `$${dCost}` },
+                                    ]
+                                    return (
+                                        <div className="bg-white/5 rounded-lg p-2.5">
+                                            <div className="text-xs font-bold text-blue-200 mb-1">Zone Statistics (current fish density)</div>
+                                            <div className="grid grid-cols-4 gap-x-2 text-xs mb-0.5">
+                                                <div />
+                                                <div className="font-medium text-gray-300 text-center">Harbor</div>
+                                                <div className="font-medium text-blue-300 text-center">Coastal</div>
+                                                <div className="font-medium text-yellow-300 text-center">Deep Sea</div>
+                                            </div>
+                                            {rows.map(row => (
+                                                <div key={row.label} className="grid grid-cols-4 gap-x-2 text-xs leading-5 border-t border-white/5">
+                                                    <div className="text-blue-400">{row.label}</div>
+                                                    <div className="text-center text-blue-100">{row.h}</div>
+                                                    <div className="text-center text-blue-100">{row.c}</div>
+                                                    <div className="text-center text-blue-100">{row.d}</div>
+                                                </div>
+                                            ))}
+                                            <div className="grid grid-cols-4 gap-x-2 text-xs leading-5 border-t border-white/10 mt-0.5 pt-0.5 font-bold">
+                                                <div className="text-blue-400">Profit/Ship</div>
+                                                <div className={`text-center ${pCls(hProfit)}`}>−${hCost}</div>
+                                                <div className={`text-center ${pCls(cProfit)}`}>{cProfit >= 0 ? '+' : ''}${fmt(cProfit)}</div>
+                                                <div className={`text-center ${pCls(dProfit)}`}>{dProfit >= 0 ? '+' : ''}${fmt(dProfit)}</div>
+                                            </div>
+                                            <div className="text-xs text-blue-500 mt-1">Based on current fish density: {fishPct}%</div>
+                                        </div>
+                                    )
+                                })()}
+
+                                {/* Ship actions: Sell + Order in one row */}
+                                <div className="flex gap-2 items-start">
+                                    <button
+                                        onClick={handleBootVerkaufen}
+                                        disabled={activeTeam.fleet <= 1}
+                                        className="shrink-0 bg-white/15 hover:bg-white/25 disabled:opacity-40 disabled:cursor-not-allowed font-medium py-1.5 px-3 rounded-lg transition-colors text-xs text-blue-100"
+                                    >
+                                        Sell Ship<br />
+                                        <span className="text-blue-400 font-normal">market: {marketShipPrice.toLocaleString()}€</span>
+                                    </button>
+                                    <div className="flex-1 bg-blue-500/20 border border-blue-400/20 rounded-lg px-2.5 py-1.5">
+                                        <div className="text-xs font-bold text-blue-200 mb-1">
+                                            Order New Ships
+                                            <span className="font-normal text-blue-400"> · {newShipPriceUI.toLocaleString()}€ · next round · max {maxShipOrder}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1 flex-wrap">
+                                            {Array.from({ length: maxShipOrder + 1 }, (_, i) => (
+                                                <button
+                                                    key={i}
+                                                    onClick={() => setCurrentShipsOrdered(i)}
+                                                    className={`min-w-[1.75rem] h-7 rounded px-1 font-bold text-sm transition-colors ${
+                                                        safeShipsOrdered === i ? 'bg-blue-500 text-white' : 'bg-white/20 hover:bg-white/30 text-white'
+                                                    }`}
+                                                >{i}</button>
+                                            ))}
+                                            {safeShipsOrdered > 0 && (
+                                                <span className="text-xs text-blue-300 ml-0.5">−{(safeShipsOrdered * newShipPriceUI).toLocaleString()}€</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Confirm Round */}
+                                <button
+                                    onClick={handleSubmit}
+                                    disabled={!allAllocated}
+                                    className="w-full bg-green-500 hover:bg-green-400 disabled:opacity-50 disabled:cursor-not-allowed font-bold py-2.5 rounded-xl text-sm transition-colors"
+                                >
+                                    {allAllocated ? 'Confirm Round' : `Allocate all ${fleetSize} ships first`}
+                                </button>
                             </div>
                         ) : (
-                            <div className="flex-1 bg-white/10 rounded-xl p-3 flex items-center justify-center">
+                            <div className="flex-1 min-h-0 bg-white/10 rounded-xl p-3 flex items-center justify-center">
                                 <p className="text-blue-300 text-center text-xs">All decisions submitted.<br />Processing round…</p>
                             </div>
                         )}
@@ -913,6 +888,21 @@ function GamePage({ gameState, setGameState }) {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Offer Ships at Auction */}
+                        {activeTeam && activeTeam.fleet > 1 && (
+                            <div className="bg-white/10 rounded-xl p-3">
+                                <h3 className="font-bold text-sm mb-2">Offer Ships at Auction</h3>
+                                <div className="flex items-center gap-2">
+                                    <button onClick={() => setCurrentBoatsOffered(Math.max(0, currentBoatsOffered - 1))}
+                                        className="bg-white/20 hover:bg-white/30 w-7 h-7 rounded-full font-bold text-sm flex items-center justify-center shrink-0">−</button>
+                                    <div className="text-lg font-bold w-7 text-center">{currentBoatsOffered}</div>
+                                    <button onClick={() => setCurrentBoatsOffered(Math.min(activeTeam.fleet - 1, currentBoatsOffered + 1))}
+                                        className="bg-white/20 hover:bg-white/30 w-7 h-7 rounded-full font-bold text-sm flex items-center justify-center shrink-0">+</button>
+                                    <div className="text-xs text-blue-300">ships offered · min. 150€ starting bid · result shown in round summary</div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Fleet overview */}
                         <div className="bg-white/10 rounded-xl p-3">
