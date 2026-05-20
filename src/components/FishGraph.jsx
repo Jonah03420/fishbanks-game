@@ -1,7 +1,8 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { GAME_CONFIG } from '../game/fishLogic'
 
-function FishGraph({ verlauf }) {
+function FishGraph({ verlauf, maxFisch }) {
+  const yMax = maxFisch || GAME_CONFIG.maxFischbestand
   if (verlauf.length === 0) return (
     <div className="w-full h-full bg-white/10 rounded-xl flex items-center justify-center text-blue-400 text-sm">
       Noch keine Daten – erste Runde läuft
@@ -22,7 +23,7 @@ function FishGraph({ verlauf }) {
             />
             <YAxis
               stroke="rgba(255,255,255,0.5)"
-              domain={[0, GAME_CONFIG.maxFischbestand]}
+              domain={[0, yMax]}
               tick={{ fontSize: 10 }}
               tickFormatter={v => v.toLocaleString()}
             />

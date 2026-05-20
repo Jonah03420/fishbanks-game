@@ -75,7 +75,7 @@ export default function AdminPage({ onBack }) {
 
   function handlePasswordSubmit(e) {
     e.preventDefault()
-    if (passwordInput === 'fish2024') {
+    if (passwordInput === 'jmu26') {
       setAuthenticated(true)
     } else {
       setPasswordError(true)
@@ -212,8 +212,14 @@ export default function AdminPage({ onBack }) {
                   suffix="%"
                 />
               </Row>
-              <Row label="Operating cost/ship" hint={`Default: $${ADMIN_DEFAULTS.operatingCostPerShip}/round (all zones)`}>
-                <NumInput value={settings.operatingCostPerShip} onChange={v => set('operatingCostPerShip', v)} min={0} max={500} step={5} prefix="$" suffix="/round" />
+              <Row label="Harbor cost/ship" hint={`Default: $${ADMIN_DEFAULTS.harborCost}/round (no catch)`}>
+                <NumInput value={settings.harborCost} onChange={v => set('harborCost', v)} min={0} max={500} step={5} prefix="$" suffix="/round" />
+              </Row>
+              <Row label="Coastal cost/ship" hint={`Default: $${ADMIN_DEFAULTS.coastalCost}/round (max 15 fish/ship)`}>
+                <NumInput value={settings.coastalCost} onChange={v => set('coastalCost', v)} min={0} max={500} step={5} prefix="$" suffix="/round" />
+              </Row>
+              <Row label="Deep Sea cost/ship" hint={`Default: $${ADMIN_DEFAULTS.deepSeaCost}/round (max 25 fish/ship)`}>
+                <NumInput value={settings.deepSeaCost} onChange={v => set('deepSeaCost', v)} min={0} max={500} step={5} prefix="$" suffix="/round" />
               </Row>
               <Row label="Starting capital" hint={`Default: $${ADMIN_DEFAULTS.startingCapital.toLocaleString()}/team`}>
                 <NumInput value={settings.startingCapital} onChange={v => set('startingCapital', v)} min={500} max={50000} step={500} prefix="$" />
