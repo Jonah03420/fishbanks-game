@@ -912,19 +912,6 @@ function GamePage({ gameState, setGameState }) {
                                     <div className="text-xs text-blue-400 mt-0.5">ordered in Dashboard · arrives next round</div>
                                 </div>
                             </div>
-                            <div className="mt-2 bg-white/5 rounded-lg p-2.5 text-xs text-blue-200">
-                                <div className="font-bold text-white mb-1">Zone operating costs (per ship per round)</div>
-                                <div className="grid grid-cols-3 gap-2">
-                                    <div><span className="text-gray-300">Harbor</span><br />${(gameState.params?.harborCost ?? GAME_CONFIG.harborCost).toLocaleString()}/ship · no catch</div>
-                                    <div><span className="text-blue-300">Coastal</span><br />${(gameState.params?.coastalCost ?? GAME_CONFIG.coastalCost).toLocaleString()}/ship · max 15/ship</div>
-                                    <div><span className="text-yellow-300">Deep Sea</span><br />${(gameState.params?.deepSeaCost ?? GAME_CONFIG.deepSeaCost).toLocaleString()}/ship · max 25/ship</div>
-                                </div>
-                            </div>
-                            <div className="mt-2 text-xs text-blue-300">
-                                Fish price: <span className="text-white font-bold">{(gameState.params?.fishPrice ?? GAME_CONFIG.fischPreis).toLocaleString()}€/fish</span>
-                                <span className="mx-2">·</span>
-                                Interest rate: <span className="text-white font-bold">{((gameState.params?.interestRate ?? GAME_CONFIG.zinsRate) * 100).toFixed(0)}%/round</span>
-                            </div>
                         </div>
 
                         {/* Fleet overview */}
