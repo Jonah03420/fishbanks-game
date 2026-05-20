@@ -9,7 +9,8 @@
       "Bash(npx acorn *)",
       "Bash(curl -s http://localhost:5173)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(git commit *)"
     ]
   }
 }
