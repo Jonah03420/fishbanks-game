@@ -5,13 +5,13 @@ function FishGraph({ verlauf, maxFisch }) {
   const yMax = maxFisch || GAME_CONFIG.maxFischbestand
   if (verlauf.length === 0) return (
     <div className="w-full h-full bg-white/10 rounded-xl flex items-center justify-center text-blue-400 text-sm">
-      Noch keine Daten – erste Runde läuft
+      No data yet – complete the first round
     </div>
   )
 
   return (
     <div className="w-full h-full bg-white/10 rounded-xl p-3 text-white flex flex-col">
-      <div className="flex-none text-sm font-bold mb-1">📈 Fischbestand Verlauf</div>
+      <div className="flex-none text-sm font-bold mb-1">Fish Stock History</div>
       <div className="flex-1 min-h-0">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={verlauf} margin={{ top: 5, right: 15, left: -20, bottom: 0 }}>
@@ -29,7 +29,7 @@ function FishGraph({ verlauf, maxFisch }) {
             />
             <Tooltip
               contentStyle={{ backgroundColor: '#1e3a8a', border: 'none', borderRadius: '8px', fontSize: 11 }}
-              formatter={v => [`${v.toLocaleString()} Fisch`, 'Bestand']}
+              formatter={v => [`${v.toLocaleString()} fish`, 'Stock']}
             />
             <Line
               type="monotone"
@@ -37,7 +37,7 @@ function FishGraph({ verlauf, maxFisch }) {
               stroke="#22c55e"
               strokeWidth={2}
               dot={false}
-              name="Fischbestand"
+              name="Fish Stock"
             />
           </LineChart>
         </ResponsiveContainer>
