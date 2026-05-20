@@ -6,7 +6,7 @@ function berechneOptimalesErgebnis(maxRunden, startFischbestand, params) {
     const startingCapital = params?.startingCapital ?? GAME_CONFIG.startGuthaben
     let totalGuthaben = startingCapital
     const fishPrice = params?.fishPrice ?? GAME_CONFIG.fischPreis
-    const opCost = params?.operatingCostPerShip ?? GAME_CONFIG.betriebskosten
+    const opCost = params?.deepSeaCost ?? GAME_CONFIG.deepSeaCost
 
     for (let r = 1; r <= maxRunden && fischbestand > 0; r++) {
         // Optimal: each of 4 teams sends 1 of 3 ships (conservative, ~33% capacity)
