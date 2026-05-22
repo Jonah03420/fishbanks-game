@@ -13,7 +13,9 @@
       "Bash(git commit *)",
       "Bash(Remove-Item *)",
       "Bash(del \"C:\\\\Users\\\\jonah\\\\fishbanks-game\\\\verify-ai.mjs\")",
-      "PowerShell(Remove-Item *)"
+      "PowerShell(Remove-Item *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\jonah\\\\fishbanks-game\\\\src\" -Recurse -Filter \"*.js\")",
+      "Bash(Select-Object FullName)"
     ]
   }
 }

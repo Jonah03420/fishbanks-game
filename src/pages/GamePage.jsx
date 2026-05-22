@@ -61,7 +61,8 @@ function kiMaxGebot(team, fischbestand, marketShipPrice) {
     return Math.min(maxBid, team.bankBalance)
 }
 
-function loeseAuktion(teams, sellerIdx, anzahlAngebote, fischbestand, marketShipPrice) {
+// humanBids: { [buyerSlotIdx]: bidAmount } — optional human player bids
+function loeseAuktion(teams, sellerIdx, anzahlAngebote, fischbestand, marketShipPrice, humanBids = {}) {
     if (anzahlAngebote === 0) return { teams, auctionEvents: [] }
     let t = teams.map(x => ({ ...x }))
     const auctionEvents = []
@@ -70,9 +71,14 @@ function loeseAuktion(teams, sellerIdx, anzahlAngebote, fischbestand, marketShip
         let bestBid = 149
         let bestBidderIdx = -1
         t.forEach((team, idx) => {
-            if (idx === sellerIdx || !team.istKI) return
-            const gebot = kiMaxGebot(team, fischbestand, marketShipPrice)
-            if (gebot > bestBid) { bestBid = gebot; bestBidderIdx = idx }
+            if (idx === sellerIdx) return
+            let gebot = 0
+            if (team.istKI) {
+                gebot = kiMaxGebot(team, fischbestand, marketShipPrice)
+            } else {
+                gebot = humanBids[idx] || 0
+            }
+            if (gebot > bestBid && team.bankBalance >= gebot) { bestBid = gebot; bestBidderIdx = idx }
         })
         if (bestBidderIdx === -1) {
             auctionEvents.push({ erfolg: false })
@@ -96,11 +102,11 @@ function kiTeamAktionen(team, gameState, params) {
     let bankBalance = team.bankBalance
     const auctionPrice = gameState.marketShipPrice ?? GAME_CONFIG.auctionPreis
 
-    // Instant sell (AI sells at current market price)
+    // Auction sell — goes to pending offers, resolved next round by all bidders
+    let shipsToAuction = 0
     if (decision.shipsToSell > 0 && fleet > 1) {
-        const actualSell = Math.min(decision.shipsToSell, fleet - 1)
-        fleet -= actualSell
-        bankBalance += actualSell * auctionPrice
+        shipsToAuction = Math.min(decision.shipsToSell, fleet - 1)
+        // Fleet and balance unchanged until auction resolves next round
     }
 
     // Instant buy (AI buys at current market price)
@@ -118,6 +124,7 @@ function kiTeamAktionen(team, gameState, params) {
         deepSeaShips,
         ausgesandteBoote: coastalShips + deepSeaShips,
         aiNewShipOrders: decision.newShipOrders,
+        shipsToAuction,
     }
 }
 
@@ -162,8 +169,26 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
             console.log('  Step 1 - No ship deliveries')
     }
 
+    // ── Step 1b: Resolve pending auction offers from previous round ──
+    const prevPendingOffers = state.pendingAuctionOffers || []
+    let teamsAfterPending = teamsNachLieferung.map(t => ({ ...t }))
+    let pendingAuctionEvents = []
+    for (const offer of prevPendingOffers) {
+        if ((teamsAfterPending[offer.sellerIdx]?.fleet ?? 0) <= 1) continue
+        const humanBids = {}
+        Object.entries(humanDecisions).forEach(([idxStr, d]) => {
+            const bid = d.auctionBids?.[offer.id]
+            if (bid > 0) humanBids[parseInt(idxStr)] = bid
+        })
+        const { teams: updated, auctionEvents } = loeseAuktion(
+            teamsAfterPending, offer.sellerIdx, offer.count, state.fischbestand, marketShipPrice, humanBids
+        )
+        teamsAfterPending = updated
+        pendingAuctionEvents = pendingAuctionEvents.concat(auctionEvents)
+    }
+
     // ── Step 2: Fleet decisions (AI buy/sell + human pre-round sells already applied) ──
-    const teamsNachEntscheidung = teamsNachLieferung.map((team, index) => {
+    const teamsNachEntscheidung = teamsAfterPending.map((team, index) => {
         if (!team.istKI) {
             const d = humanDecisions[index] || { harbor: 0, coastal: 0, deepSea: 0, boatsOffered: 0, shipsOrdered: 0 }
             const harbor = d.harbor || 0
@@ -177,26 +202,49 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
                 ausgesandteBoote: coastal + deepSea,
             }
         }
-        const stateForAI = { ...state, teams: teamsNachLieferung, marketShipPrice }
+        const stateForAI = { ...state, teams: teamsAfterPending, marketShipPrice }
         return { ...team, ...kiTeamAktionen(team, stateForAI, params) }
     })
 
-    // Detect AI ship purchases this round (fleet grew vs. post-delivery fleet)
+    // Detect AI ship purchases this round (fleet grew vs. post-pending-resolution fleet)
     const aiShipPurchases = []
     teamsNachEntscheidung.forEach((t, i) => {
-        if (t.istKI && t.fleet > teamsNachLieferung[i].fleet) {
-            aiShipPurchases.push({ name: t.name, farbe: t.farbe, count: t.fleet - teamsNachLieferung[i].fleet, price: marketShipPrice })
+        if (t.istKI && t.fleet > teamsAfterPending[i].fleet) {
+            aiShipPurchases.push({ name: t.name, farbe: t.farbe, count: t.fleet - teamsAfterPending[i].fleet, price: marketShipPrice })
         }
     })
 
-    // ── Step 2 continued: Auction — resolve human ship offers before operating costs ──
-    let allAuctionEvents = []
+    // Collect new AI auction offers (pending for next round); skip if seller already has a pending offer
+    const existingPendingSellerIdxs = new Set(prevPendingOffers.map(o => o.sellerIdx))
+    const newPendingAuctionOffers = []
+    teamsNachEntscheidung.forEach((t, i) => {
+        if (t.istKI && (t.shipsToAuction || 0) > 0 && !existingPendingSellerIdxs.has(i)) {
+            newPendingAuctionOffers.push({
+                id: `ai-${i}-${state.runde}`,
+                sellerIdx: i,
+                sellerName: t.name,
+                sellerFarbe: t.farbe,
+                count: t.shipsToAuction,
+            })
+        }
+    })
+
+    // ── Step 2 continued: Auction — resolve human ship offers (H→H and H→AI) ──
+    let allAuctionEvents = [...pendingAuctionEvents]
     let teamsNachStep2 = [...teamsNachEntscheidung]
     for (const [idxStr, decision] of Object.entries(humanDecisions)) {
         const idx = parseInt(idxStr)
         if ((decision.boatsOffered || 0) > 0) {
             const maxOffer = Math.min(decision.boatsOffered, Math.max(0, teamsNachStep2[idx].fleet - 1))
-            const { teams: updated, auctionEvents } = loeseAuktion(teamsNachStep2, idx, maxOffer, state.fischbestand, marketShipPrice)
+            // Collect human bids on this same-round offer (keyed as `h-${sellerSlotIdx}`)
+            const humanBids = {}
+            Object.entries(humanDecisions).forEach(([bidderIdxStr, d]) => {
+                const bidderIdx = parseInt(bidderIdxStr)
+                if (bidderIdx === idx) return
+                const bid = d.auctionBids?.[`h-${idx}`]
+                if (bid > 0) humanBids[bidderIdx] = bid
+            })
+            const { teams: updated, auctionEvents } = loeseAuktion(teamsNachStep2, idx, maxOffer, state.fischbestand, marketShipPrice, humanBids)
             teamsNachStep2 = updated
             allAuctionEvents = [...allAuctionEvents, ...auctionEvents]
         }
@@ -328,6 +376,7 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         verlauf: [...state.verlauf, verlaufEintrag],
         auctionHistory: neueAuctionHistory,
         letzteAuktionEvents: allAuctionEvents,
+        pendingAuctionOffers: newPendingAuctionOffers,
         roundDeliveries,
         letzterWetterfaktor: wetterfaktor,
         letzterGesamtFang: gesamtFang,
@@ -348,6 +397,7 @@ function GamePage({ gameState, setGameState }) {
     })
     const [currentBoatsOffered, setCurrentBoatsOffered] = useState(0)
     const [currentShipsOrdered, setCurrentShipsOrdered] = useState(0)
+    const [humanBids, setHumanBids] = useState({})
     const [showHandoff, setShowHandoff] = useState(false)
     const [rundenErgebnis, setRundenErgebnis] = useState(null)
     const [activeTab, setActiveTab] = useState('dashboard')
@@ -435,6 +485,7 @@ function GamePage({ gameState, setGameState }) {
                 deepSea: currentDeepSea,
                 boatsOffered: currentBoatsOffered,
                 shipsOrdered: safeShipsOrdered,
+                auctionBids: { ...humanBids },
             }
         }
         const allDone = humanTeams.every(t => newDecisions[t.slotIndex] !== undefined)
@@ -444,6 +495,7 @@ function GamePage({ gameState, setGameState }) {
             setCurrentHarbor(0)
             setCurrentCoastal(0)
             setCurrentDeepSea(0)
+            setHumanBids({})
         } else {
             setHumanDecisions(newDecisions)
             // Reset zone allocator for the next player's fleet
@@ -457,6 +509,7 @@ function GamePage({ gameState, setGameState }) {
             setCurrentCoastal(0)
             setCurrentBoatsOffered(0)
             setCurrentShipsOrdered(0)
+            setHumanBids({})
             if (humanTeams.length > 1) setShowHandoff(true)
         }
     }
@@ -474,6 +527,7 @@ function GamePage({ gameState, setGameState }) {
             auctionEvents: nachRunde.letzteAuktionEvents || [],
             roundDeliveries: nachRunde.roundDeliveries || [],
             aiShipPurchases: nachRunde.aiShipPurchases || [],
+            newPendingOffers: nachRunde.pendingAuctionOffers || [],
             gameStateNachRunde: nachRunde,
         })
     }
@@ -485,6 +539,7 @@ function GamePage({ gameState, setGameState }) {
         setGameState(newState)
         setRundenErgebnis(null)
         setHumanDecisions({})
+        setHumanBids({})
         setCurrentHarbor(0)
         setCurrentCoastal(0)
         setCurrentDeepSea(firstHumanTeam ? firstHumanTeam.fleet : 0)
@@ -592,6 +647,18 @@ function GamePage({ gameState, setGameState }) {
                                 {rundenErgebnis.aiShipPurchases.map((p, i) => (
                                     <div key={i} className="text-xs text-blue-200">
                                         {p.farbe} {p.name} purchased {p.count} ship{p.count !== 1 ? 's' : ''} at auction ({p.price.toLocaleString()}€ each)
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* AI ships offered at auction — human can bid next round in Market tab */}
+                        {(rundenErgebnis.newPendingOffers || []).length > 0 && (
+                            <div className="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-2.5 mb-4">
+                                <div className="font-bold text-xs text-yellow-300 mb-1">Ships Offered at Auction</div>
+                                {rundenErgebnis.newPendingOffers.map((offer, i) => (
+                                    <div key={i} className="text-xs text-blue-200">
+                                        {offer.sellerFarbe} {offer.sellerName} offered {offer.count} ship{offer.count !== 1 ? 's' : ''} at auction — bid in the Market tab next round
                                     </div>
                                 ))}
                             </div>
@@ -1204,9 +1271,9 @@ function GamePage({ gameState, setGameState }) {
                                         </div>
                                     </div>
 
-                                    {/* Auction */}
+                                    {/* Auction — offer ships */}
                                     <div className="bg-white/5 border border-white/10 rounded-lg p-2.5 mb-2">
-                                        <div className="text-xs font-bold text-blue-200 mb-2">Auction</div>
+                                        <div className="text-xs font-bold text-blue-200 mb-2">Auction — Offer Ships</div>
                                         {activeTeam.fleet > 1 ? (
                                             <>
                                                 <div className="flex items-center gap-2 mb-1.5">
@@ -1217,12 +1284,78 @@ function GamePage({ gameState, setGameState }) {
                                                         className="bg-white/20 hover:bg-white/30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0">+</button>
                                                     <span className="text-xs text-blue-300">ships offered</span>
                                                 </div>
-                                                <div className="text-xs text-blue-400">Offer ships to other teams. Bidding happens each round. Higher price possible but not guaranteed.</div>
+                                                <div className="text-xs text-blue-400">Offer ships to other teams. Highest bidder wins at end of round.</div>
                                             </>
                                         ) : (
                                             <div className="text-xs text-blue-500">Need at least 2 ships to offer at auction.</div>
                                         )}
                                     </div>
+
+                                    {/* Auction — pending AI offers (from last round) */}
+                                    {(gameState.pendingAuctionOffers || []).length > 0 && (
+                                        <div className="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-2.5 mb-2">
+                                            <div className="text-xs font-bold text-yellow-300 mb-2">Place Bid</div>
+                                            {(gameState.pendingAuctionOffers || []).map(offer => (
+                                                <div key={offer.id} className="mb-2 last:mb-0">
+                                                    <div className="text-xs text-blue-200 mb-1.5">
+                                                        {offer.sellerFarbe} {offer.sellerName} offered {offer.count} ship{offer.count !== 1 ? 's' : ''}
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs text-blue-400">Bid:</span>
+                                                        <input
+                                                            type="number"
+                                                            min={0}
+                                                            step={10}
+                                                            value={humanBids[offer.id] ?? ''}
+                                                            onChange={e => setHumanBids(prev => ({ ...prev, [offer.id]: Math.max(0, parseInt(e.target.value) || 0) }))}
+                                                            className="w-24 bg-white/10 border border-white/20 rounded px-2 py-1 text-sm text-white"
+                                                            placeholder={`${marketShipPrice}€`}
+                                                        />
+                                                        <span className="text-xs text-blue-400">€</span>
+                                                        <button
+                                                            onClick={() => setHumanBids(prev => ({ ...prev, [offer.id]: marketShipPrice }))}
+                                                            className="text-xs bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-400/30 px-2 py-1 rounded transition-colors"
+                                                        >
+                                                            Place Bid
+                                                        </button>
+                                                    </div>
+                                                    <div className="text-xs text-blue-500 mt-1">Highest bid wins. Leave blank or 0 to pass.</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Auction — same-round human offers (H→H hot-seat) */}
+                                    {Object.entries(humanDecisions)
+                                        .filter(([idxStr, d]) => (d.boatsOffered || 0) > 0 && parseInt(idxStr) !== activeSlot)
+                                        .map(([idxStr, d]) => {
+                                            const sellerIdx = parseInt(idxStr)
+                                            const seller = gameState.teams[sellerIdx]
+                                            const offerKey = `h-${sellerIdx}`
+                                            return (
+                                                <div key={idxStr} className="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-2.5 mb-2">
+                                                    <div className="text-xs font-bold text-yellow-300 mb-1">Bid on {seller.name}'s Ships</div>
+                                                    <div className="text-xs text-blue-200 mb-1.5">
+                                                        {seller.farbe} {seller.name} offered {d.boatsOffered} ship{d.boatsOffered !== 1 ? 's' : ''} at auction
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs text-blue-400">Bid:</span>
+                                                        <input
+                                                            type="number"
+                                                            min={0}
+                                                            step={10}
+                                                            value={humanBids[offerKey] ?? ''}
+                                                            onChange={e => setHumanBids(prev => ({ ...prev, [offerKey]: Math.max(0, parseInt(e.target.value) || 0) }))}
+                                                            className="w-24 bg-white/10 border border-white/20 rounded px-2 py-1 text-sm text-white"
+                                                            placeholder={`${marketShipPrice}€`}
+                                                        />
+                                                        <span className="text-xs text-blue-400">€</span>
+                                                    </div>
+                                                    <div className="text-xs text-blue-500 mt-1">Highest bid wins. Leave blank or 0 to pass.</div>
+                                                </div>
+                                            )
+                                        })
+                                    }
 
                                     <div className="text-xs text-blue-400 space-y-0.5">
                                         <div>Max order this round: <span className="text-white font-medium">{Math.ceil(activeTeam.fleet / 2)} ships</span> (½ of your fleet of {activeTeam.fleet})</div>

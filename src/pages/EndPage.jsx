@@ -80,7 +80,7 @@ function EndPage({ gameState, onRestart }) {
                 <div className="bg-white/10 rounded-xl px-5 py-3 flex items-center gap-4">
                     <div>
                         <h1 className="text-lg font-bold leading-tight">
-                            {kollabiert ? 'Fish Stock Collapsed!' : 'Game Over!'}
+                            {kollabiert ? 'Fish Stock Collapsed!' : 'Simulation Complete!'}
                         </h1>
                         <p className="text-blue-200 text-xs mt-0.5">
                             {kollabiert

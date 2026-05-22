@@ -165,8 +165,8 @@ export function kiDecisionHard(team, gameState, params) {
   // Fish trend: average change per round over last 3 rounds
   const fishTrend = berechneTrend(verlauf)
 
-  // Rapid decline: avg loss > 80 fish/round over last 3 rounds
-  const rapidDecline = fishTrend < -80
+  // Rapid decline: avg loss > 100 fish/round over last 3 rounds
+  const rapidDecline = fishTrend < -100
 
   // Expected profit per ship over all remaining rounds
   const expectedProfitPerShip = bestZoneProfit * roundsRemaining
@@ -174,7 +174,7 @@ export function kiDecisionHard(team, gameState, params) {
   // Ship buying (auction – instant, max 1 per round)
   let shipsToBuy = 0
   if (
-    density > 0.70 &&
+    density > 0.60 &&
     gameProgress < 0.50 &&
     expectedProfitPerShip > auctionPrice * 1.5 &&
     bankBalance > auctionPrice * 2
@@ -196,7 +196,7 @@ export function kiDecisionHard(team, gameState, params) {
   // New ship orders (shipyard – arrives next round, max 1 to prevent runaway expansion)
   let newShipOrders = 0
   if (
-    density > 0.65 &&
+    density > 0.55 &&
     gameProgress < 0.65 &&
     (team.shipsInDelivery || 0) === 0 &&
     bankBalance > newShipPrice * 3 &&
@@ -213,11 +213,11 @@ export function kiDecisionHard(team, gameState, params) {
 
   let harborShips, coastalShips, deepSeaShips
 
-  if (deepSeaProfit >= coastalProfit && deepSeaProfit > 0) {
+  if (deepSeaProfit >= coastalProfit) {
     deepSeaShips = clampBoote(deployedCount * rand(0.95, 1.05), effectiveFleet)
     coastalShips = 0
     harborShips = effectiveFleet - deepSeaShips
-  } else if (coastalProfit > deepSeaProfit && coastalProfit > 0) {
+  } else if (coastalProfit > 0) {
     coastalShips = clampBoote(deployedCount * rand(0.95, 1.05), effectiveFleet)
     deepSeaShips = 0
     harborShips = effectiveFleet - coastalShips

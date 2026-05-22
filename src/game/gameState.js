@@ -46,6 +46,7 @@ export function erstelleStartzustandAusLobby(room, playerIndex) {
     schwierigkeitsgrad: room.schwierigkeitsgrad || 'leicht',
     marketShipPrice: GAME_CONFIG.auctionPreis,
     auctionHistory: [],
+    pendingAuctionOffers: [],
     playerIndex,
     teams,
     verlauf: [],
