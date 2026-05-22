@@ -2,6 +2,14 @@ import express from 'express'
 import http from 'http'
 import { Server } from 'socket.io'
 import cors from 'cors'
+import {
+  GAME_CONFIG,
+  berechneFischbestand,
+  erzeugeMarktereignis,
+  berechneNetWorth,
+  kiDecisionEasy,
+  kiDecisionHard,
+} from './src/game/fishLogic.js'
 
 const PORT = process.env.PORT || 3002
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173'
@@ -24,6 +32,11 @@ const rooms = new Map()
 
 const SLOT_COLORS = ['red', 'yellow', 'green', 'blue', 'purple', 'orange']
 
+const SLOT_COLOR_EMOJI = {
+  red: '🔴', yellow: '🟡', green: '🟢',
+  blue: '🔵', purple: '🟣', orange: '🟠'
+}
+
 const AI_NAMES = [
   'Captain AI', 'Fleet Admiral', 'Sea Bot', 'Ocean AI',
   'Wave Runner', 'Deep Diver'
@@ -45,19 +58,19 @@ function createDefaultSettings(overrides = {}) {
     maxRounds: overrides.maxRounds ?? 20,
     numTeams: overrides.numTeams ?? 4,
     aiDifficulty: overrides.aiDifficulty ?? 'easy',
-    startingBalance: overrides.startingBalance ?? 5000,
-    startingFleet: overrides.startingFleet ?? 3,
-    fishPrice: overrides.fishPrice ?? 20,
-    newShipPrice: overrides.newShipPrice ?? 300,
-    auctionPrice: overrides.auctionPrice ?? 500,
-    interestRate: overrides.interestRate ?? 0.02,
-    maxFishPopulation: overrides.maxFishPopulation ?? 6000,
-    startingFish: overrides.startingFish ?? 4000,
-    reproductionRate: overrides.reproductionRate ?? 0.05,
+    startingBalance: overrides.startingBalance ?? GAME_CONFIG.startGuthaben,
+    startingFleet: overrides.startingFleet ?? GAME_CONFIG.initialBoote,
+    fishPrice: overrides.fishPrice ?? GAME_CONFIG.fischPreis,
+    newShipPrice: overrides.newShipPrice ?? GAME_CONFIG.bootKosten,
+    auctionPrice: overrides.auctionPrice ?? GAME_CONFIG.auctionPreis,
+    interestRate: overrides.interestRate ?? GAME_CONFIG.zinsRate,
+    maxFishPopulation: overrides.maxFishPopulation ?? GAME_CONFIG.maxFischbestand,
+    startingFish: overrides.startingFish ?? GAME_CONFIG.startFischbestand,
+    reproductionRate: overrides.reproductionRate ?? GAME_CONFIG.wachstumsRate,
     operatingCosts: {
-      harbor: 50,
-      coastal: 150,
-      deepSea: 250,
+      harbor: GAME_CONFIG.harborCost,
+      coastal: GAME_CONFIG.coastalCost,
+      deepSea: GAME_CONFIG.deepSeaCost,
       ...overrides.operatingCosts
     }
   }
@@ -92,10 +105,11 @@ function buildSlots(numTeams, hostSocketId, hostName, aiDifficulty) {
   return slots
 }
 
-// Remove socketId before sending to clients (security)
+// Remove socketId and internal server fields before sending to clients
 function sanitizeRoom(room) {
+  const { pendingDecisions: _pd, ...rest } = room
   return {
-    ...room,
+    ...rest,
     slots: room.slots.map(slot => ({
       ...slot,
       socketId: undefined
@@ -145,6 +159,196 @@ function validateSettings(s) {
   return out
 }
 
+// ─── Game State Init ──────────────────────────────────────────────────────────
+
+function initGameState(room) {
+  const s = room.settings
+
+  const params = {
+    fishPrice: s.fishPrice,
+    newShipPrice: s.newShipPrice,
+    interestRate: s.interestRate,
+    harborCost: s.operatingCosts.harbor,
+    coastalCost: s.operatingCosts.coastal,
+    deepSeaCost: s.operatingCosts.deepSea,
+    maxFishPopulation: s.maxFishPopulation,
+    startingFishStock: s.startingFish,
+    fishReproductionRate: s.reproductionRate,
+    showFishStock: true,
+    showOtherCatches: true,
+  }
+
+  const teams = room.slots.map((slot, idx) => ({
+    id: idx + 1,
+    name: slot.name,
+    farbe: SLOT_COLOR_EMOJI[slot.color] || '⚪',
+    fleet: s.startingFleet,
+    bankBalance: s.startingBalance,
+    netWorth: s.startingBalance + s.startingFleet * s.auctionPrice,
+    ausgesandteBoote: 0,
+    harborShips: 0,
+    coastalShips: 0,
+    deepSeaShips: 0,
+    letzterFang: 0,
+    letzteZinsen: 0,
+    shipsInDelivery: 0,
+    auctionPurchases: 0,
+    istKI: slot.isAI,
+    aiDifficulty: slot.isAI ? s.aiDifficulty : null,
+    isRealHuman: !slot.isAI,
+  }))
+
+  return {
+    runde: 1,
+    fischbestand: s.startingFish,
+    phase: 'entscheidung',
+    maxRunden: s.maxRounds,
+    schwierigkeitsgrad: s.aiDifficulty,
+    marketShipPrice: s.auctionPrice,
+    auctionHistory: [],
+    pendingAuctionOffers: [],
+    teams,
+    verlauf: [],
+    params,
+  }
+}
+
+// ─── Round Processing ─────────────────────────────────────────────────────────
+//
+// Follows exact MIT order (mit_reference.md §3 and §7):
+//   Step 1  Deliver ships from previous round's orders
+//   Step 2  AI decisions (after delivery, uses current fish stock)
+//   Step 3  Auction buy / sell → track minBalance
+//   Step 4  Operating costs   → track minBalance
+//   Step 5  Fish catch + revenue → track minBalance
+//   Step 6  Interest on minBalance (MIT §6: same formula, sign auto)
+//   Step 7  New ship orders (pay now, deliver next round)
+//   Step 8  Update fish stock (logistic growth)
+//   Step 9  Market price (constant in Phase 3)
+//   Step 10 Recalculate net worth
+//   Step 11 Save round snapshot to verlauf
+//   Step 12 Check game end → emit 'game-ended' or 'round-complete'
+
+function processRound(room) {
+  const gs = room.gameState
+  const { params } = gs
+  if (!room.pendingDecisions) room.pendingDecisions = {}
+
+  const weatherFactor = erzeugeMarktereignis()
+  let totalCatch = 0
+
+  // Step 1: Deliver ships ordered last round
+  for (const team of gs.teams) {
+    team.fleet += team.shipsInDelivery
+    team.shipsInDelivery = 0
+  }
+
+  // Step 2: AI decisions (computed after delivery so fleet is up to date)
+  for (let i = 0; i < gs.teams.length; i++) {
+    const team = gs.teams[i]
+    if (!team.istKI) continue
+    const fn = team.aiDifficulty === 'hard' ? kiDecisionHard : kiDecisionEasy
+    room.pendingDecisions[i] = fn(team, gs, params)
+  }
+
+  // Steps 3–7: Per-team processing
+  for (let i = 0; i < gs.teams.length; i++) {
+    const team = gs.teams[i]
+    const dec  = room.pendingDecisions[i]
+    if (!dec) continue
+
+    let minBalance = team.bankBalance
+    const track = (b) => { minBalance = Math.min(minBalance, b); return b }
+
+    // Step 3: Auction buy / sell
+    const toBuy  = Math.max(0, dec.shipsToBuy  ?? 0)
+    const toSell = Math.min(Math.max(0, dec.shipsToSell ?? 0), team.fleet)
+    team.fleet  += toBuy - toSell
+    team.auctionPurchases = toBuy
+    team.bankBalance = track(team.bankBalance - toBuy  * gs.marketShipPrice)
+    team.bankBalance = track(team.bankBalance + toSell * gs.marketShipPrice)
+
+    // Step 4: Operating costs per zone
+    const harbor  = Math.max(0, dec.harborShips  ?? 0)
+    const coastal = Math.max(0, dec.coastalShips  ?? 0)
+    const deep    = Math.max(0, dec.deepSeaShips  ?? 0)
+    const opCosts = harbor  * params.harborCost
+                  + coastal * params.coastalCost
+                  + deep    * params.deepSeaCost
+    team.bankBalance = track(team.bankBalance - opCosts)
+
+    // Step 5: Fish catch + revenue
+    // Zone effectiveness: Coastal max 15 fish/ship, Deep Sea max 25 fish/ship
+    // Both scale with sqrt(density) per MIT §5
+    const density      = Math.max(0, gs.fischbestand) / params.maxFishPopulation
+    const sqrtDensity  = Math.sqrt(density)
+    const coastalCatch = Math.round(coastal * 15 * sqrtDensity * weatherFactor)
+    const deepCatch    = Math.round(deep    * 25 * sqrtDensity * weatherFactor)
+    const teamCatch    = coastalCatch + deepCatch
+    team.bankBalance   = track(team.bankBalance + teamCatch * params.fishPrice)
+    totalCatch        += teamCatch
+    team.letzterFang   = teamCatch
+    team.harborShips   = harbor
+    team.coastalShips  = coastal
+    team.deepSeaShips  = deep
+    team.ausgesandteBoote = coastal + deep
+
+    // Step 6: Interest on minimum balance reached this round (MIT §6)
+    const interest    = minBalance * params.interestRate
+    team.bankBalance += interest
+    team.letzteZinsen = interest
+
+    // Step 7: New ship orders — payment immediate, delivery next round (MIT §3 Step 6)
+    const maxOrder     = Math.ceil(team.fleet / 2)
+    const actualOrders = Math.min(Math.max(0, dec.newShipOrders ?? 0), maxOrder)
+    team.bankBalance  -= actualOrders * params.newShipPrice
+    team.shipsInDelivery = actualOrders
+  }
+
+  // Step 8: Update fish stock — logistic growth after total catch removed
+  gs.fischbestand = berechneFischbestand(gs.fischbestand, totalCatch, params)
+
+  // Step 9: Market price unchanged in Phase 3
+
+  // Step 10: Recalculate net worth for all teams
+  for (const team of gs.teams) {
+    team.netWorth = berechneNetWorth(team.bankBalance, team.fleet, gs.marketShipPrice)
+  }
+
+  // Step 11: Save round snapshot to verlauf
+  gs.verlauf.push({
+    runde: gs.runde,
+    fischbestand: gs.fischbestand,
+    weatherFactor,
+    teams: gs.teams.map(t => ({
+      id: t.id,
+      bankBalance: Math.round(t.bankBalance),
+      fleet: t.fleet,
+      netWorth: Math.round(t.netWorth),
+      letzterFang: t.letzterFang,
+      letzteZinsen: Math.round(t.letzteZinsen),
+    }))
+  })
+
+  // Step 12: Game end — max rounds reached or fish stock collapsed
+  const isOver = gs.runde >= gs.maxRunden || gs.fischbestand <= 0
+
+  room.pendingDecisions = {}
+  room.lastActivity = Date.now()
+
+  if (isOver) {
+    gs.phase = 'ende'
+    room.phase = 'ended'
+    io.to(room.code).emit('game-ended', { gameState: gs })
+    console.log(`Game ended in room ${room.code} (round ${gs.runde}, fish: ${gs.fischbestand})`)
+  } else {
+    gs.runde++
+    gs.phase = 'entscheidung'
+    io.to(room.code).emit('round-complete', { gameState: gs })
+    console.log(`Round ${gs.runde - 1} complete in room ${room.code}, fish: ${gs.fischbestand}`)
+  }
+}
+
 // ─── Socket Events ────────────────────────────────────────────────────────────
 
 io.on('connection', socket => {
@@ -174,7 +378,8 @@ io.on('connection', socket => {
         playerName.trim(),
         mergedSettings.aiDifficulty
       ),
-      gameState: null
+      gameState: null,
+      pendingDecisions: {},
     }
 
     rooms.set(roomCode, room)
@@ -256,7 +461,6 @@ io.on('connection', socket => {
     const prev = room.settings
     const incoming = settings || {}
 
-    // Validate individual fields
     if ([10, 15, 20].includes(incoming.maxRounds)) prev.maxRounds = incoming.maxRounds
     if (typeof incoming.numTeams === 'number' && incoming.numTeams >= 2 && incoming.numTeams <= 6) {
       const oldCount = prev.numTeams
@@ -264,7 +468,6 @@ io.on('connection', socket => {
       prev.numTeams = newCount
 
       if (newCount > oldCount) {
-        // Add AI slots
         for (let i = oldCount; i < newCount; i++) {
           room.slots.push({
             slotIndex: i,
@@ -278,7 +481,6 @@ io.on('connection', socket => {
           })
         }
       } else if (newCount < oldCount) {
-        // Remove slots from the end — kick humans back to the lobby if needed
         room.slots.slice(newCount).forEach(slot => {
           if (!slot.isAI && slot.socketId) {
             const kickedSocket = io.sockets.sockets.get(slot.socketId)
@@ -289,7 +491,6 @@ io.on('connection', socket => {
           }
         })
         room.slots = room.slots.slice(0, newCount)
-        // Re-index slotIndex
         room.slots.forEach((s, i) => { s.slotIndex = i })
       }
     }
@@ -311,10 +512,69 @@ io.on('connection', socket => {
     io.to(code).emit('room-updated', { room: sanitizeRoom(room) })
   })
 
+  // ── start-game ───────────────────────────────────────────────────────────────
+  socket.on('start-game', ({ roomCode } = {}) => {
+    const code = typeof roomCode === 'string' ? roomCode.toUpperCase() : ''
+    const room = rooms.get(code)
+    if (!room) return
+
+    if (room.host !== socket.id) {
+      socket.emit('error', { code: 'NOT_HOST', message: 'Only the host can start the game.' })
+      return
+    }
+    if (room.phase !== 'lobby') {
+      socket.emit('error', { code: 'ALREADY_STARTED', message: 'Game already started.' })
+      return
+    }
+
+    room.gameState = initGameState(room)
+    room.phase = 'game'
+    room.pendingDecisions = {}
+    room.lastActivity = Date.now()
+
+    io.to(code).emit('game-started', { gameState: room.gameState })
+    console.log(`Game started in room ${code} with ${room.slots.length} teams`)
+  })
+
+  // ── submit-decision ──────────────────────────────────────────────────────────
+  socket.on('submit-decision', ({ roomCode, decision } = {}) => {
+    const code = typeof roomCode === 'string' ? roomCode.toUpperCase() : ''
+    const room = rooms.get(code)
+    if (!room || room.phase !== 'game' || !room.gameState) return
+
+    const slot = room.slots.find(s => s.socketId === socket.id)
+    if (!slot || slot.isAI) return
+
+    // Sanitize and store decision
+    const dec = {
+      harborShips:   Math.max(0, parseInt(decision?.harborShips)   || 0),
+      coastalShips:  Math.max(0, parseInt(decision?.coastalShips)  || 0),
+      deepSeaShips:  Math.max(0, parseInt(decision?.deepSeaShips)  || 0),
+      shipsToBuy:    Math.max(0, parseInt(decision?.shipsToBuy)    || 0),
+      shipsToSell:   Math.max(0, parseInt(decision?.shipsToSell)   || 0),
+      newShipOrders: Math.max(0, parseInt(decision?.newShipOrders) || 0),
+    }
+    room.pendingDecisions[slot.slotIndex] = dec
+
+    const humanSlots     = room.slots.filter(s => !s.isAI && s.socketId)
+    const submittedCount = humanSlots.filter(s => room.pendingDecisions[s.slotIndex] !== undefined).length
+
+    io.to(code).emit('decision-received', {
+      slotIndex: slot.slotIndex,
+      submitted: submittedCount,
+      total: humanSlots.length
+    })
+
+    console.log(`Decision from slot ${slot.slotIndex} in room ${code} (${submittedCount}/${humanSlots.length})`)
+
+    if (submittedCount === humanSlots.length) {
+      processRound(room)
+    }
+  })
+
   // ── disconnect ──────────────────────────────────────────────────────────────
   socket.on('disconnect', () => {
     console.log(`Socket ${socket.id} disconnected`)
-    // Find and leave all rooms this socket is part of
     rooms.forEach(room => {
       const slot = room.slots.find(s => s.socketId === socket.id)
       if (slot) handleLeave(socket, room.code)
@@ -332,7 +592,17 @@ function handleLeave(socket, roomCode) {
   const slot = room.slots.find(s => s.socketId === socket.id)
   if (!slot) return
 
-  // Replace the human with an AI
+  // If game is running, convert team to AI so the round can still complete
+  if (room.phase === 'game' && room.gameState) {
+    const team = room.gameState.teams[slot.slotIndex]
+    if (team) {
+      team.istKI = true
+      team.aiDifficulty = room.settings.aiDifficulty
+      team.isRealHuman = false
+    }
+  }
+
+  // Replace slot with AI placeholder
   slot.name = AI_NAMES[slot.slotIndex] || `AI Team ${slot.slotIndex + 1}`
   slot.socketId = null
   slot.isAI = true
@@ -352,6 +622,18 @@ function handleLeave(socket, roomCode) {
     }
   }
 
+  // If game in progress, check whether the disconnecting player was the last
+  // one to submit — if so, all remaining humans are done, process the round
+  if (room.phase === 'game' && room.gameState && room.pendingDecisions) {
+    const humanSlots = room.slots.filter(s => !s.isAI && s.socketId)
+    const allSubmitted = humanSlots.length > 0 &&
+      humanSlots.every(s => room.pendingDecisions[s.slotIndex] !== undefined)
+    if (allSubmitted) {
+      processRound(room)
+      return
+    }
+  }
+
   room.lastActivity = Date.now()
   io.to(code).emit('room-updated', { room: sanitizeRoom(room) })
 }
@@ -360,9 +642,9 @@ function handleLeave(socket, roomCode) {
 
 setInterval(() => {
   const now = Date.now()
-  const TEN_MIN = 10 * 60 * 1000
+  const TEN_MIN    = 10 * 60 * 1000
   const FIFTEEN_MIN = 15 * 60 * 1000
-  const SIXTY_MIN = 60 * 60 * 1000
+  const SIXTY_MIN  = 60 * 60 * 1000
 
   rooms.forEach((room, code) => {
     const idle = now - room.lastActivity
