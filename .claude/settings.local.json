@@ -10,7 +10,10 @@
       "Bash(curl -s http://localhost:5173)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(Remove-Item *)",
+      "Bash(del \"C:\\\\Users\\\\jonah\\\\fishbanks-game\\\\verify-ai.mjs\")",
+      "PowerShell(Remove-Item *)"
     ]
   }
 }

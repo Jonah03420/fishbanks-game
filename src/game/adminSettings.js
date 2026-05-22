@@ -15,7 +15,7 @@ export const ADMIN_DEFAULTS = {
   startingFishStock: 4000,
   fishReproductionRate: 0.05,
   schwierigkeitsgrad: 'leicht',
-  aiPersonalities: [null, 'gierig', 'kooperativ', 'rational'],
+  aiDifficulties: [null, 'easy', 'easy', 'easy'],
   showFishStock: true,
   showOtherCatches: true,
 }
@@ -23,17 +23,17 @@ export const ADMIN_DEFAULTS = {
 export function getAdminSettings() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
-    if (!stored) return { ...ADMIN_DEFAULTS, aiPersonalities: [...ADMIN_DEFAULTS.aiPersonalities] }
+    if (!stored) return { ...ADMIN_DEFAULTS, aiDifficulties: [...ADMIN_DEFAULTS.aiDifficulties] }
     const parsed = JSON.parse(stored)
     return {
       ...ADMIN_DEFAULTS,
       ...parsed,
-      aiPersonalities: ADMIN_DEFAULTS.aiPersonalities.map((d, i) =>
-        parsed.aiPersonalities?.[i] ?? d
+      aiDifficulties: ADMIN_DEFAULTS.aiDifficulties.map((d, i) =>
+        parsed.aiDifficulties?.[i] ?? d
       ),
     }
   } catch {
-    return { ...ADMIN_DEFAULTS, aiPersonalities: [...ADMIN_DEFAULTS.aiPersonalities] }
+    return { ...ADMIN_DEFAULTS, aiDifficulties: [...ADMIN_DEFAULTS.aiDifficulties] }
   }
 }
 
@@ -53,7 +53,7 @@ export function hasNonDefaultSettings() {
     const d = ADMIN_DEFAULTS
     for (const key of Object.keys(d)) {
       if (!(key in s)) continue
-      if (key === 'aiPersonalities') {
+      if (key === 'aiDifficulties') {
         if (s[key]?.some((v, i) => v !== d[key][i])) return true
         continue
       }

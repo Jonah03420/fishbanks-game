@@ -7,11 +7,9 @@ import {
 import { getAdminSettings, hasNonDefaultSettings } from '../game/adminSettings'
 
 const TEAM_COLORS = ['🔴', '🟡', '🟢', '🔵']
-const AI_PERSONALITY_LABEL = { gierig: 'Greedy', kooperativ: 'Cooperative', rational: 'Rational' }
-
 function PlayerList({ room, myId }) {
   const numSlots = room.numTeams || 4
-  const personalities = room.aiPersonalities || [null, 'gierig', 'kooperativ', 'rational']
+  const difficulties = room.aiDifficulties || [null, 'easy', 'easy', 'easy']
   return (
     <div className="space-y-2">
       {Array.from({ length: numSlots }, (_, slot) => {
@@ -27,12 +25,12 @@ function PlayerList({ room, myId }) {
             <span className="text-green-400 text-sm">Connected</span>
           </div>
         )
-        const pLabel = personalities[slot] ? AI_PERSONALITY_LABEL[personalities[slot]] : '–'
+        const diffLabel = difficulties[slot] === 'hard' ? 'Hard AI' : 'Easy AI'
         return (
           <div key={slot} className="flex items-center gap-3 bg-white/5 border border-dashed border-white/20 rounded-xl px-4 py-3 text-blue-400">
             <span className="text-xl opacity-30">{TEAM_COLORS[slot]}</span>
             <span className="flex-1 text-sm">
-              {slot === 0 ? 'Waiting for host…' : `🤖 AI Player – ${pLabel}`}
+              {slot === 0 ? 'Waiting for host…' : `🤖 ${diffLabel}`}
             </span>
             <span className="text-xs text-blue-600">replaced when joined</span>
           </div>
@@ -117,7 +115,7 @@ export default function LobbyPage({ onStart, onBack, initialView = 'create', onO
       maxFishPopulation: admin.maxFishPopulation,
       startingFishStock: admin.startingFishStock,
       fishReproductionRate: admin.fishReproductionRate,
-      aiPersonalities: admin.aiPersonalities,
+      aiDifficulties: admin.aiDifficulties,
       showFishStock: admin.showFishStock,
       showOtherCatches: admin.showOtherCatches,
     })

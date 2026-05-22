@@ -2,9 +2,8 @@ import FishGraph from '../components/FishGraph'
 import { useState, useEffect, useRef } from 'react'
 import {
     GAME_CONFIG, berechneFischbestand, berechneNetWorth,
-    kiBootAktionLeicht, kiAusgesandtLeicht,
-    kiBootAktionSchwer, kiAusgesandtSchwer,
-    erzeugeMarktereignis, kiZoneAllokierung,
+    kiDecisionEasy, kiDecisionHard,
+    erzeugeMarktereignis,
 } from '../game/fishLogic'
 
 // ─── MIT Order Verification Test (DEV only) ───────────────────────────────────
@@ -46,12 +45,6 @@ if (import.meta.env.DEV) {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const PERSOENLICHKEIT_LABEL = {
-    gierig:     'Greedy',
-    kooperativ: 'Cooperative',
-    rational:   'Rational',
-}
-
 function aktualisiereMarktpreis(aktuellPreis, alleTeams) {
     const totalBoote = alleTeams.reduce((sum, t) => sum + t.fleet, 0)
     let neuerPreis = aktuellPreis
@@ -61,10 +54,10 @@ function aktualisiereMarktpreis(aktuellPreis, alleTeams) {
 }
 
 function kiMaxGebot(team, fischbestand, marketShipPrice) {
-    let maxBid
-    if (team.persoenlichkeit === 'gierig') maxBid = fischbestand > 3000 ? 800 : 300
-    else if (team.persoenlichkeit === 'kooperativ') maxBid = 400
-    else maxBid = Math.round(marketShipPrice * 1.1)
+    // Hard AI bids up to 10% over market; Easy AI bids up to market price.
+    const maxBid = team.aiDifficulty === 'hard'
+        ? Math.round(marketShipPrice * 1.1)
+        : marketShipPrice
     return Math.min(maxBid, team.bankBalance)
 }
 
@@ -92,23 +85,40 @@ function loeseAuktion(teams, sellerIdx, anzahlAngebote, fischbestand, marketShip
     return { teams: t, auctionEvents }
 }
 
-function kiTeamAktionen(team, fischbestand, verlauf, alleTeams, schwierigkeit, marketShipPrice, params) {
-    let result
-    if (schwierigkeit === 'schwer') {
-        const booteResult = kiBootAktionSchwer(team, fischbestand, verlauf, alleTeams, marketShipPrice, params)
-        result = {
-            ...booteResult,
-            ausgesandteBoote: kiAusgesandtSchwer(
-                team.persoenlichkeit, team.name, booteResult.fleet,
-                fischbestand, verlauf, alleTeams, params
-            ),
-        }
-    } else {
-        const booteResult = kiBootAktionLeicht(team, marketShipPrice, params)
-        result = { ...booteResult, ausgesandteBoote: kiAusgesandtLeicht(booteResult.fleet) }
+// Calls the appropriate AI decision function, then applies instant buy/sell to fleet and balance.
+// Returns updated fleet, bankBalance, zone allocation, and aiNewShipOrders for Step 6.
+function kiTeamAktionen(team, gameState, params) {
+    const decision = team.aiDifficulty === 'hard'
+        ? kiDecisionHard(team, gameState, params)
+        : kiDecisionEasy(team, gameState, params)
+
+    let fleet = team.fleet
+    let bankBalance = team.bankBalance
+    const auctionPrice = gameState.marketShipPrice ?? GAME_CONFIG.auctionPreis
+
+    // Instant sell (AI sells at current market price)
+    if (decision.shipsToSell > 0 && fleet > 1) {
+        const actualSell = Math.min(decision.shipsToSell, fleet - 1)
+        fleet -= actualSell
+        bankBalance += actualSell * auctionPrice
     }
-    const zones = kiZoneAllokierung(team.persoenlichkeit || 'kooperativ', result.fleet, result.ausgesandteBoote, fischbestand, params)
-    return { ...result, ...zones }
+
+    // Instant buy (AI buys at current market price)
+    if (decision.shipsToBuy > 0 && bankBalance >= decision.shipsToBuy * auctionPrice) {
+        fleet += decision.shipsToBuy
+        bankBalance -= decision.shipsToBuy * auctionPrice
+    }
+
+    const { harborShips, coastalShips, deepSeaShips } = decision
+    return {
+        fleet,
+        bankBalance,
+        harborShips,
+        coastalShips,
+        deepSeaShips,
+        ausgesandteBoote: coastalShips + deepSeaShips,
+        aiNewShipOrders: decision.newShipOrders,
+    }
 }
 
 // ─── Core round simulation — MIT order of debits & credits ───────────────────
@@ -141,7 +151,7 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         if (delivered > 0) {
             roundDeliveries.push({ name: team.name, farbe: team.farbe, count: delivered })
         }
-        return { ...team, fleet: team.fleet + delivered, shipsInDelivery: 0 }
+        return { ...team, fleet: team.fleet + delivered, shipsInDelivery: 0, auctionPurchases: 0 }
     })
 
     if (import.meta.env.DEV) {
@@ -167,7 +177,8 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
                 ausgesandteBoote: coastal + deepSea,
             }
         }
-        return { ...team, ...kiTeamAktionen(team, state.fischbestand, state.verlauf, teamsNachLieferung, schwierigkeit, marketShipPrice, params) }
+        const stateForAI = { ...state, teams: teamsNachLieferung, marketShipPrice }
+        return { ...team, ...kiTeamAktionen(team, stateForAI, params) }
     })
 
     // Detect AI ship purchases this round (fleet grew vs. post-delivery fleet)
@@ -178,6 +189,19 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         }
     })
 
+    // ── Step 2 continued: Auction — resolve human ship offers before operating costs ──
+    let allAuctionEvents = []
+    let teamsNachStep2 = [...teamsNachEntscheidung]
+    for (const [idxStr, decision] of Object.entries(humanDecisions)) {
+        const idx = parseInt(idxStr)
+        if ((decision.boatsOffered || 0) > 0) {
+            const maxOffer = Math.min(decision.boatsOffered, Math.max(0, teamsNachStep2[idx].fleet - 1))
+            const { teams: updated, auctionEvents } = loeseAuktion(teamsNachStep2, idx, maxOffer, state.fischbestand, marketShipPrice)
+            teamsNachStep2 = updated
+            allAuctionEvents = [...allAuctionEvents, ...auctionEvents]
+        }
+    }
+
     // ONE weather roll per round — same value used for all teams (MIT spec)
     const wetterfaktor = erzeugeMarktereignis()
 
@@ -185,7 +209,7 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
     // Formula: teamCatch = (coastalShips × 15 + deepSeaShips × 25) × sqrt(density) × weatherFactor
     const dichte = state.fischbestand / maxFisch
     const sqrtDichte = Math.sqrt(Math.max(0, dichte))
-    const teamCatches = teamsNachEntscheidung.map(t => {
+    const teamCatches = teamsNachStep2.map(t => {
         const coastal = Math.round((t.coastalShips || 0) * 15 * sqrtDichte * wetterfaktor)
         const deepSea = Math.round((t.deepSeaShips || 0) * 25 * sqrtDichte * wetterfaktor)
         return { coastal, deepSea, total: coastal + deepSea }
@@ -198,8 +222,8 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
     const neuerFischbestand = berechneFischbestand(state.fischbestand, gesamtFang, params)
 
     // ── Steps 3–6 per team ──
-    let teamsNachRunde = teamsNachEntscheidung.map((team, index) => {
-        const shipsOrdered = !team.istKI ? (humanDecisions[index]?.shipsOrdered || 0) : 0
+    let teamsNachRunde = teamsNachStep2.map((team, index) => {
+        const shipsOrdered = !team.istKI ? (humanDecisions[index]?.shipsOrdered || 0) : (team.aiNewShipOrders || 0)
 
         // Starting balance after Step 2 (pre-round auction activity)
         const startBalance = team.bankBalance
@@ -272,18 +296,6 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         }
     })
 
-    // ── Auction: human players selling ships to AI bidders ──
-    let allAuctionEvents = []
-    for (const [idxStr, decision] of Object.entries(humanDecisions)) {
-        const idx = parseInt(idxStr)
-        if ((decision.boatsOffered || 0) > 0) {
-            const maxOffer = Math.min(decision.boatsOffered, Math.max(0, teamsNachRunde[idx].fleet - 1))
-            const { teams: updated, auctionEvents } = loeseAuktion(teamsNachRunde, idx, maxOffer, neuerFischbestand, marketShipPrice)
-            teamsNachRunde = updated
-            allAuctionEvents = [...allAuctionEvents, ...auctionEvents]
-        }
-    }
-
     const neuerMarktpreis = aktualisiereMarktpreis(marketShipPrice, teamsNachRunde)
     const finalTeams = teamsNachRunde.map(team => ({
         ...team,
@@ -306,10 +318,11 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         ? [...(state.auctionHistory || []), ...allAuctionEvents.filter(e => e.erfolg).map(e => ({ runde: state.runde, ...e }))]
         : (state.auctionHistory || [])
 
+    const finalFischbestand = Math.max(0, neuerFischbestand)
     return {
         ...state,
         runde: state.runde + 1,
-        fischbestand: neuerFischbestand,
+        fischbestand: finalFischbestand,
         marketShipPrice: neuerMarktpreis,
         teams: finalTeams,
         verlauf: [...state.verlauf, verlaufEintrag],
@@ -319,7 +332,7 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         letzterWetterfaktor: wetterfaktor,
         letzterGesamtFang: gesamtFang,
         aiShipPurchases,
-        phase: state.runde >= maxRunden ? 'ende' : 'entscheidung',
+        phase: (state.runde >= maxRunden || finalFischbestand <= 0) ? 'ende' : 'entscheidung',
     }
 }
 
@@ -339,6 +352,7 @@ function GamePage({ gameState, setGameState }) {
     const [rundenErgebnis, setRundenErgebnis] = useState(null)
     const [activeTab, setActiveTab] = useState('dashboard')
     const [devToast, setDevToast] = useState(false)
+    const [buyConfirm, setBuyConfirm] = useState(false)
     const devSkipRef = useRef(null)
 
     const maxRunden = gameState.maxRunden || GAME_CONFIG.maxRunden
@@ -370,6 +384,22 @@ function GamePage({ gameState, setGameState }) {
     const allAllocated = totalAllocated === fleetSize
     const maxShipOrder = activeTeam ? Math.ceil(activeTeam.fleet / 2) : 0
     const safeShipsOrdered = Math.min(currentShipsOrdered, maxShipOrder)
+
+    // Buy ship instantly at market price (Step 2 auction purchase — immediate)
+    function handleBootKaufen() {
+        if (activeSlot === null || activeTeam.bankBalance < marketShipPrice) return
+        const neueBoote = activeTeam.fleet + 1
+        setGameState({
+            ...gameState,
+            teams: gameState.teams.map((team, i) => {
+                if (i !== activeSlot) return team
+                const newBankBalance = team.bankBalance - marketShipPrice
+                return { ...team, fleet: neueBoote, bankBalance: newBankBalance, auctionPurchases: (team.auctionPurchases || 0) + 1, netWorth: berechneNetWorth(newBankBalance, neueBoote, marketShipPrice) }
+            })
+        })
+        setBuyConfirm(true)
+        setTimeout(() => setBuyConfirm(false), 2000)
+    }
 
     // Sell ship instantly at market price (Step 2 auction sale — immediate)
     function handleBootVerkaufen() {
@@ -473,6 +503,10 @@ function GamePage({ gameState, setGameState }) {
                 }
             })
             state = simuliereRunde(state, decisions, schwierigkeit)
+            if (state.fischbestand <= 0) {
+                state = { ...state, fischbestand: 0, phase: 'ende' }
+                break
+            }
         }
         setGameState({ ...state, phase: 'ende' })
     }
@@ -501,7 +535,7 @@ function GamePage({ gameState, setGameState }) {
         { id: 'market',    label: 'Market' },
     ]
 
-    const fishDichte = gameState.fischbestand / maxFischUI
+    const fishDichte = Math.max(0, gameState.fischbestand) / maxFischUI
     const fishPct    = Math.round(fishDichte * 100)
 
     return (
@@ -636,7 +670,7 @@ function GamePage({ gameState, setGameState }) {
                                             <div className="text-blue-200">Net stock change: <span className={rundenErgebnis.fischDelta >= 0 ? 'text-green-300' : 'text-red-300'}>{rundenErgebnis.fischDelta >= 0 ? '+' : ''}{rundenErgebnis.fischDelta.toLocaleString()} fish</span></div>
                                         </div>
                                         <div className={`font-bold text-sm text-center ${rundenErgebnis.fischDelta < 0 ? 'text-red-200' : 'text-green-200'}`}>
-                                            Fish stock: {rundenErgebnis.alterFischbestand.toLocaleString()} → {rundenErgebnis.neuerFischbestand.toLocaleString()}
+                                            Fish stock: {Math.max(0, rundenErgebnis.alterFischbestand).toLocaleString()} → {Math.max(0, rundenErgebnis.neuerFischbestand).toLocaleString()}
                                         </div>
                                     </div>
                                 </div>
@@ -735,8 +769,8 @@ function GamePage({ gameState, setGameState }) {
                                                 {team.istKI ? '🤖' : hasSubmitted ? '✓' : isActive ? '◉' : '…'}
                                             </span>
                                         </div>
-                                        {team.istKI && team.persoenlichkeit && (
-                                            <div className="text-xs text-blue-400 mb-1">{PERSOENLICHKEIT_LABEL[team.persoenlichkeit] ?? team.persoenlichkeit}</div>
+                                        {team.istKI && (
+                                            <div className="text-xs text-blue-500 mb-1">{team.aiDifficulty === 'hard' ? 'Hard AI' : 'Easy AI'}</div>
                                         )}
                                         <div className="text-xs space-y-0.5 mb-1">
                                             <div className="flex justify-between">
@@ -774,7 +808,7 @@ function GamePage({ gameState, setGameState }) {
                             <div className="flex justify-between items-center mb-1">
                                 <span className="font-bold text-sm">Fish Stock</span>
                                 {showFishStock
-                                    ? <span className="font-bold text-sm">{gameState.fischbestand.toLocaleString()} / {maxFischUI.toLocaleString()}</span>
+                                    ? <span className="font-bold text-sm">{Math.max(0, gameState.fischbestand).toLocaleString()} / {maxFischUI.toLocaleString()}</span>
                                     : <span className="font-bold text-sm text-blue-400">Hidden by instructor</span>
                                 }
                             </div>
@@ -984,7 +1018,7 @@ function GamePage({ gameState, setGameState }) {
                                         <div key={team.name} className="mb-4 last:mb-0">
                                             <div className="flex items-center gap-2 mb-1.5">
                                                 <span className="font-bold text-xs">{team.farbe} {team.name}</span>
-                                                {team.istKI && <span className="text-xs text-blue-500">🤖 {PERSOENLICHKEIT_LABEL[team.persoenlichkeit] ?? ''}</span>}
+                                                {team.istKI && <span className="text-xs text-blue-500">🤖 {team.aiDifficulty === 'hard' ? 'Hard' : 'Easy'}</span>}
                                             </div>
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-xs border-collapse">
@@ -1047,7 +1081,7 @@ function GamePage({ gameState, setGameState }) {
                                 <div className="flex justify-between items-center mb-1">
                                     <span className="font-bold text-sm">Fish Stock</span>
                                     {showFishStock
-                                        ? <span className="font-bold text-sm">{gameState.fischbestand.toLocaleString()} / {maxFischUI.toLocaleString()}</span>
+                                        ? <span className="font-bold text-sm">{Math.max(0, gameState.fischbestand).toLocaleString()} / {maxFischUI.toLocaleString()}</span>
                                         : <span className="font-bold text-sm text-blue-400">Hidden</span>
                                     }
                                 </div>
@@ -1154,25 +1188,40 @@ function GamePage({ gameState, setGameState }) {
                                             <div className="text-xs text-blue-400">Sell at current market price immediately.</div>
                                         </div>
 
-                                        {/* Auction */}
+                                        {/* Instant Purchase */}
                                         <div className="bg-white/5 border border-white/10 rounded-lg p-2.5">
-                                            <div className="text-xs font-bold text-blue-200 mb-2">Auction</div>
-                                            {activeTeam.fleet > 1 ? (
-                                                <>
-                                                    <div className="flex items-center gap-2 mb-1.5">
-                                                        <button onClick={() => setCurrentBoatsOffered(Math.max(0, currentBoatsOffered - 1))}
-                                                            className="bg-white/20 hover:bg-white/30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0">−</button>
-                                                        <div className="text-base font-bold w-6 text-center">{currentBoatsOffered}</div>
-                                                        <button onClick={() => setCurrentBoatsOffered(Math.min(activeTeam.fleet - 1, currentBoatsOffered + 1))}
-                                                            className="bg-white/20 hover:bg-white/30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0">+</button>
-                                                        <span className="text-xs text-blue-300">ships offered</span>
-                                                    </div>
-                                                    <div className="text-xs text-blue-400">Offer ships to other teams. Bidding happens each round. Higher price possible but not guaranteed.</div>
-                                                </>
-                                            ) : (
-                                                <div className="text-xs text-blue-500">Need at least 2 ships to offer at auction.</div>
-                                            )}
+                                            <div className="text-xs font-bold text-blue-200 mb-2">Instant Purchase</div>
+                                            <button
+                                                onClick={handleBootKaufen}
+                                                disabled={activeTeam.bankBalance < marketShipPrice}
+                                                className="w-full bg-white/15 hover:bg-white/25 disabled:opacity-40 disabled:cursor-not-allowed font-medium py-1.5 px-2 rounded-lg transition-colors text-xs text-blue-100 border border-white/10 mb-1.5"
+                                            >
+                                                Buy 1 Ship – pay {marketShipPrice.toLocaleString()}€ instantly
+                                                {activeTeam.bankBalance < marketShipPrice && <span className="block text-xs text-blue-400 mt-0.5">(insufficient funds)</span>}
+                                            </button>
+                                            {buyConfirm && <div className="text-xs text-green-300 mb-1">+1 ship purchased for {marketShipPrice.toLocaleString()}€</div>}
+                                            <div className="text-xs text-blue-400">Buy at current market price immediately.</div>
                                         </div>
+                                    </div>
+
+                                    {/* Auction */}
+                                    <div className="bg-white/5 border border-white/10 rounded-lg p-2.5 mb-2">
+                                        <div className="text-xs font-bold text-blue-200 mb-2">Auction</div>
+                                        {activeTeam.fleet > 1 ? (
+                                            <>
+                                                <div className="flex items-center gap-2 mb-1.5">
+                                                    <button onClick={() => setCurrentBoatsOffered(Math.max(0, currentBoatsOffered - 1))}
+                                                        className="bg-white/20 hover:bg-white/30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0">−</button>
+                                                    <div className="text-base font-bold w-6 text-center">{currentBoatsOffered}</div>
+                                                    <button onClick={() => setCurrentBoatsOffered(Math.min(activeTeam.fleet - 1, currentBoatsOffered + 1))}
+                                                        className="bg-white/20 hover:bg-white/30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0">+</button>
+                                                    <span className="text-xs text-blue-300">ships offered</span>
+                                                </div>
+                                                <div className="text-xs text-blue-400">Offer ships to other teams. Bidding happens each round. Higher price possible but not guaranteed.</div>
+                                            </>
+                                        ) : (
+                                            <div className="text-xs text-blue-500">Need at least 2 ships to offer at auction.</div>
+                                        )}
                                     </div>
 
                                     <div className="text-xs text-blue-400 space-y-0.5">

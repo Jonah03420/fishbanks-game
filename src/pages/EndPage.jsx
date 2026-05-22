@@ -26,7 +26,7 @@ function berechneOptimalesErgebnis(maxRunden, startFischbestand, params) {
 
 function EndPage({ gameState, onRestart }) {
     const winner = [...gameState.teams].sort((a, b) => b.netWorth - a.netWorth)[0]
-    const kollabiert = gameState.fischbestand === 0
+    const kollabiert = gameState.fischbestand <= 0
     const maxRunden = gameState.maxRunden || GAME_CONFIG.maxRunden
     const marketShipPrice = gameState.marketShipPrice || GAME_CONFIG.auctionPreis
 
@@ -43,7 +43,7 @@ function EndPage({ gameState, onRestart }) {
 
     const maxFisch = gameState.params?.maxFishPopulation ?? GAME_CONFIG.maxFischbestand
     const numTeams = gameState.teams.length
-    const sustainabilityScore = Math.round((gameState.fischbestand / maxFisch) * 100)
+    const sustainabilityScore = Math.round((Math.max(0, gameState.fischbestand) / maxFisch) * 100)
 
     const optimal = berechneOptimalesErgebnis(maxRunden, gameState.params?.startingFishStock ?? GAME_CONFIG.startFischbestand, gameState.params)
 
@@ -85,7 +85,7 @@ function EndPage({ gameState, onRestart }) {
                         <p className="text-blue-200 text-xs mt-0.5">
                             {kollabiert
                                 ? 'Tragedy of the Commons'
-                                : `${gameState.fischbestand.toLocaleString()} / ${maxFisch.toLocaleString()} fish`}
+                                : `${Math.max(0, gameState.fischbestand).toLocaleString()} / ${maxFisch.toLocaleString()} fish`}
                         </p>
                         <p className="text-blue-300 text-xs">{gameState.verlauf.length} rounds played</p>
                     </div>
@@ -196,7 +196,7 @@ function EndPage({ gameState, onRestart }) {
                                 <div>
                                     <div className="font-bold text-xs">Final Status</div>
                                     <div className="text-blue-300 text-xs">
-                                        {gameState.fischbestand.toLocaleString()} fish – {kollabiert ? 'collapsed' : gameState.fischbestand >= maxFisch * 0.5 ? 'sustained' : 'low'}
+                                        {Math.max(0, gameState.fischbestand).toLocaleString()} fish – {kollabiert ? 'collapsed' : gameState.fischbestand >= maxFisch * 0.5 ? 'sustained' : 'low'}
                                     </div>
                                 </div>
                             </div>

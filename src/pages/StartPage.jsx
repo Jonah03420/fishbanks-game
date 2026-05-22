@@ -19,7 +19,7 @@ function StartPage({ onCreateGame, onJoinGame, onOpenAdmin }) {
           </div>
           <div className="bg-white/10 rounded-xl p-4">
             <div className="font-bold text-sm mb-1">AI fills empty slots</div>
-            <div className="text-blue-300 text-xs">Greedy, cooperative, or rational – AI teams automatically fill empty spots.</div>
+            <div className="text-blue-300 text-xs">Easy or Hard AI teams automatically fill empty spots.</div>
           </div>
           <div className="bg-white/10 rounded-xl p-4">
             <div className="font-bold text-sm mb-1">Live Analysis</div>

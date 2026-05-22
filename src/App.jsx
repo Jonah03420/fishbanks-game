@@ -27,7 +27,7 @@ function App() {
     setPhase('admin')
   }
 
-  if (gameState && (gameState.phase === 'ende' || gameState.fischbestand === 0)) {
+  if (gameState && (gameState.phase === 'ende' || gameState.fischbestand <= 0)) {
     return <EndPage gameState={gameState} onRestart={handleRestart} />
   }
 

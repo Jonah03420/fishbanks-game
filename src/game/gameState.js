@@ -2,13 +2,13 @@ import { GAME_CONFIG } from './fishLogic'
 
 const TEAM_COLORS = ['🔴', '🟡', '🟢', '🔵']
 const TEAM_NAMES = ['Team A', 'Team B', 'Team C', 'Team D']
-const DEFAULT_PERSONALITIES = [null, 'gierig', 'kooperativ', 'rational']
+const DEFAULT_AI_DIFFICULTIES = [null, 'easy', 'easy', 'easy']
 
 export function erstelleStartzustandAusLobby(room, playerIndex) {
   const numTeams = room.numTeams || 4
   const startGuthaben = room.startingCapital || room.startGuthaben || GAME_CONFIG.startGuthaben
   const startBoote = room.startBoote || GAME_CONFIG.initialBoote
-  const aiPersonalities = room.aiPersonalities || DEFAULT_PERSONALITIES
+  const aiDifficulties = room.aiDifficulties || DEFAULT_AI_DIFFICULTIES
 
   // Build params object from room (admin-configured values) with GAME_CONFIG fallbacks
   const params = {
@@ -33,7 +33,7 @@ export function erstelleStartzustandAusLobby(room, playerIndex) {
     }
     return erstelleTeam(
       slot + 1, TEAM_NAMES[slot], TEAM_COLORS[slot], true,
-      aiPersonalities[slot] || 'kooperativ',
+      aiDifficulties[slot] || 'easy',
       startGuthaben, startBoote, false
     )
   })
@@ -53,7 +53,7 @@ export function erstelleStartzustandAusLobby(room, playerIndex) {
   }
 }
 
-function erstelleTeam(id, name, farbe, istKI, persoenlichkeit, startGuthaben, startBoote, isRealHuman) {
+function erstelleTeam(id, name, farbe, istKI, aiDifficulty, startGuthaben, startBoote, isRealHuman) {
   return {
     id,
     name, farbe,
@@ -67,8 +67,9 @@ function erstelleTeam(id, name, farbe, istKI, persoenlichkeit, startGuthaben, st
     letzterFang: 0,
     letzteZinsen: 0,
     shipsInDelivery: 0,
+    auctionPurchases: 0,
     istKI,
-    persoenlichkeit,
+    aiDifficulty,
     isRealHuman,
   }
 }

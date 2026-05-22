@@ -26,15 +26,6 @@ function clampBoote(value, max) {
   return Math.max(0, Math.min(max, Math.round(value)))
 }
 
-// Zone cost/effectiveness lookup by personality.
-// Greedy → Deep Sea, Cooperative → Coastal, Rational → Deep Sea (optimal at high density).
-function getZoneParams(persoenlichkeit, params) {
-  const deepSeaCost = params?.deepSeaCost ?? GAME_CONFIG.deepSeaCost
-  const coastalCost = params?.coastalCost ?? GAME_CONFIG.coastalCost
-  if (persoenlichkeit === 'kooperativ') return { zoneCost: coastalCost, zoneMaxEff: 15 }
-  return { zoneCost: deepSeaCost, zoneMaxEff: 25 }
-}
-
 // ─── Core game functions ──────────────────────────────────────────────────────
 
 // Logistic growth after total catch is removed.
@@ -47,7 +38,7 @@ export function berechneFischbestand(aktuellerBestand, gesamtFang, params) {
   return Math.min(maxFisch, Math.max(0, Math.round(neuerBestand)))
 }
 
-// Per-team catch: ships × zoneMaxEff × sqrt(density). Used for AI decisions.
+// Per-team catch: ships × zoneMaxEff × sqrt(density).
 export function berechneFang(ausgesandteBoote, fischbestand, params) {
   if (ausgesandteBoote === 0) return 0
   const maxFisch = params?.maxFishPopulation ?? GAME_CONFIG.maxFischbestand
@@ -64,27 +55,9 @@ export function berechneNetWorth(bankBalance, boote, shipPrice) {
   return bankBalance + (boote * shipPrice)
 }
 
-// ─── Leicht ──────────────────────────────────────────────────────────────────
+// ─── AI helpers ───────────────────────────────────────────────────────────────
 
-export function kiBootAktionLeicht(team, verkaufPreis = GAME_CONFIG.bootVerkaufswert, params) {
-  const { fleet: boote, bankBalance: guthaben } = team
-  const newShipCost = params?.newShipPrice ?? GAME_CONFIG.bootKosten
-  const r = Math.random()
-  if (r > 0.93 && guthaben >= newShipCost && boote < 7) {
-    return { fleet: boote + 1, bankBalance: guthaben - newShipCost }
-  }
-  if (r < 0.04 && boote > 2) {
-    return { fleet: boote - 1, bankBalance: guthaben + verkaufPreis }
-  }
-  return { fleet: boote, bankBalance: guthaben }
-}
-
-export function kiAusgesandtLeicht(boote) {
-  return clampBoote(boote * rand(0.10, 0.70), boote)
-}
-
-// ─── Schwer ──────────────────────────────────────────────────────────────────
-
+// Average fish change per round over the last 3 rounds (negative = declining).
 function berechneTrend(verlauf) {
   if (verlauf.length < 2) return 0
   const recent = verlauf.slice(-3)
@@ -95,104 +68,166 @@ function berechneTrend(verlauf) {
   return delta / (recent.length - 1)
 }
 
-// Grid-search: find profit-maximising boat count for a given zone.
-function bestResponse(meineMaxBoote, fischbestand, params, zoneCost, zoneMaxEff) {
+// ─── Easy AI ─────────────────────────────────────────────────────────────────
+//
+// Reasonable but imperfect: uses current fish stock, 20% chance of suboptimal
+// zone choice, orders max 1 ship/round from shipyard when conditions allow.
+// Scales with game progress so it doesn't expand in the late game.
+//
+// Returns { harborShips, coastalShips, deepSeaShips,
+//           shipsToBuy, shipsToSell, newShipOrders }
+
+export function kiDecisionEasy(team, gameState, params) {
+  const { fleet, bankBalance } = team
+  const { fischbestand, runde, maxRunden, marketShipPrice } = gameState
   const maxFisch = params?.maxFishPopulation ?? GAME_CONFIG.maxFischbestand
-  const fischPreis = params?.fishPrice ?? GAME_CONFIG.fischPreis
-  const fischDichte = fischbestand / maxFisch
-  const eff = zoneMaxEff * Math.sqrt(Math.max(0, fischDichte))
-  let bestBoote = 0
-  let bestGewinn = 0
-  for (let b = 1; b <= meineMaxBoote; b++) {
-    const gewinn = b * eff * fischPreis - b * zoneCost
-    if (gewinn > bestGewinn) {
-      bestGewinn = gewinn
-      bestBoote = b
-    }
+  const auctionPrice = marketShipPrice ?? GAME_CONFIG.auctionPreis
+  const newShipPrice = params?.newShipPrice ?? GAME_CONFIG.bootKosten
+
+  const density = fischbestand / maxFisch
+  const maxRoundsVal = maxRunden ?? GAME_CONFIG.maxRunden
+  const gameProgress = runde / maxRoundsVal
+
+  // Ship buying: max 1/round, only if stock healthy and in first 55% of game
+  const shipsToBuy = (density > 0.65 && gameProgress < 0.55 && bankBalance >= auctionPrice) ? 1 : 0
+
+  // Ship selling: only if stock has dropped below 25%
+  const shipsToSell = (density < 0.25 && fleet > 1) ? 1 : 0
+
+  // Shipyard ordering: 1 ship/round when stock healthy and in first 70% of game
+  const newShipOrders = (
+    density > 0.65 &&
+    gameProgress < 0.70 &&
+    (team.shipsInDelivery || 0) === 0 &&
+    bankBalance > newShipPrice * 2
+  ) ? 1 : 0
+
+  // Zone allocation on effective fleet (fleet after applying buy/sell)
+  const effectiveFleet = Math.max(1, fleet + shipsToBuy - shipsToSell)
+  let harborShips, coastalShips, deepSeaShips
+
+  if (density > 0.65) {
+    // Prefer Deep Sea (70 %), Coastal (30 %)
+    deepSeaShips = Math.round(effectiveFleet * 0.7)
+    coastalShips = effectiveFleet - deepSeaShips
+    harborShips = 0
+  } else if (density >= 0.4) {
+    // Even split Coastal / Deep Sea
+    deepSeaShips = Math.floor(effectiveFleet / 2)
+    coastalShips = effectiveFleet - deepSeaShips
+    harborShips = 0
+  } else {
+    // Prefer Coastal, keep 1 ship in Harbor
+    harborShips = Math.min(1, effectiveFleet)
+    coastalShips = effectiveFleet - harborShips
+    deepSeaShips = 0
   }
-  return bestBoote
+
+  // 20 % chance of a suboptimal zone choice
+  if (Math.random() < 0.2 && effectiveFleet > 1) {
+    if (deepSeaShips > 0) { deepSeaShips--; harborShips++ }
+    else if (coastalShips > 0) { coastalShips--; harborShips++ }
+  }
+
+  return { harborShips, coastalShips, deepSeaShips, shipsToBuy, shipsToSell, newShipOrders }
 }
 
-function andereBooteGeschaetzt(meineTeamName, alleTeams) {
-  return alleTeams
-    .filter(t => t.name !== meineTeamName)
-    .reduce((sum, t) => sum + (t.ausgesandteBoote || 3), 0)
-}
+// ─── Hard AI ─────────────────────────────────────────────────────────────────
+//
+// Near-optimal: deploys all ships to the highest-profit zone, calculates ROI
+// before buying/ordering ships, tracks fish trend and other teams' deployment.
+//
+// Returns { harborShips, coastalShips, deepSeaShips,
+//           shipsToBuy, shipsToSell, newShipOrders }
 
-export function kiBootAktionSchwer(team, fischbestand, verlauf, alleTeams, verkaufPreis = GAME_CONFIG.bootVerkaufswert, params) {
-  let { fleet: boote, bankBalance: guthaben, persoenlichkeit, name } = team
-  const trend = berechneTrend(verlauf)
+export function kiDecisionHard(team, gameState, params) {
+  const { fleet, bankBalance } = team
+  const { fischbestand, runde, maxRunden, verlauf, marketShipPrice } = gameState
   const maxFisch = params?.maxFishPopulation ?? GAME_CONFIG.maxFischbestand
-  const fischPreis = params?.fishPrice ?? GAME_CONFIG.fischPreis
-  const newShipCost = params?.newShipPrice ?? GAME_CONFIG.bootKosten
-  const { zoneCost, zoneMaxEff } = getZoneParams(persoenlichkeit, params)
+  const fishPrice = params?.fishPrice ?? GAME_CONFIG.fischPreis
+  const auctionPrice = marketShipPrice ?? GAME_CONFIG.auctionPreis
+  const newShipPrice = params?.newShipPrice ?? GAME_CONFIG.bootKosten
+  const harborCost = params?.harborCost ?? GAME_CONFIG.harborCost   // eslint-disable-line no-unused-vars
+  const coastalCost = params?.coastalCost ?? GAME_CONFIG.coastalCost
+  const deepSeaCost = params?.deepSeaCost ?? GAME_CONFIG.deepSeaCost
 
-  // Panic selling: 8% chance when trend sharply negative and stock < 40%
-  if (trend < maxFisch * -0.05 && fischbestand < maxFisch * 0.4 && boote > 3 && Math.random() < 0.08) {
-    return { fleet: boote - 1, bankBalance: guthaben + verkaufPreis }
+  const density = fischbestand / maxFisch
+  const sqrtDensity = Math.sqrt(Math.max(0, density))
+  const maxRoundsVal = maxRunden ?? GAME_CONFIG.maxRunden
+  const roundsRemaining = Math.max(1, maxRoundsVal - runde + 1)
+  const gameProgress = runde / maxRoundsVal
+
+  // Expected profit per ship per round in each zone
+  const coastalProfit = (15 * sqrtDensity * fishPrice) - coastalCost
+  const deepSeaProfit = (25 * sqrtDensity * fishPrice) - deepSeaCost
+  const bestZoneProfit = Math.max(coastalProfit, deepSeaProfit)
+
+  // Fish trend: average change per round over last 3 rounds
+  const fishTrend = berechneTrend(verlauf)
+
+  // Rapid decline: avg loss > 80 fish/round over last 3 rounds
+  const rapidDecline = fishTrend < -80
+
+  // Expected profit per ship over all remaining rounds
+  const expectedProfitPerShip = bestZoneProfit * roundsRemaining
+
+  // Ship buying (auction – instant, max 1 per round)
+  let shipsToBuy = 0
+  if (
+    density > 0.70 &&
+    gameProgress < 0.50 &&
+    expectedProfitPerShip > auctionPrice * 1.5 &&
+    bankBalance > auctionPrice * 2
+  ) {
+    shipsToBuy = 1
   }
 
-  function expectedProfit(meineBoote) {
-    if (meineBoote === 0) return 0
-    const opt = bestResponse(meineBoote, fischbestand, params, zoneCost, zoneMaxEff)
-    const fischDichte = fischbestand / maxFisch
-    const meinFang = opt * zoneMaxEff * Math.sqrt(Math.max(0, fischDichte))
-    return meinFang * fischPreis - opt * zoneCost
+  // Ship selling (instant) – ship is a net liability, or late-game rapid decline
+  let shipsToSell = 0
+  if (bestZoneProfit < 0 && auctionPrice > 150 && fleet > 1) {
+    shipsToSell = 1
+    shipsToBuy = 0   // never buy and sell simultaneously
+  }
+  if (rapidDecline && gameProgress > 0.70 && fleet > 1 && shipsToSell === 0) {
+    shipsToSell = 1
+    shipsToBuy = 0
   }
 
-  const marginalROI = (expectedProfit(boote + 1) - expectedProfit(boote)) * rand(0.85, 1.15)
-  const kaufSchwelle = (persoenlichkeit === 'gierig' ? 30 : persoenlichkeit === 'rational' ? 150 : 250) * rand(0.90, 1.10)
-  const verkaufTrendSchwelle = persoenlichkeit === 'kooperativ' ? maxFisch * -0.03 : persoenlichkeit === 'rational' ? maxFisch * -0.05 : maxFisch * -0.08
-
-  if (marginalROI > kaufSchwelle && guthaben >= newShipCost && fischbestand > maxFisch * 0.35 && trend >= maxFisch * -0.02 && boote < 10) {
-    boote += 1
-    guthaben -= newShipCost
-  } else if (trend < verkaufTrendSchwelle && boote > 3) {
-    boote -= 1
-    guthaben += verkaufPreis
+  // New ship orders (shipyard – arrives next round, max 1 to prevent runaway expansion)
+  let newShipOrders = 0
+  if (
+    density > 0.65 &&
+    gameProgress < 0.65 &&
+    (team.shipsInDelivery || 0) === 0 &&
+    bankBalance > newShipPrice * 3 &&
+    !rapidDecline
+  ) {
+    newShipOrders = 1
   }
 
-  return { fleet: boote, bankBalance: guthaben }
-}
+  // Zone allocation on effective fleet (after buy/sell)
+  const effectiveFleet = Math.max(1, fleet + shipsToBuy - shipsToSell)
 
-// Zone allocation for AI teams based on personality and fish density.
-export function kiZoneAllokierung(persoenlichkeit, boote, ausgesandt, fischbestand, params) {
-  const harbor = boote - ausgesandt
-  if (persoenlichkeit === 'gierig') {
-    return { harborShips: harbor, coastalShips: 0, deepSeaShips: ausgesandt }
-  } else if (persoenlichkeit === 'kooperativ') {
-    return { harborShips: harbor, coastalShips: ausgesandt, deepSeaShips: 0 }
-  } else { // rational — 1 in Harbor, split rest by density
-    const adjustedHarbor = Math.max(harbor, Math.min(1, boote))
-    const remaining = boote - adjustedHarbor
-    const maxFisch = params?.maxFishPopulation ?? GAME_CONFIG.maxFischbestand
-    const fishDichte = fischbestand / maxFisch
-    if (fishDichte > 0.5) {
-      return { harborShips: adjustedHarbor, coastalShips: 0, deepSeaShips: remaining }
-    } else {
-      return { harborShips: adjustedHarbor, coastalShips: remaining, deepSeaShips: 0 }
-    }
+  // Reduce deployment to 60% when stock is declining rapidly
+  const deployedCount = rapidDecline ? Math.max(1, Math.round(effectiveFleet * 0.6)) : effectiveFleet
+
+  let harborShips, coastalShips, deepSeaShips
+
+  if (deepSeaProfit >= coastalProfit && deepSeaProfit > 0) {
+    deepSeaShips = clampBoote(deployedCount * rand(0.95, 1.05), effectiveFleet)
+    coastalShips = 0
+    harborShips = effectiveFleet - deepSeaShips
+  } else if (coastalProfit > deepSeaProfit && coastalProfit > 0) {
+    coastalShips = clampBoote(deployedCount * rand(0.95, 1.05), effectiveFleet)
+    deepSeaShips = 0
+    harborShips = effectiveFleet - coastalShips
+  } else {
+    // Both zones unprofitable – harbor all ships to minimize losses
+    harborShips = effectiveFleet
+    coastalShips = 0
+    deepSeaShips = 0
   }
-}
+  harborShips = Math.max(0, harborShips)
 
-export function kiAusgesandtSchwer(persoenlichkeit, teamName, boote, fischbestand, verlauf, alleTeams, params) {
-  const trend = berechneTrend(verlauf)
-  const maxFisch = params?.maxFishPopulation ?? GAME_CONFIG.maxFischbestand
-  const { zoneCost, zoneMaxEff } = getZoneParams(persoenlichkeit, params)
-
-  let optimal = bestResponse(boote, fischbestand, params, zoneCost, zoneMaxEff)
-
-  if (persoenlichkeit === 'gierig') {
-    optimal = Math.min(boote, optimal + 1)
-  } else if (persoenlichkeit === 'kooperativ' && trend < maxFisch * -0.03) {
-    optimal = Math.max(0, optimal - 1)
-  }
-
-  optimal = Math.round(optimal * rand(0.90, 1.10))
-
-  if (fischbestand < maxFisch * 0.15) {
-    optimal = Math.min(optimal, Math.max(0, Math.floor(boote * 0.2)))
-  }
-
-  return Math.max(0, Math.min(boote, optimal))
+  return { harborShips, coastalShips, deepSeaShips, shipsToBuy, shipsToSell, newShipOrders }
 }

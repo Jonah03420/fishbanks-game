@@ -2,8 +2,6 @@ import { useState } from 'react'
 import { getAdminSettings, saveAdminSettings, resetAdminSettings, ADMIN_DEFAULTS } from '../game/adminSettings'
 
 const TEAM_COLORS = ['🔴', '🟡', '🟢', '🔵']
-const PERSONALITIES = ['gierig', 'kooperativ', 'rational']
-const PERSONALITY_LABEL = { gierig: 'Greedy', kooperativ: 'Cooperative', rational: 'Rational' }
 
 function Section({ title, children }) {
   return (
@@ -87,17 +85,17 @@ export default function AdminPage({ onBack }) {
     setSettings(s => ({ ...s, [key]: value }))
   }
 
-  function setPersonality(slot, value) {
+  function setDifficulty(slot, value) {
     setSettings(s => {
-      const p = [...s.aiPersonalities]
-      p[slot] = value
-      return { ...s, aiPersonalities: p }
+      const d = [...s.aiDifficulties]
+      d[slot] = value
+      return { ...s, aiDifficulties: d }
     })
   }
 
   function handleReset() {
     resetAdminSettings()
-    setSettings({ ...ADMIN_DEFAULTS, aiPersonalities: [...ADMIN_DEFAULTS.aiPersonalities] })
+    setSettings({ ...ADMIN_DEFAULTS, aiDifficulties: [...ADMIN_DEFAULTS.aiDifficulties] })
   }
 
   function handleSave() {
@@ -253,23 +251,16 @@ export default function AdminPage({ onBack }) {
             </Section>
 
             <Section title="AI Settings">
-              <Row label="AI difficulty" hint="Applies to all AI-controlled slots">
-                <BtnGroup
-                  value={settings.schwierigkeitsgrad}
-                  options={[{value:'leicht',label:'Easy'},{value:'schwer',label:'Hard'}]}
-                  onChange={v => set('schwierigkeitsgrad', v)}
-                />
-              </Row>
               {[1, 2, 3].map(slot => (
                 <Row
                   key={slot}
-                  label={`${TEAM_COLORS[slot]} Slot ${slot + 1} personality`}
+                  label={`${TEAM_COLORS[slot]} Slot ${slot + 1} difficulty`}
                   hint="Only active if this slot has no human player"
                 >
                   <BtnGroup
-                    value={settings.aiPersonalities[slot] || 'gierig'}
-                    options={PERSONALITIES.map(p => ({ value: p, label: PERSONALITY_LABEL[p] }))}
-                    onChange={v => setPersonality(slot, v)}
+                    value={settings.aiDifficulties[slot] || 'easy'}
+                    options={[{value:'easy',label:'Easy'},{value:'hard',label:'Hard'}]}
+                    onChange={v => setDifficulty(slot, v)}
                   />
                 </Row>
               ))}
