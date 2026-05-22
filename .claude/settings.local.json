@@ -15,7 +15,11 @@
       "Bash(del \"C:\\\\Users\\\\jonah\\\\fishbanks-game\\\\verify-ai.mjs\")",
       "PowerShell(Remove-Item *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\jonah\\\\fishbanks-game\\\\src\" -Recurse -Filter \"*.js\")",
-      "Bash(Select-Object FullName)"
+      "Bash(Select-Object FullName)",
+      "Bash(npm install *)",
+      "Bash(curl -s http://localhost:3001/health)",
+      "Bash(curl -s http://localhost:3001/rooms)",
+      "Bash(pkill -f \"node server.js\")"
     ]
   }
 }
