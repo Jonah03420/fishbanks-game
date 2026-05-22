@@ -5,8 +5,10 @@ import GamePage from './pages/GamePage'
 import EndPage from './pages/EndPage'
 import AdminPage from './pages/AdminPage'
 import { erstelleStartzustandAusLobby } from './game/gameState'
+import { useSocket } from './hooks/useSocket'
 
 function App() {
+  const { socket, connected } = useSocket()
   const [gameState, setGameState] = useState(null)
   const [phase, setPhase] = useState('start')
   const [lobbyView, setLobbyView] = useState('create')
@@ -39,6 +41,7 @@ function App() {
     <div className="w-full h-full">
       {phase === 'start' && (
         <StartPage
+          connected={connected}
           onCreateGame={() => { setLobbyView('create'); setPhase('lobby') }}
           onJoinGame={() => { setLobbyView('join'); setPhase('lobby') }}
           onOpenAdmin={handleOpenAdmin}
@@ -46,6 +49,8 @@ function App() {
       )}
       {phase === 'lobby' && (
         <LobbyPage
+          socket={socket}
+          connected={connected}
           initialView={lobbyView}
           onStart={handleGameStart}
           onBack={() => setPhase('start')}

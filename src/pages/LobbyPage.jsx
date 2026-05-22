@@ -1,41 +1,45 @@
-import { useState, useEffect, useRef } from 'react'
-import { GAME_CONFIG } from '../game/fishLogic'
-import {
-  generateRoomCode, createRoom, joinRoom, getRoom,
-  updateSettings, startGame, leaveRoom,
-} from '../game/lobbyStore'
-import { getAdminSettings, hasNonDefaultSettings } from '../game/adminSettings'
+import { useState, useEffect } from 'react'
 
-const TEAM_COLORS = ['🔴', '🟡', '🟢', '🔵']
-function PlayerList({ room, myId }) {
-  const numSlots = room.numTeams || 4
-  const difficulties = room.aiDifficulties || [null, 'easy', 'easy', 'easy']
+const COLOR_EMOJI = {
+  red: '🔴', yellow: '🟡', green: '🟢',
+  blue: '🔵', purple: '🟣', orange: '🟠'
+}
+
+function ConnectionStatus({ connected }) {
+  return (
+    <div className={`flex items-center gap-1.5 text-xs ${connected ? 'text-green-400' : 'text-red-400'}`}>
+      <span>{connected ? '🟢' : '🔴'}</span>
+      {connected ? 'Connected to server' : 'Connecting...'}
+    </div>
+  )
+}
+
+function SlotList({ slots, mySlotIndex }) {
   return (
     <div className="space-y-2">
-      {Array.from({ length: numSlots }, (_, slot) => {
-        const player = room.players[slot]
-        if (player) return (
-          <div key={slot} className="flex items-center gap-3 bg-white/10 rounded-xl px-4 py-3">
-            <span className="text-xl">{TEAM_COLORS[slot]}</span>
-            <span className="flex-1 font-medium">
-              {player.name}
-              {player.isCreator && <span className="text-xs text-yellow-300 ml-2">Host</span>}
-              {player.id === myId && <span className="text-xs text-blue-300 ml-2">(You)</span>}
-            </span>
-            <span className="text-green-400 text-sm">Connected</span>
-          </div>
-        )
-        const diffLabel = difficulties[slot] === 'hard' ? 'Hard AI' : 'Easy AI'
-        return (
-          <div key={slot} className="flex items-center gap-3 bg-white/5 border border-dashed border-white/20 rounded-xl px-4 py-3 text-blue-400">
-            <span className="text-xl opacity-30">{TEAM_COLORS[slot]}</span>
-            <span className="flex-1 text-sm">
-              {slot === 0 ? 'Waiting for host…' : `🤖 ${diffLabel}`}
-            </span>
-            <span className="text-xs text-blue-600">replaced when joined</span>
-          </div>
-        )
-      })}
+      {slots.map(slot => (
+        <div key={slot.slotIndex}
+          className={`flex items-center gap-3 rounded-xl px-4 py-3 ${
+            slot.isAI
+              ? 'bg-white/5 border border-dashed border-white/20 text-blue-400'
+              : 'bg-white/10'
+          }`}>
+          <span className="text-xl">{COLOR_EMOJI[slot.color] || '⚪'}</span>
+          <span className="flex-1 font-medium">
+            {slot.name}
+            {slot.slotIndex === 0 && !slot.isAI && (
+              <span className="text-xs text-yellow-300 ml-2">Host</span>
+            )}
+            {slot.slotIndex === mySlotIndex && !slot.isAI && (
+              <span className="text-xs text-blue-300 ml-2">(You)</span>
+            )}
+          </span>
+          {slot.isAI
+            ? <span className="text-xs text-blue-500">AI</span>
+            : <span className="text-green-400 text-sm">Connected</span>
+          }
+        </div>
+      ))}
     </div>
   )
 }
@@ -53,108 +57,94 @@ function Layout({ leftContent, rightContent }) {
   )
 }
 
-export default function LobbyPage({ onStart, onBack, initialView = 'create', onOpenAdmin }) {
+export default function LobbyPage({ socket, connected, onStart, onBack, initialView = 'create', onOpenAdmin }) {
   const [view, setView] = useState(initialView)
   const [playerName, setPlayerName] = useState('')
   const [joinCode, setJoinCode] = useState('')
-  const [joinError, setJoinError] = useState('')
+  const [error, setError] = useState('')
   const [room, setRoom] = useState(null)
-  const [myId, setMyId] = useState(null)
-
-  const roomRef = useRef(null)
-  const myIdRef = useRef(null)
-  useEffect(() => { roomRef.current = room }, [room])
-  useEffect(() => { myIdRef.current = myId }, [myId])
+  const [mySlotIndex, setMySlotIndex] = useState(null)
+  const [isHost, setIsHost] = useState(false)
 
   useEffect(() => {
-    const isWaiting = view === 'waiting-host' || view === 'waiting-guest'
-    if (!isWaiting) return
+    if (!socket) return
 
-    function checkRoom() {
-      const r = roomRef.current
-      const id = myIdRef.current
-      if (!r || !id) return
-      const updated = getRoom(r.code)
-      if (!updated) return
-      setRoom(updated)
-      if (updated.status === 'started') {
-        const idx = updated.players.findIndex(p => p.id === id)
-        if (idx !== -1) onStart(updated, idx)
-      }
+    function onRoomCreated({ slotIndex, room: r }) {
+      setRoom(r)
+      setMySlotIndex(slotIndex)
+      setIsHost(true)
+      setError('')
+      setView('waiting')
     }
 
-    const interval = setInterval(checkRoom, 500)
-    window.addEventListener('storage', checkRoom)
+    function onRoomJoined({ slotIndex, room: r }) {
+      setRoom(r)
+      setMySlotIndex(slotIndex)
+      setIsHost(false)
+      setError('')
+      setView('waiting')
+    }
+
+    function onRoomUpdated({ room: r }) {
+      setRoom(prev => prev?.code === r.code ? r : prev)
+    }
+
+    function onServerError({ message }) {
+      setError(message)
+    }
+
+    function onKicked() {
+      setRoom(null)
+      setMySlotIndex(null)
+      setIsHost(false)
+      onBack()
+    }
+
+    socket.on('room-created', onRoomCreated)
+    socket.on('room-joined', onRoomJoined)
+    socket.on('room-updated', onRoomUpdated)
+    socket.on('error', onServerError)
+    socket.on('kicked', onKicked)
+
     return () => {
-      clearInterval(interval)
-      window.removeEventListener('storage', checkRoom)
+      socket.off('room-created', onRoomCreated)
+      socket.off('room-joined', onRoomJoined)
+      socket.off('room-updated', onRoomUpdated)
+      socket.off('error', onServerError)
+      socket.off('kicked', onKicked)
     }
-  }, [view, onStart])
+  }, [socket, onBack])
 
   function doCreate() {
-    const name = playerName.trim() || 'Player 1'
-    const code = generateRoomCode()
-    const admin = getAdminSettings()
-    const result = createRoom({
-      code,
-      creatorName: name,
-      maxRunden: admin.maxRunden,
-      maxHumanPlayers: admin.numTeams,
-      schwierigkeitsgrad: admin.schwierigkeitsgrad,
-      startGuthaben: admin.startingCapital,
-      startBoote: admin.startBoote,
-      // All admin params forwarded to room (lobbyStore spreads ...adminParams)
-      numTeams: admin.numTeams,
-      startingCapital: admin.startingCapital,
-      fishPrice: admin.fishPrice,
-      newShipPrice: admin.newShipPrice,
-      interestRate: admin.interestRate,
-      harborCost: admin.harborCost,
-      coastalCost: admin.coastalCost,
-      deepSeaCost: admin.deepSeaCost,
-      maxFishPopulation: admin.maxFishPopulation,
-      startingFishStock: admin.startingFishStock,
-      fishReproductionRate: admin.fishReproductionRate,
-      aiDifficulties: admin.aiDifficulties,
-      showFishStock: admin.showFishStock,
-      showOtherCatches: admin.showOtherCatches,
+    if (!socket || !connected) { setError('Not connected to server.'); return }
+    setError('')
+    socket.emit('create-room', {
+      playerName: playerName.trim() || 'Player 1',
+      settings: {}
     })
-    setRoom(result.room)
-    setMyId(result.myId)
-    setView('waiting-host')
   }
 
   function doJoin() {
-    setJoinError('')
-    const name = playerName.trim() || 'Player'
+    if (!socket || !connected) { setError('Not connected to server.'); return }
+    setError('')
     const code = joinCode.toUpperCase().replace(/[^A-Z]/g, '')
-    if (code.length !== 4) { setJoinError('Please enter a 4-letter code.'); return }
-    const result = joinRoom(code, name)
-    if (result.error) { setJoinError(result.error); return }
-    setRoom(result.room)
-    setMyId(result.myId)
-    setView('waiting-guest')
+    if (code.length !== 4) { setError('Please enter a 4-letter code.'); return }
+    socket.emit('join-room', {
+      playerName: playerName.trim() || 'Player',
+      roomCode: code
+    })
   }
 
   function changeSetting(key, value) {
-    if (!room) return
-    const next = updateSettings(room.code, { [key]: value })
-    if (next) setRoom(next)
-  }
-
-  function doStartGame() {
-    if (!room) return
-    const updated = startGame(room.code)
-    if (updated) {
-      const idx = updated.players.findIndex(p => p.id === myId)
-      if (idx !== -1) onStart(updated, idx)
-    }
+    if (!room || !socket) return
+    socket.emit('update-settings', { roomCode: room.code, settings: { [key]: value } })
   }
 
   function doLeave() {
-    if (room && myId) leaveRoom(room.code, myId)
+    if (room && socket) socket.emit('leave-room', { roomCode: room.code })
     setRoom(null)
-    setMyId(null)
+    setMySlotIndex(null)
+    setIsHost(false)
     onBack()
   }
 
@@ -186,6 +176,9 @@ export default function LobbyPage({ onStart, onBack, initialView = 'create', onO
       }
       rightContent={
         <>
+          <div className="flex justify-end mb-6">
+            <ConnectionStatus connected={connected} />
+          </div>
           <h2 className="text-2xl font-bold mb-2">Create Game</h2>
           <p className="text-blue-300 text-sm mb-8">Enter your name and create a room.</p>
           <div className="mb-6">
@@ -200,9 +193,14 @@ export default function LobbyPage({ onStart, onBack, initialView = 'create', onO
               className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-blue-300 focus:outline-none focus:border-blue-400 transition-colors"
             />
           </div>
+          {error && (
+            <div className="bg-red-500/20 border border-red-400/30 rounded-xl p-3 text-red-200 text-sm text-center mb-4">
+              {error}
+            </div>
+          )}
           <div className="flex flex-col gap-3 mt-auto">
-            <button onClick={doCreate}
-              className="w-full bg-green-500 hover:bg-green-400 font-bold py-4 rounded-xl text-lg transition-colors">
+            <button onClick={doCreate} disabled={!connected}
+              className="w-full bg-green-500 hover:bg-green-400 disabled:opacity-50 disabled:cursor-not-allowed font-bold py-4 rounded-xl text-lg transition-colors">
               Create Room
             </button>
             <button onClick={onBack} className="w-full text-blue-300 hover:text-white text-sm transition-colors py-2">
@@ -233,6 +231,9 @@ export default function LobbyPage({ onStart, onBack, initialView = 'create', onO
       }
       rightContent={
         <>
+          <div className="flex justify-end mb-6">
+            <ConnectionStatus connected={connected} />
+          </div>
           <h2 className="text-2xl font-bold mb-2">Join Game</h2>
           <p className="text-blue-300 text-sm mb-8">Enter your name and type in the code.</p>
           <div className="space-y-4 mb-6">
@@ -259,15 +260,15 @@ export default function LobbyPage({ onStart, onBack, initialView = 'create', onO
                 className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-4 text-white placeholder-blue-300 text-center text-3xl font-bold tracking-widest focus:outline-none focus:border-blue-400 transition-colors uppercase"
               />
             </div>
-            {joinError && (
+            {error && (
               <div className="bg-red-500/20 border border-red-400/30 rounded-xl p-3 text-red-200 text-sm text-center">
-                {joinError}
+                {error}
               </div>
             )}
           </div>
           <div className="flex flex-col gap-3">
-            <button onClick={doJoin}
-              className="w-full bg-blue-500 hover:bg-blue-400 font-bold py-4 rounded-xl text-lg transition-colors">
+            <button onClick={doJoin} disabled={!connected}
+              className="w-full bg-blue-500 hover:bg-blue-400 disabled:opacity-50 disabled:cursor-not-allowed font-bold py-4 rounded-xl text-lg transition-colors">
               Join
             </button>
             <button onClick={onBack} className="w-full text-blue-300 hover:text-white text-sm transition-colors py-2">
@@ -279,158 +280,146 @@ export default function LobbyPage({ onStart, onBack, initialView = 'create', onO
     />
   )
 
-  // ── waiting-host ────────────────────────────────────────────────────────────
-  if (view === 'waiting-host' && room) return (
-    <div className="w-full h-full bg-blue-900 text-white flex overflow-hidden">
+  // ── waiting ──────────────────────────────────────────────────────────────────
+  if (view === 'waiting' && room) {
+    const s = room.settings
+    const humanCount = room.slots.filter(sl => !sl.isAI).length
+    const aiCount = room.slots.filter(sl => sl.isAI).length
 
-      <div className="flex-1 flex flex-col justify-center px-16 py-12 bg-gradient-to-br from-blue-800 to-blue-950 gap-6">
-        <div>
-          <p className="text-blue-200 text-sm mb-3">Room code – share with participants</p>
-          <div className="bg-white/15 border-2 border-white/30 rounded-2xl px-10 py-5 inline-block mb-6">
-            <div className="text-6xl font-bold tracking-widest font-mono">{room.code}</div>
-          </div>
-        </div>
+    return (
+      <div className="w-full h-full bg-blue-900 text-white flex overflow-hidden">
 
-        <div>
-          <p className="text-sm text-blue-200 mb-3">
-            Players ({room.players.length} / 4 slots filled)
-          </p>
-          <div className="max-w-md">
-            <PlayerList room={room} myId={myId} />
-          </div>
-        </div>
-      </div>
-
-      <div className="w-[420px] flex flex-col justify-center px-10 py-8 bg-blue-950/60 border-l border-white/10 gap-4">
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 flex flex-col justify-center px-16 py-12 bg-gradient-to-br from-blue-800 to-blue-950 gap-6">
           <div>
-            <h2 className="text-2xl font-bold mb-1">Settings</h2>
-            <p className="text-blue-300 text-sm">You are host – configure the game.</p>
-            {hasNonDefaultSettings() && (
-              <div className="mt-1.5 text-xs text-yellow-300 bg-yellow-500/15 border border-yellow-400/30 rounded-lg px-2 py-1 inline-block">
-                Custom instructor settings active
-              </div>
-            )}
+            <p className="text-blue-200 text-sm mb-3">
+              {isHost ? 'Room code – share with participants' : 'You joined – Room code'}
+            </p>
+            <div className="bg-white/15 border-2 border-white/30 rounded-2xl px-10 py-5 inline-block mb-2">
+              <div className="text-6xl font-bold tracking-widest font-mono">{room.code}</div>
+            </div>
+            <p className="text-blue-400 text-xs">Share this code with other players</p>
           </div>
-          {onOpenAdmin && (
-            <button onClick={onOpenAdmin} className="text-blue-500 hover:text-blue-300 text-xs transition-colors flex-none">
-              ⚙ Instructor
-            </button>
+
+          <div>
+            <p className="text-sm text-blue-200 mb-3">
+              Players ({humanCount} human · {aiCount} AI)
+            </p>
+            <div className="max-w-md">
+              <SlotList slots={room.slots} mySlotIndex={mySlotIndex} />
+            </div>
+          </div>
+        </div>
+
+        <div className="w-[420px] flex flex-col px-10 py-8 bg-blue-950/60 border-l border-white/10 gap-4 justify-center">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h2 className="text-2xl font-bold mb-1">
+                {isHost ? 'Settings' : 'Waiting for Host'}
+              </h2>
+              <p className="text-blue-300 text-sm">
+                {isHost
+                  ? 'You are host – configure the game.'
+                  : 'You have successfully joined. The host will start the game.'}
+              </p>
+            </div>
+            <ConnectionStatus connected={connected} />
+          </div>
+
+          {isHost ? (
+            <>
+              <div>
+                <label className="block text-sm text-blue-200 mb-2">Rounds</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[10, 15, 20].map(r => (
+                    <button key={r}
+                      onClick={() => changeSetting('maxRounds', r)}
+                      className={`py-3 rounded-xl font-bold text-sm transition-colors ${s.maxRounds === r ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-blue-200'}`}>
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-blue-200 mb-2">AI Difficulty</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[['easy', 'Easy'], ['hard', 'Hard']].map(([val, lbl]) => (
+                    <button key={val}
+                      onClick={() => changeSetting('aiDifficulty', val)}
+                      className={`py-3 rounded-xl font-bold text-sm transition-colors ${s.aiDifficulty === val ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-blue-200'}`}>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-blue-200 mb-2">Starting Balance</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[3000, 5000, 8000].map(n => (
+                    <button key={n}
+                      onClick={() => changeSetting('startingBalance', n)}
+                      className={`py-2 rounded-xl font-bold text-xs transition-colors ${s.startingBalance === n ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-blue-200'}`}>
+                      {(n / 1000).toLocaleString()}k€
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-blue-200 mb-2">Starting Fleet</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[2, 3, 5].map(n => (
+                    <button key={n}
+                      onClick={() => changeSetting('startingFleet', n)}
+                      className={`py-2 rounded-xl font-bold text-sm transition-colors ${s.startingFleet === n ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-blue-200'}`}>
+                      {n} ships
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {onOpenAdmin && (
+                <button onClick={onOpenAdmin} className="text-blue-500 hover:text-blue-300 text-xs transition-colors text-left">
+                  ⚙ Instructor Settings
+                </button>
+              )}
+
+              <div className="flex flex-col gap-3 mt-auto">
+                <button disabled
+                  className="w-full bg-green-500/40 cursor-not-allowed font-bold py-4 rounded-xl text-lg opacity-60">
+                  Start Game (Phase 3)
+                </button>
+                <button onClick={doLeave} className="w-full text-blue-300 hover:text-white text-sm transition-colors py-2">
+                  ← Leave Room
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="bg-white/5 rounded-xl p-6 text-center border border-white/10">
+                <p className="text-blue-300 text-sm">Waiting for host to start the game…</p>
+                <p className="text-blue-400 text-xs mt-2">This page updates automatically.</p>
+              </div>
+
+              <div className="bg-white/10 rounded-xl p-4 text-sm text-blue-300">
+                <div className="font-bold text-white mb-2">Game Settings</div>
+                <div>{s.maxRounds} rounds</div>
+                <div>{s.aiDifficulty === 'easy' ? 'Easy' : 'Hard'} AI</div>
+                <div>Balance: {s.startingBalance.toLocaleString()}€ · Fleet: {s.startingFleet} ships</div>
+              </div>
+
+              <div className="mt-auto">
+                <button onClick={doLeave} className="w-full text-blue-300 hover:text-white text-sm transition-colors py-2">
+                  ← Leave Room
+                </button>
+              </div>
+            </>
           )}
         </div>
-
-        <div>
-          <label className="block text-sm text-blue-200 mb-2">Rounds</label>
-          <div className="grid grid-cols-3 gap-2">
-            {[10, 15, 20].map(r => (
-              <button key={r}
-                onClick={() => changeSetting('maxRunden', r)}
-                className={`py-3 rounded-xl font-bold text-sm transition-colors ${room.maxRunden === r ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-blue-200'}`}>
-                {r}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm text-blue-200 mb-2">AI Difficulty</label>
-          <div className="grid grid-cols-2 gap-2">
-            {[['leicht', 'Easy'], ['schwer', 'Hard']].map(([val, lbl]) => (
-              <button key={val}
-                onClick={() => changeSetting('schwierigkeitsgrad', val)}
-                className={`py-3 rounded-xl font-bold text-sm transition-colors ${(room.schwierigkeitsgrad || 'leicht') === val ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-blue-200'}`}>
-                {lbl}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm text-blue-200 mb-2">Starting Balance</label>
-          <div className="grid grid-cols-3 gap-2">
-            {[3000, 5000, 8000].map(n => (
-              <button key={n}
-                onClick={() => changeSetting('startingCapital', n)}
-                className={`py-2 rounded-xl font-bold text-xs transition-colors ${(room.startingCapital || room.startGuthaben || GAME_CONFIG.startGuthaben) === n ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-blue-200'}`}>
-                {(n / 1000).toLocaleString()}k€
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm text-blue-200 mb-2">Starting Fleet</label>
-          <div className="grid grid-cols-3 gap-2">
-            {[2, 3, 5].map(n => (
-              <button key={n}
-                onClick={() => changeSetting('startBoote', n)}
-                className={`py-2 rounded-xl font-bold text-sm transition-colors ${(room.startBoote || GAME_CONFIG.initialBoote) === n ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-blue-200'}`}>
-                {n} ships
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-3 mt-auto">
-          <button onClick={doStartGame}
-            className="w-full bg-green-500 hover:bg-green-400 font-bold py-4 rounded-xl text-lg transition-colors">
-            Start Game
-          </button>
-          <button onClick={doLeave} className="w-full text-blue-300 hover:text-white text-sm transition-colors py-2">
-            ← Leave Room
-          </button>
-        </div>
       </div>
-    </div>
-  )
-
-  // ── waiting-guest ───────────────────────────────────────────────────────────
-  if (view === 'waiting-guest' && room) return (
-    <div className="w-full h-full bg-blue-900 text-white flex overflow-hidden">
-
-      <div className="flex-1 flex flex-col justify-center px-16 py-12 bg-gradient-to-br from-blue-800 to-blue-950 gap-6">
-        <div>
-          <p className="text-blue-200 text-sm mb-3">You joined – Room code</p>
-          <div className="bg-white/15 border-2 border-white/30 rounded-2xl px-10 py-5 inline-block mb-6">
-            <div className="text-6xl font-bold tracking-widest font-mono">{room.code}</div>
-          </div>
-        </div>
-
-        <div>
-          <p className="text-sm text-blue-200 mb-3">
-            Players ({room.players.length} / 4 slots · {room.maxRunden} rounds)
-          </p>
-          <div className="max-w-md">
-            <PlayerList room={room} myId={myId} />
-          </div>
-        </div>
-      </div>
-
-      <div className="w-[420px] flex flex-col justify-center px-10 py-12 bg-blue-950/60 border-l border-white/10 gap-6">
-        <div>
-          <h2 className="text-2xl font-bold mb-1">Waiting for Host</h2>
-          <p className="text-blue-300 text-sm">You have successfully joined. The host will start the game.</p>
-        </div>
-
-        <div className="bg-white/5 rounded-xl p-6 text-center border border-white/10">
-          <p className="text-blue-300 text-sm">Waiting for host to start the game…</p>
-          <p className="text-blue-400 text-xs mt-2">This page updates automatically.</p>
-        </div>
-
-        <div className="bg-white/10 rounded-xl p-4 text-sm text-blue-300">
-          <div className="font-bold text-white mb-2">Game Info</div>
-          <div>{room.maxRunden} rounds</div>
-          <div>{room.players.length} Human · {4 - room.players.length} AI (so far)</div>
-        </div>
-
-        <div className="mt-auto">
-          <button onClick={doLeave} className="w-full text-blue-300 hover:text-white text-sm transition-colors py-2">
-            ← Leave Room
-          </button>
-        </div>
-      </div>
-    </div>
-  )
+    )
+  }
 
   return null
 }

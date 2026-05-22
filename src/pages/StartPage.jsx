@@ -1,6 +1,6 @@
 import { GAME_CONFIG } from '../game/fishLogic'
 
-function StartPage({ onCreateGame, onJoinGame, onOpenAdmin }) {
+function StartPage({ connected, onCreateGame, onJoinGame, onOpenAdmin }) {
   return (
     <div className="w-full h-full bg-blue-900 text-white flex overflow-hidden">
 
@@ -98,6 +98,11 @@ function StartPage({ onCreateGame, onJoinGame, onOpenAdmin }) {
         >
           ⚙ Instructor Settings
         </button>
+
+        <div className={`mt-6 flex items-center gap-1.5 text-xs ${connected ? 'text-green-500' : 'text-red-400'}`}>
+          <span>{connected ? '🟢' : '🔴'}</span>
+          {connected ? 'Server online' : 'Server offline'}
+        </div>
       </div>
     </div>
   )
