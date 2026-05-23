@@ -576,7 +576,14 @@ io.on('connection', socket => {
     room.pendingDecisions = {}
     room.lastActivity = Date.now()
 
-    io.to(code).emit('game-started', { gameState: room.gameState })
+    // Send each connected human their own slotIndex so the client never relies
+    // on a potentially-stale closure value.
+    for (const slot of room.slots) {
+      if (!slot.isAI && slot.socketId) {
+        const s = io.sockets.sockets.get(slot.socketId)
+        if (s) s.emit('game-started', { gameState: room.gameState, slotIndex: slot.slotIndex })
+      }
+    }
     console.log(`Game started in room ${code} with ${room.slots.length} teams`)
   })
 

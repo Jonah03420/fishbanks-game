@@ -1,10 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import StartPage from './pages/StartPage'
 import LobbyPage from './pages/LobbyPage'
 import GamePage from './pages/GamePage'
 import EndPage from './pages/EndPage'
 import AdminPage from './pages/AdminPage'
-import { erstelleStartzustandAusLobby } from './game/gameState'
 import { useSocket } from './hooks/useSocket'
 
 function App() {
@@ -13,14 +12,20 @@ function App() {
   const [phase, setPhase] = useState('start')
   const [lobbyView, setLobbyView] = useState('create')
   const [adminReturnPhase, setAdminReturnPhase] = useState('start')
+  const [mySlotIndex, setMySlotIndex] = useState(null)
+  const [roomCode, setRoomCode] = useState(null)
 
-  function handleGameStart(room, playerIndex) {
-    setGameState(erstelleStartzustandAusLobby(room, playerIndex))
+  function handleGameStart(serverGS, slotIndex, rCode) {
+    setMySlotIndex(slotIndex)
+    setRoomCode(rCode)
+    setGameState({ ...serverGS, playerIndex: slotIndex })
     setPhase('game')
   }
 
   function handleRestart() {
     setGameState(null)
+    setMySlotIndex(null)
+    setRoomCode(null)
     setPhase('start')
   }
 
@@ -29,7 +34,17 @@ function App() {
     setPhase('admin')
   }
 
-  if (gameState && (gameState.phase === 'ende' || gameState.fischbestand <= 0)) {
+  useEffect(() => {
+    if (!socket) return
+    function onGameEnded({ gameState: gs }) {
+      setGameState(gs)
+      setPhase('ended')
+    }
+    socket.on('game-ended', onGameEnded)
+    return () => socket.off('game-ended', onGameEnded)
+  }, [socket])
+
+  if (gameState && (gameState.phase === 'ende' || gameState.fish?.current <= 0)) {
     return <EndPage gameState={gameState} onRestart={handleRestart} />
   }
 
@@ -58,7 +73,16 @@ function App() {
         />
       )}
       {phase === 'game' && gameState && (
-        <GamePage gameState={gameState} setGameState={setGameState} />
+        <GamePage
+          gameState={gameState}
+          setGameState={setGameState}
+          socket={socket}
+          mySlotIndex={mySlotIndex}
+          roomCode={roomCode}
+        />
+      )}
+      {phase === 'ended' && gameState && (
+        <EndPage gameState={gameState} onRestart={handleRestart} />
       )}
     </div>
   )

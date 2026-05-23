@@ -100,11 +100,16 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
       onBack()
     }
 
+    function onGameStarted({ gameState: gs, slotIndex: si }) {
+      onStart(gs, si ?? mySlotIndex, room?.code)
+    }
+
     socket.on('room-created', onRoomCreated)
     socket.on('room-joined', onRoomJoined)
     socket.on('room-updated', onRoomUpdated)
     socket.on('error', onServerError)
     socket.on('kicked', onKicked)
+    socket.on('game-started', onGameStarted)
 
     return () => {
       socket.off('room-created', onRoomCreated)
@@ -112,8 +117,9 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
       socket.off('room-updated', onRoomUpdated)
       socket.off('error', onServerError)
       socket.off('kicked', onKicked)
+      socket.off('game-started', onGameStarted)
     }
-  }, [socket, onBack])
+  }, [socket, onBack, mySlotIndex, room])
 
   function doCreate() {
     if (!socket || !connected) { setError('Not connected to server.'); return }
@@ -146,6 +152,14 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
     setMySlotIndex(null)
     setIsHost(false)
     onBack()
+  }
+
+  function doStartGame() {
+    if (!socket || !connected) { setError('Not connected to server.'); return }
+    if (!room?.code) { setError('Room not found.'); return }
+    const roomCode = room.code
+    console.log('emitting start-game', roomCode)
+    socket.emit('start-game', { roomCode })
   }
 
   // ── create ──────────────────────────────────────────────────────────────────
@@ -386,9 +400,11 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
               )}
 
               <div className="flex flex-col gap-3 mt-auto">
-                <button disabled
-                  className="w-full bg-green-500/40 cursor-not-allowed font-bold py-4 rounded-xl text-lg opacity-60">
-                  Start Game (Phase 3)
+                <button
+                  onClick={doStartGame}
+                  disabled={!connected}
+                  className="w-full bg-green-500 hover:bg-green-400 disabled:opacity-50 disabled:cursor-not-allowed font-bold py-4 rounded-xl text-lg transition-colors">
+                  Start Game
                 </button>
                 <button onClick={doLeave} className="w-full text-blue-300 hover:text-white text-sm transition-colors py-2">
                   ← Leave Room
