@@ -234,11 +234,15 @@ function processRound(room) {
   const { params } = gs
   if (!room.pendingDecisions) room.pendingDecisions = {}
 
-  const weatherFactor = erzeugeMarktereignis()
+  const wetterfaktor = erzeugeMarktereignis()
   let totalCatch = 0
 
   // Step 1: Deliver ships ordered last round
+  const roundDeliveries = []
   for (const team of gs.teams) {
+    if (team.shipsInDelivery > 0) {
+      roundDeliveries.push({ name: team.name, farbe: team.farbe, count: team.shipsInDelivery })
+    }
     team.fleet += team.shipsInDelivery
     team.shipsInDelivery = 0
   }
@@ -252,21 +256,29 @@ function processRound(room) {
   }
 
   // Steps 3–7: Per-team processing
+  const aiShipPurchases = []
+
   for (let i = 0; i < gs.teams.length; i++) {
     const team = gs.teams[i]
     const dec  = room.pendingDecisions[i]
     if (!dec) continue
 
-    let minBalance = team.bankBalance
-    const track = (b) => { minBalance = Math.min(minBalance, b); return b }
-
-    // Step 3: Auction buy / sell
+    // Step 3: Auction buy / sell — applied before minBalance tracking (matches client sim)
     const toBuy  = Math.max(0, dec.shipsToBuy  ?? 0)
     const toSell = Math.min(Math.max(0, dec.shipsToSell ?? 0), team.fleet)
     team.fleet  += toBuy - toSell
     team.auctionPurchases = toBuy
-    team.bankBalance = track(team.bankBalance - toBuy  * gs.marketShipPrice)
-    team.bankBalance = track(team.bankBalance + toSell * gs.marketShipPrice)
+    team.bankBalance -= toBuy  * gs.marketShipPrice
+    team.bankBalance += toSell * gs.marketShipPrice
+
+    if (team.istKI && toBuy > 0) {
+      aiShipPurchases.push({ name: team.name, farbe: team.farbe, count: toBuy, price: gs.marketShipPrice })
+    }
+
+    // startBalance = balance after auction, before op costs (matches client roundSummary)
+    const startBalance = team.bankBalance
+    let balance    = startBalance
+    let minBalance = balance
 
     // Step 4: Operating costs per zone
     const harbor  = Math.max(0, dec.harborShips  ?? 0)
@@ -275,60 +287,92 @@ function processRound(room) {
     const opCosts = harbor  * params.harborCost
                   + coastal * params.coastalCost
                   + deep    * params.deepSeaCost
-    team.bankBalance = track(team.bankBalance - opCosts)
+    balance   -= opCosts
+    minBalance = Math.min(minBalance, balance)
 
     // Step 5: Fish catch + revenue
-    // Zone effectiveness: Coastal max 15 fish/ship, Deep Sea max 25 fish/ship
-    // Both scale with sqrt(density) per MIT §5
     const density      = Math.max(0, gs.fischbestand) / params.maxFishPopulation
     const sqrtDensity  = Math.sqrt(density)
-    const coastalCatch = Math.round(coastal * 15 * sqrtDensity * weatherFactor)
-    const deepCatch    = Math.round(deep    * 25 * sqrtDensity * weatherFactor)
+    const coastalCatch = Math.round(coastal * 15 * sqrtDensity * wetterfaktor)
+    const deepCatch    = Math.round(deep    * 25 * sqrtDensity * wetterfaktor)
     const teamCatch    = coastalCatch + deepCatch
-    team.bankBalance   = track(team.bankBalance + teamCatch * params.fishPrice)
+    const fishRevenue  = Math.round(teamCatch * params.fishPrice)
+    balance           += fishRevenue
     totalCatch        += teamCatch
-    team.letzterFang   = teamCatch
-    team.harborShips   = harbor
-    team.coastalShips  = coastal
-    team.deepSeaShips  = deep
+
+    team.letzterFang      = teamCatch
+    team.harborShips      = harbor
+    team.coastalShips     = coastal
+    team.deepSeaShips     = deep
     team.ausgesandteBoote = coastal + deep
 
     // Step 6: Interest on minimum balance reached this round (MIT §6)
-    const interest    = minBalance * params.interestRate
-    team.bankBalance += interest
-    team.letzteZinsen = interest
+    const zinsen    = Math.round(minBalance * params.interestRate)
+    balance        += zinsen
+    team.letzteZinsen = zinsen
 
-    // Step 7: New ship orders — payment immediate, delivery next round (MIT §3 Step 6)
+    // Step 7: New ship orders — payment immediate, delivery next round
     const maxOrder     = Math.ceil(team.fleet / 2)
     const actualOrders = Math.min(Math.max(0, dec.newShipOrders ?? 0), maxOrder)
-    team.bankBalance  -= actualOrders * params.newShipPrice
+    const orderCost    = actualOrders * params.newShipPrice
+    balance           -= orderCost
     team.shipsInDelivery = actualOrders
+    team.bankBalance     = balance
+
+    // Attach roundSummary for the round result modal
+    team.roundSummary = {
+      startBalance,
+      opCosts,
+      deployedShips: team.fleet,
+      harborShips: harbor,
+      coastalShips: coastal,
+      deepSeaShips: deep,
+      coastalFang: coastalCatch,
+      deepSeaFang: deepCatch,
+      fang: teamCatch,
+      wetterfaktor,
+      fishRevenue,
+      minBalance,
+      zinsen,
+      actualOrder: actualOrders,
+      orderCost,
+      newShipPrice: params.newShipPrice,
+      finalBalance: balance,
+    }
   }
 
   // Step 8: Update fish stock — logistic growth after total catch removed
+  const fischbestandVor = gs.fischbestand
   gs.fischbestand = berechneFischbestand(gs.fischbestand, totalCatch, params)
 
-  // Step 9: Market price unchanged in Phase 3
+  // Step 9: Market price unchanged in Phase 4
 
   // Step 10: Recalculate net worth for all teams
   for (const team of gs.teams) {
     team.netWorth = berechneNetWorth(team.bankBalance, team.fleet, gs.marketShipPrice)
   }
 
-  // Step 11: Save round snapshot to verlauf
-  gs.verlauf.push({
+  // Step 11: Save round snapshot to verlauf with all fields GamePage expects.
+  // fischbestand = pre-round value (matches client simuliereRunde convention) so
+  // FishGraph and the Fishery Data table work identically in single-player and multiplayer.
+  const verlaufEintrag = {
     runde: gs.runde,
-    fischbestand: gs.fischbestand,
-    weatherFactor,
-    teams: gs.teams.map(t => ({
-      id: t.id,
-      bankBalance: Math.round(t.bankBalance),
-      fleet: t.fleet,
-      netWorth: Math.round(t.netWorth),
-      letzterFang: t.letzterFang,
-      letzteZinsen: Math.round(t.letzteZinsen),
-    }))
-  })
+    fischbestand: fischbestandVor,
+    gesamtFang: totalCatch,
+    wetterfaktor,
+  }
+  for (const team of gs.teams) {
+    verlaufEintrag[team.name]           = Math.round(team.netWorth)
+    verlaufEintrag[`${team.name}_rs`]   = team.roundSummary
+  }
+  gs.verlauf.push(verlaufEintrag)
+
+  // Attach top-level round data for the round result modal
+  gs.letzterWetterfaktor = wetterfaktor
+  gs.letzterGesamtFang   = totalCatch
+  gs.letzteAuktionEvents = []
+  gs.roundDeliveries     = roundDeliveries
+  gs.aiShipPurchases     = aiShipPurchases
 
   // Step 12: Game end — max rounds reached or fish stock collapsed
   const isOver = gs.runde >= gs.maxRunden || gs.fischbestand <= 0

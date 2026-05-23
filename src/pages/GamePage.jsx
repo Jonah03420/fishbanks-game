@@ -387,7 +387,7 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-function GamePage({ gameState, setGameState }) {
+function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
     const [humanDecisions, setHumanDecisions] = useState({})
     const [currentHarbor, setCurrentHarbor] = useState(0)
     const [currentCoastal, setCurrentCoastal] = useState(0)
@@ -403,7 +403,15 @@ function GamePage({ gameState, setGameState }) {
     const [activeTab, setActiveTab] = useState('dashboard')
     const [devToast, setDevToast] = useState(false)
     const [buyConfirm, setBuyConfirm] = useState(false)
+    const [waitingForServer, setWaitingForServer] = useState(false)
+    const [submittedCount, setSubmittedCount] = useState(0)
+    const [totalPlayers, setTotalPlayers] = useState(0)
+    const [pendingBuys, setPendingBuys] = useState(0)
+    const [pendingSells, setPendingSells] = useState(0)
     const devSkipRef = useRef(null)
+    const prevFischRef = useRef(gameState.fischbestand)
+
+    const isMultiplayer = !!(socket && roomCode)
 
     const maxRunden = gameState.maxRunden || GAME_CONFIG.maxRunden
     const schwierigkeit = gameState.schwierigkeitsgrad || 'leicht'
@@ -418,16 +426,16 @@ function GamePage({ gameState, setGameState }) {
         .map((t, i) => ({ ...t, slotIndex: i }))
         .filter(t => !t.istKI)
 
-    // First human who hasn't submitted a decision yet
-    const activeEntry = humanTeams.find(t => !humanDecisions[t.slotIndex])
-    const activeSlot = activeEntry ? activeEntry.slotIndex : null
-    const activeTeam = activeSlot !== null ? gameState.teams[activeSlot] : null
-
-    // Next human after the active one (for handoff screen)
-    const activeEntryIdx = activeEntry ? humanTeams.indexOf(activeEntry) : -1
-    const nextEntry = activeEntryIdx >= 0 && activeEntryIdx < humanTeams.length - 1
-        ? humanTeams[activeEntryIdx + 1]
+    // Hot-seat tracking (single-player only)
+    const hotSeatEntry = !isMultiplayer ? humanTeams.find(t => !humanDecisions[t.slotIndex]) : null
+    const hotSeatEntryIdx = hotSeatEntry ? humanTeams.indexOf(hotSeatEntry) : -1
+    const nextEntry = hotSeatEntryIdx >= 0 && hotSeatEntryIdx < humanTeams.length - 1
+        ? humanTeams[hotSeatEntryIdx + 1]
         : null
+
+    // Active player: in multiplayer = my assigned slot; in single-player = next hot-seat player
+    const activeSlot = isMultiplayer ? mySlotIndex : (hotSeatEntry ? hotSeatEntry.slotIndex : null)
+    const activeTeam = activeSlot !== null ? gameState.teams[activeSlot] : null
 
     const fleetSize = activeTeam ? activeTeam.fleet : 0
     const totalAllocated = currentHarbor + currentCoastal + currentDeepSea
@@ -447,6 +455,7 @@ function GamePage({ gameState, setGameState }) {
                 return { ...team, fleet: neueBoote, bankBalance: newBankBalance, auctionPurchases: (team.auctionPurchases || 0) + 1, netWorth: berechneNetWorth(newBankBalance, neueBoote, marketShipPrice) }
             })
         })
+        if (isMultiplayer) setPendingBuys(prev => prev + 1)
         setBuyConfirm(true)
         setTimeout(() => setBuyConfirm(false), 2000)
     }
@@ -473,10 +482,36 @@ function GamePage({ gameState, setGameState }) {
                 return { ...team, fleet: neueBoote, bankBalance: newBankBalance, netWorth: berechneNetWorth(newBankBalance, neueBoote, marketShipPrice) }
             })
         })
+        if (isMultiplayer) setPendingSells(prev => prev + 1)
     }
 
     function handleSubmit() {
         if (activeSlot === null) return
+
+        if (isMultiplayer) {
+            socket.emit('submit-decision', {
+                roomCode,
+                decision: {
+                    harborShips: currentHarbor,
+                    coastalShips: currentCoastal,
+                    deepSeaShips: currentDeepSea,
+                    shipsToBuy: pendingBuys,
+                    shipsToSell: pendingSells,
+                    newShipOrders: safeShipsOrdered,
+                }
+            })
+            setPendingBuys(0)
+            setPendingSells(0)
+            setWaitingForServer(true)
+            setCurrentHarbor(0)
+            setCurrentCoastal(0)
+            setCurrentDeepSea(0)
+            setCurrentBoatsOffered(0)
+            setCurrentShipsOrdered(0)
+            setHumanBids({})
+            return
+        }
+
         const newDecisions = {
             ...humanDecisions,
             [activeSlot]: {
@@ -535,19 +570,27 @@ function GamePage({ gameState, setGameState }) {
     function handleWeiter() {
         if (!rundenErgebnis) return
         const newState = rundenErgebnis.gameStateNachRunde
-        const firstHumanTeam = newState.teams.find(t => !t.istKI)
+        const myTeamInNew = isMultiplayer && mySlotIndex != null
+            ? newState.teams[mySlotIndex]
+            : newState.teams.find(t => !t.istKI)
         setGameState(newState)
         setRundenErgebnis(null)
         setHumanDecisions({})
         setHumanBids({})
         setCurrentHarbor(0)
         setCurrentCoastal(0)
-        setCurrentDeepSea(firstHumanTeam ? firstHumanTeam.fleet : 0)
+        setCurrentDeepSea(myTeamInNew ? myTeamInNew.fleet : 0)
         setCurrentBoatsOffered(0)
         setCurrentShipsOrdered(0)
+        if (isMultiplayer) {
+            setPendingBuys(0)
+            setPendingSells(0)
+            prevFischRef.current = newState.fischbestand
+        }
     }
 
     function handleDevSkip() {
+        if (isMultiplayer) return
         let state = { ...gameState, verlauf: [...gameState.verlauf], teams: gameState.teams.map(t => ({ ...t })) }
         while (state.runde <= maxRunden && state.fischbestand > 0) {
             const decisions = {}
@@ -566,7 +609,7 @@ function GamePage({ gameState, setGameState }) {
         setGameState({ ...state, phase: 'ende' })
     }
 
-    // Keyboard shortcut Ctrl/Cmd+Shift+S triggers full simulation (DEV only)
+    // Keyboard shortcut Ctrl/Cmd+Shift+S triggers full simulation (DEV only, disabled in multiplayer)
     devSkipRef.current = handleDevSkip
     useEffect(() => {
         if (!import.meta.env.DEV) return
@@ -581,6 +624,70 @@ function GamePage({ gameState, setGameState }) {
         window.addEventListener('keydown', onKey)
         return () => window.removeEventListener('keydown', onKey)
     }, [])
+
+    // Multiplayer socket events
+    useEffect(() => {
+        if (!socket || !isMultiplayer) return
+
+        function onDecisionReceived({ submitted, total }) {
+            setSubmittedCount(submitted)
+            setTotalPlayers(total)
+        }
+
+        function onRoundComplete({ gameState: newGS }) {
+            if (mySlotIndex != null) newGS.playerIndex = mySlotIndex
+            const lastV = newGS.verlauf[newGS.verlauf.length - 1]
+            const alterFisch = lastV?.fischbestand ?? prevFischRef.current
+            setRundenErgebnis({
+                runde: lastV?.runde ?? (newGS.runde - 1),
+                teams: newGS.teams,
+                alterFischbestand: alterFisch,
+                fischDelta: newGS.fischbestand - alterFisch,
+                neuerFischbestand: newGS.fischbestand,
+                wetterfaktor: newGS.letzterWetterfaktor,
+                gesamtFang: newGS.letzterGesamtFang ?? 0,
+                auctionEvents: newGS.letzteAuktionEvents || [],
+                roundDeliveries: newGS.roundDeliveries || [],
+                aiShipPurchases: newGS.aiShipPurchases || [],
+                newPendingOffers: newGS.pendingAuctionOffers || [],
+                gameStateNachRunde: newGS,
+            })
+            prevFischRef.current = newGS.fischbestand
+            setWaitingForServer(false)
+            setSubmittedCount(0)
+        }
+
+        function onGameEnded({ gameState: newGS }) {
+            if (mySlotIndex != null) newGS.playerIndex = mySlotIndex
+            const lastV = newGS.verlauf[newGS.verlauf.length - 1]
+            const alterFisch = lastV?.fischbestand ?? prevFischRef.current
+            setRundenErgebnis({
+                runde: lastV?.runde ?? newGS.runde,
+                teams: newGS.teams,
+                alterFischbestand: alterFisch,
+                fischDelta: newGS.fischbestand - alterFisch,
+                neuerFischbestand: newGS.fischbestand,
+                wetterfaktor: newGS.letzterWetterfaktor,
+                gesamtFang: newGS.letzterGesamtFang ?? 0,
+                auctionEvents: newGS.letzteAuktionEvents || [],
+                roundDeliveries: newGS.roundDeliveries || [],
+                aiShipPurchases: newGS.aiShipPurchases || [],
+                newPendingOffers: newGS.pendingAuctionOffers || [],
+                gameStateNachRunde: newGS,
+            })
+            setWaitingForServer(false)
+        }
+
+        socket.on('decision-received', onDecisionReceived)
+        socket.on('round-complete', onRoundComplete)
+        socket.on('game-ended', onGameEnded)
+
+        return () => {
+            socket.off('decision-received', onDecisionReceived)
+            socket.off('round-complete', onRoundComplete)
+            socket.off('game-ended', onGameEnded)
+        }
+    }, [socket, isMultiplayer, mySlotIndex])
 
     // ── Tab helpers ──────────────────────────────────────────────────────────────
 
@@ -767,7 +874,10 @@ function GamePage({ gameState, setGameState }) {
                             onClick={handleWeiter}
                             className="w-full bg-green-500 hover:bg-green-400 font-bold py-3 rounded-xl transition-colors text-base"
                         >
-                            Continue to Round {rundenErgebnis.runde + 1} →
+                            {rundenErgebnis.gameStateNachRunde?.phase === 'ende' || rundenErgebnis.gameStateNachRunde?.fischbestand <= 0
+                                ? 'View Final Results →'
+                                : `Continue to Round ${rundenErgebnis.runde + 1} →`
+                            }
                         </button>
                     </div>
                 </div>
@@ -777,9 +887,14 @@ function GamePage({ gameState, setGameState }) {
             <div className="flex-none flex justify-between items-center px-4 py-2 border-b border-white/10">
                 <div className="flex items-center gap-2">
                     <h1 className="text-base font-bold">Fish Banks Game</h1>
-                    {humanTeams.length > 1 && activeTeam && (
+                    {isMultiplayer && activeTeam && (
                         <span className="text-xs px-2 py-0.5 rounded font-medium bg-blue-500/30 text-blue-200">
-                            {activeTeam.name} ({activeEntryIdx + 1}/{humanTeams.length})
+                            {activeTeam.farbe} {activeTeam.name} (You)
+                        </span>
+                    )}
+                    {!isMultiplayer && humanTeams.length > 1 && activeTeam && (
+                        <span className="text-xs px-2 py-0.5 rounded font-medium bg-blue-500/30 text-blue-200">
+                            {activeTeam.name} ({hotSeatEntryIdx + 1}/{humanTeams.length})
                         </span>
                     )}
                 </div>
@@ -896,7 +1011,20 @@ function GamePage({ gameState, setGameState }) {
                         </div>
 
                         {/* Decision panel */}
-                        {activeTeam ? (
+                        {waitingForServer ? (
+                            <div className="flex-1 min-h-0 bg-white/10 rounded-xl p-3 flex flex-col items-center justify-center gap-3">
+                                <p className="text-blue-200 text-sm font-medium">Decision submitted!</p>
+                                {totalPlayers > 1 && (
+                                    <p className="text-blue-400 text-xs">Waiting for other players… {submittedCount} / {totalPlayers}</p>
+                                )}
+                                <div className="w-32 h-1.5 bg-white/20 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-blue-400 rounded-full transition-all duration-300"
+                                        style={{ width: `${totalPlayers > 0 ? (submittedCount / totalPlayers) * 100 : 50}%` }}
+                                    />
+                                </div>
+                            </div>
+                        ) : activeTeam ? (
                             <div className="flex-1 min-h-0 bg-white/10 rounded-xl p-3 flex flex-col gap-2">
 
                                 <h2 className="font-bold text-sm">{activeTeam.name} – Ship Allocation</h2>
