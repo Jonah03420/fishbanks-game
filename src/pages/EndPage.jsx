@@ -55,11 +55,12 @@ function EndPage({ gameState, onRestart }) {
     let niedrigsterBestand = { runde: 0, wert: Infinity }
     let groessterEinzelAbfall = { runde: 0, delta: 0 }
     gameState.verlauf.forEach((v, i) => {
-        if (v.fischbestand < niedrigsterBestand.wert) {
-            niedrigsterBestand = { runde: v.runde, wert: v.fischbestand }
+        const fisch = v.fischbestand ?? 0
+        if (fisch < niedrigsterBestand.wert) {
+            niedrigsterBestand = { runde: v.runde, wert: fisch }
         }
         if (i > 0) {
-            const delta = gameState.verlauf[i - 1].fischbestand - v.fischbestand
+            const delta = (gameState.verlauf[i - 1].fischbestand ?? 0) - fisch
             if (delta > groessterEinzelAbfall.delta) {
                 groessterEinzelAbfall = { runde: v.runde, delta }
             }

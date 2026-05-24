@@ -360,6 +360,7 @@ function processRound(room) {
     fischbestand: fischbestandVor,
     gesamtFang: totalCatch,
     wetterfaktor,
+    wachstum: gs.fischbestand - fischbestandVor + totalCatch,
   }
   for (const team of gs.teams) {
     verlaufEintrag[team.name]           = Math.round(team.netWorth)

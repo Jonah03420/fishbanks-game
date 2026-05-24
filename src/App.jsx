@@ -35,18 +35,42 @@ function App() {
   }
 
   useEffect(() => {
+    if (gameState?.phase === 'ende') {
+      setPhase('ended')
+    }
+  }, [gameState?.phase])
+
+  useEffect(() => {
     if (!socket) return
+
+    function onRoundComplete({ gameState: gs }) {
+      if (!roomCode) return
+      if (import.meta.env.DEV) {
+        console.log('round-complete received:', gs)
+        console.log('verlauf in new gameState:', gs.verlauf)
+      }
+      // Merge server state into React state, preserving client-only playerIndex.
+      // verlauf fallback guards against any edge case where server sends empty array.
+      setGameState(prev => ({
+        ...gs,
+        playerIndex: prev?.playerIndex ?? null,
+        verlauf: gs.verlauf?.length ? gs.verlauf : (prev?.verlauf ?? []),
+      }))
+    }
+
     function onGameEnded({ gameState: gs }) {
+      if (!roomCode) return
       setGameState(gs)
       setPhase('ended')
     }
-    socket.on('game-ended', onGameEnded)
-    return () => socket.off('game-ended', onGameEnded)
-  }, [socket])
 
-  if (gameState && (gameState.phase === 'ende' || gameState.fish?.current <= 0)) {
-    return <EndPage gameState={gameState} onRestart={handleRestart} />
-  }
+    socket.on('round-complete', onRoundComplete)
+    socket.on('game-ended', onGameEnded)
+    return () => {
+      socket.off('round-complete', onRoundComplete)
+      socket.off('game-ended', onGameEnded)
+    }
+  }, [socket, roomCode])
 
   if (phase === 'admin') {
     return <AdminPage onBack={() => setPhase(adminReturnPhase)} />

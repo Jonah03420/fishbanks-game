@@ -356,7 +356,8 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         console.log('=== END ROUND ===')
     }
 
-    const verlaufEintrag = { runde: state.runde, fischbestand: state.fischbestand, gesamtFang, wetterfaktor }
+    const finalFischbestand = Math.max(0, neuerFischbestand)
+    const verlaufEintrag = { runde: state.runde, fischbestand: state.fischbestand, gesamtFang, wetterfaktor, wachstum: finalFischbestand - state.fischbestand + gesamtFang }
     finalTeams.forEach(team => {
         verlaufEintrag[team.name] = team.netWorth
         verlaufEintrag[`${team.name}_rs`] = team.roundSummary
@@ -365,8 +366,6 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
     const neueAuctionHistory = allAuctionEvents.some(e => e.erfolg)
         ? [...(state.auctionHistory || []), ...allAuctionEvents.filter(e => e.erfolg).map(e => ({ runde: state.runde, ...e }))]
         : (state.auctionHistory || [])
-
-    const finalFischbestand = Math.max(0, neuerFischbestand)
     return {
         ...state,
         runde: state.runde + 1,
@@ -590,7 +589,8 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
     }
 
     function handleDevSkip() {
-        if (isMultiplayer) return
+        const otherHumans = gameState.teams.filter((t, idx) => !t.istKI && idx !== mySlotIndex).length
+        if (isMultiplayer && otherHumans > 0) return
         let state = { ...gameState, verlauf: [...gameState.verlauf], teams: gameState.teams.map(t => ({ ...t })) }
         while (state.runde <= maxRunden && state.fischbestand > 0) {
             const decisions = {}
@@ -635,6 +635,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
         }
 
         function onRoundComplete({ gameState: newGS }) {
+            if (import.meta.env.DEV) console.log('[round-complete] verlauf:', JSON.stringify(newGS.verlauf))
             if (mySlotIndex != null) newGS.playerIndex = mySlotIndex
             const lastV = newGS.verlauf[newGS.verlauf.length - 1]
             const alterFisch = lastV?.fischbestand ?? prevFischRef.current
@@ -644,8 +645,8 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                 alterFischbestand: alterFisch,
                 fischDelta: newGS.fischbestand - alterFisch,
                 neuerFischbestand: newGS.fischbestand,
-                wetterfaktor: newGS.letzterWetterfaktor,
-                gesamtFang: newGS.letzterGesamtFang ?? 0,
+                wetterfaktor: newGS.letzterWetterfaktor ?? lastV?.wetterfaktor,
+                gesamtFang: newGS.letzterGesamtFang ?? lastV?.gesamtFang ?? 0,
                 auctionEvents: newGS.letzteAuktionEvents || [],
                 roundDeliveries: newGS.roundDeliveries || [],
                 aiShipPurchases: newGS.aiShipPurchases || [],
@@ -667,8 +668,8 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                 alterFischbestand: alterFisch,
                 fischDelta: newGS.fischbestand - alterFisch,
                 neuerFischbestand: newGS.fischbestand,
-                wetterfaktor: newGS.letzterWetterfaktor,
-                gesamtFang: newGS.letzterGesamtFang ?? 0,
+                wetterfaktor: newGS.letzterWetterfaktor ?? lastV?.wetterfaktor,
+                gesamtFang: newGS.letzterGesamtFang ?? lastV?.gesamtFang ?? 0,
                 auctionEvents: newGS.letzteAuktionEvents || [],
                 roundDeliveries: newGS.roundDeliveries || [],
                 aiShipPurchases: newGS.aiShipPurchases || [],
@@ -699,6 +700,10 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
 
     const fishDichte = Math.max(0, gameState.fischbestand) / maxFischUI
     const fishPct    = Math.round(fishDichte * 100)
+
+    if (import.meta.env.DEV && activeTab === 'reports') {
+        console.log('gameState.verlauf:', gameState.verlauf)
+    }
 
     return (
         <div className="w-full h-screen bg-blue-900 text-white flex flex-col">
@@ -1298,7 +1303,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
 
                             {/* FishGraph */}
                             <div className="bg-white/10 rounded-xl p-2" style={{ height: 300 }}>
-                                <FishGraph verlauf={gameState.verlauf} />
+                                <FishGraph verlauf={gameState.verlauf} maxFisch={maxFischUI} />
                             </div>
 
                             {/* Fishery Data table */}
@@ -1325,14 +1330,14 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                             </tr>
                                             {gameState.verlauf.map((v, i) => {
                                                 const fishAfter = i + 1 < gameState.verlauf.length
-                                                    ? gameState.verlauf[i + 1].fischbestand
+                                                    ? (gameState.verlauf[i + 1].fischbestand ?? 0)
                                                     : gameState.fischbestand
-                                                const growth = fishAfter - v.fischbestand + v.gesamtFang
+                                                const growth = fishAfter - (v.fischbestand ?? 0) + (v.gesamtFang ?? 0)
                                                 return (
                                                     <tr key={i} className={`border-b border-white/5 ${i % 2 !== 0 ? 'bg-white/5' : ''}`}>
                                                         <td className="py-1 pr-3 text-blue-400">{v.runde}</td>
-                                                        <td className="py-1 px-2 text-right">{v.fischbestand.toLocaleString()}</td>
-                                                        <td className="py-1 px-2 text-right text-red-300">{v.gesamtFang.toLocaleString()}</td>
+                                                        <td className="py-1 px-2 text-right">{(v.fischbestand ?? 0).toLocaleString()}</td>
+                                                        <td className="py-1 px-2 text-right text-red-300">{(v.gesamtFang ?? 0).toLocaleString()}</td>
                                                         <td className={`py-1 pl-2 text-right ${growth >= 0 ? 'text-green-300' : 'text-red-300'}`}>
                                                             {growth >= 0 ? '+' : ''}{growth.toLocaleString()}
                                                         </td>
