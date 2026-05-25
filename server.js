@@ -209,6 +209,7 @@ function initGameState(room) {
     pendingAuctionOffers: [],
     teams,
     verlauf: [],
+    auctionListings: [],
     params,
   }
 }
@@ -361,6 +362,7 @@ function processRound(room) {
     gesamtFang: totalCatch,
     wetterfaktor,
     wachstum: gs.fischbestand - fischbestandVor + totalCatch,
+    marketShipPrice: gs.marketShipPrice,
   }
   for (const team of gs.teams) {
     verlaufEintrag[team.name]           = Math.round(team.netWorth)

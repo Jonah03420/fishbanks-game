@@ -47,6 +47,7 @@ export function erstelleStartzustandAusLobby(room, playerIndex) {
     marketShipPrice: GAME_CONFIG.auctionPreis,
     auctionHistory: [],
     pendingAuctionOffers: [],
+    auctionListings: [],
     playerIndex,
     teams,
     verlauf: [],

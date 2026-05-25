@@ -1,4 +1,5 @@
 import FishGraph from '../components/FishGraph'
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { useState, useEffect, useRef } from 'react'
 import {
     GAME_CONFIG, berechneFischbestand, berechneNetWorth,
@@ -187,8 +188,47 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         pendingAuctionEvents = pendingAuctionEvents.concat(auctionEvents)
     }
 
+    // ── Step 1c: Resolve auction listings from previous round ──
+    const listingAuctionEvents = []
+    let teamsAfterListings = teamsAfterPending.map(t => ({ ...t }))
+    const fishDensityForBids = maxFisch > 0 ? state.fischbestand / maxFisch : 0
+
+    for (const listing of (state.auctionListings || [])) {
+        const allBids = { ...(listing.bids || {}) }
+        teamsAfterListings.forEach((team, idx) => {
+            if (idx === listing.sellerSlot) return
+            if (team.istKI && team.aiDifficulty === 'hard' && fishDensityForBids > 0.60) {
+                const aiBid = Math.round(Math.min(marketShipPrice * 1.15, team.bankBalance))
+                if (aiBid > 0 && (allBids[idx] == null || allBids[idx] < aiBid)) allBids[idx] = aiBid
+            }
+        })
+        let bestBid = listing.askingPrice - 1
+        let bestBidderIdx = -1
+        Object.entries(allBids).forEach(([idxStr, bid]) => {
+            const idx = parseInt(idxStr)
+            if (idx === listing.sellerSlot) return
+            if (bid >= listing.askingPrice && bid > bestBid && (teamsAfterListings[idx]?.bankBalance ?? 0) >= bid) {
+                bestBid = bid; bestBidderIdx = idx
+            }
+        })
+        if (bestBidderIdx >= 0) {
+            teamsAfterListings = teamsAfterListings.map((t, idx) => {
+                if (idx === listing.sellerSlot) return { ...t, bankBalance: t.bankBalance + bestBid }
+                if (idx === bestBidderIdx) return { ...t, fleet: t.fleet + listing.ships, bankBalance: t.bankBalance - bestBid }
+                return t
+            })
+            listingAuctionEvents.push({ erfolg: true, sellerName: listing.sellerName, kaeufer: teamsAfterListings[bestBidderIdx].name, preis: bestBid, ships: listing.ships })
+        } else {
+            teamsAfterListings = teamsAfterListings.map((t, idx) => {
+                if (idx === listing.sellerSlot) return { ...t, fleet: t.fleet + listing.ships }
+                return t
+            })
+            listingAuctionEvents.push({ erfolg: false, sellerName: listing.sellerName, ships: listing.ships })
+        }
+    }
+
     // ── Step 2: Fleet decisions (AI buy/sell + human pre-round sells already applied) ──
-    const teamsNachEntscheidung = teamsAfterPending.map((team, index) => {
+    const teamsNachEntscheidung = teamsAfterListings.map((team, index) => {
         if (!team.istKI) {
             const d = humanDecisions[index] || { harbor: 0, coastal: 0, deepSea: 0, boatsOffered: 0, shipsOrdered: 0 }
             const harbor = d.harbor || 0
@@ -202,7 +242,7 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
                 ausgesandteBoote: coastal + deepSea,
             }
         }
-        const stateForAI = { ...state, teams: teamsAfterPending, marketShipPrice }
+        const stateForAI = { ...state, teams: teamsAfterListings, marketShipPrice }
         return { ...team, ...kiTeamAktionen(team, stateForAI, params) }
     })
 
@@ -229,9 +269,28 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         }
     })
 
+    // ── AI market listings (ships removed from fleet immediately, resolved next round) ──
+    const aiNewListings = []
+    const fishDensityForAI = maxFisch > 0 ? state.fischbestand / maxFisch : 0
+    let teamsWithAIListings = teamsNachEntscheidung.map(t => ({ ...t }))
+    teamsNachEntscheidung.forEach((team, idx) => {
+        if (!team.istKI || teamsWithAIListings[idx].fleet <= 2) return
+        if (aiNewListings.some(l => l.sellerSlot === idx)) return
+        let askingPrice = null
+        if (team.aiDifficulty === 'easy' && fishDensityForAI < 0.35) {
+            askingPrice = Math.round(marketShipPrice * 0.9)
+        } else if (team.aiDifficulty === 'hard' && fishDensityForAI < 0.40) {
+            askingPrice = Math.round(marketShipPrice * 0.85)
+        }
+        if (askingPrice !== null) {
+            aiNewListings.push({ id: `al-${idx}-${state.runde}`, sellerSlot: idx, sellerName: team.name, sellerFarbe: team.farbe, ships: 1, askingPrice, bids: {} })
+            teamsWithAIListings[idx] = { ...teamsWithAIListings[idx], fleet: teamsWithAIListings[idx].fleet - 1 }
+        }
+    })
+
     // ── Step 2 continued: Auction — resolve human ship offers (H→H and H→AI) ──
     let allAuctionEvents = [...pendingAuctionEvents]
-    let teamsNachStep2 = [...teamsNachEntscheidung]
+    let teamsNachStep2 = [...teamsWithAIListings]
     for (const [idxStr, decision] of Object.entries(humanDecisions)) {
         const idx = parseInt(idxStr)
         if ((decision.boatsOffered || 0) > 0) {
@@ -357,7 +416,7 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
     }
 
     const finalFischbestand = Math.max(0, neuerFischbestand)
-    const verlaufEintrag = { runde: state.runde, fischbestand: state.fischbestand, gesamtFang, wetterfaktor, wachstum: finalFischbestand - state.fischbestand + gesamtFang }
+    const verlaufEintrag = { runde: state.runde, fischbestand: state.fischbestand, gesamtFang, wetterfaktor, wachstum: finalFischbestand - state.fischbestand + gesamtFang, marketShipPrice: neuerMarktpreis }
     finalTeams.forEach(team => {
         verlaufEintrag[team.name] = team.netWorth
         verlaufEintrag[`${team.name}_rs`] = team.roundSummary
@@ -380,6 +439,8 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         letzterWetterfaktor: wetterfaktor,
         letzterGesamtFang: gesamtFang,
         aiShipPurchases,
+        auctionListings: aiNewListings,
+        letzteListingEvents: listingAuctionEvents,
         phase: (state.runde >= maxRunden || finalFischbestand <= 0) ? 'ende' : 'entscheidung',
     }
 }
@@ -394,7 +455,6 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
         const firstHuman = gameState.teams.find(t => !t.istKI)
         return firstHuman ? firstHuman.fleet : 0
     })
-    const [currentBoatsOffered, setCurrentBoatsOffered] = useState(0)
     const [currentShipsOrdered, setCurrentShipsOrdered] = useState(0)
     const [humanBids, setHumanBids] = useState({})
     const [showHandoff, setShowHandoff] = useState(false)
@@ -409,6 +469,14 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
     const [pendingSells, setPendingSells] = useState(0)
     const devSkipRef = useRef(null)
     const prevFischRef = useRef(gameState.fischbestand)
+    const [selectedTeamForIncome, setSelectedTeamForIncome] = useState(() => {
+        if (mySlotIndex != null && gameState.teams[mySlotIndex]) return gameState.teams[mySlotIndex].name
+        return gameState.teams.find(t => !t.istKI)?.name ?? gameState.teams[0]?.name ?? ''
+    })
+    const [newListingPrice, setNewListingPrice] = useState(
+        () => gameState.marketShipPrice || GAME_CONFIG.auctionPreis
+    )
+    const [newListingCount, setNewListingCount] = useState(1)
 
     const isMultiplayer = !!(socket && roomCode)
 
@@ -505,7 +573,6 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
             setCurrentHarbor(0)
             setCurrentCoastal(0)
             setCurrentDeepSea(0)
-            setCurrentBoatsOffered(0)
             setCurrentShipsOrdered(0)
             setHumanBids({})
             return
@@ -517,7 +584,6 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                 harbor: currentHarbor,
                 coastal: currentCoastal,
                 deepSea: currentDeepSea,
-                boatsOffered: currentBoatsOffered,
                 shipsOrdered: safeShipsOrdered,
                 auctionBids: { ...humanBids },
             }
@@ -541,7 +607,6 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
             }
             setCurrentHarbor(0)
             setCurrentCoastal(0)
-            setCurrentBoatsOffered(0)
             setCurrentShipsOrdered(0)
             setHumanBids({})
             if (humanTeams.length > 1) setShowHandoff(true)
@@ -559,6 +624,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
             wetterfaktor: nachRunde.letzterWetterfaktor,
             gesamtFang: nachRunde.letzterGesamtFang,
             auctionEvents: nachRunde.letzteAuktionEvents || [],
+            listingEvents: nachRunde.letzteListingEvents || [],
             roundDeliveries: nachRunde.roundDeliveries || [],
             aiShipPurchases: nachRunde.aiShipPurchases || [],
             newPendingOffers: nachRunde.pendingAuctionOffers || [],
@@ -579,13 +645,50 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
         setCurrentHarbor(0)
         setCurrentCoastal(0)
         setCurrentDeepSea(myTeamInNew ? myTeamInNew.fleet : 0)
-        setCurrentBoatsOffered(0)
         setCurrentShipsOrdered(0)
         if (isMultiplayer) {
             setPendingBuys(0)
             setPendingSells(0)
             prevFischRef.current = newState.fischbestand
         }
+    }
+
+    function handleListShip() {
+        if (!activeTeam || newListingCount < 1 || activeTeam.fleet - newListingCount < 1) return
+        const listing = {
+            id: `hl-${activeSlot}-${gameState.runde}-${Date.now()}`,
+            sellerSlot: activeSlot,
+            sellerName: activeTeam.name,
+            sellerFarbe: activeTeam.farbe,
+            ships: newListingCount,
+            askingPrice: Math.max(1, newListingPrice),
+            bids: {},
+        }
+        setGameState({
+            ...gameState,
+            teams: gameState.teams.map((t, i) => i === activeSlot ? { ...t, fleet: t.fleet - listing.ships } : t),
+            auctionListings: [...(gameState.auctionListings || []), listing],
+        })
+        setNewListingCount(1)
+    }
+
+    function handleCancelListing(listingId) {
+        const listing = (gameState.auctionListings || []).find(l => l.id === listingId)
+        if (!listing) return
+        setGameState({
+            ...gameState,
+            teams: gameState.teams.map((t, i) => i === listing.sellerSlot ? { ...t, fleet: t.fleet + listing.ships } : t),
+            auctionListings: (gameState.auctionListings || []).filter(l => l.id !== listingId),
+        })
+    }
+
+    function handlePlaceBid(listingId, bidAmount) {
+        setGameState({
+            ...gameState,
+            auctionListings: (gameState.auctionListings || []).map(l =>
+                l.id === listingId ? { ...l, bids: { ...l.bids, [activeSlot]: bidAmount } } : l
+            ),
+        })
     }
 
     function handleDevSkip() {
@@ -864,6 +967,19 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                         {ev.erfolg
                                             ? `1 ship sold to ${ev.kaeufer} for ${ev.preis.toLocaleString()}€`
                                             : 'No bid received – ship not sold'}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {(rundenErgebnis.listingEvents || []).length > 0 && (
+                            <div className="bg-indigo-500/10 border border-indigo-400/20 rounded-lg p-2.5 mb-4">
+                                <div className="font-bold text-xs text-indigo-300 mb-1">Open Market Results</div>
+                                {rundenErgebnis.listingEvents.map((ev, i) => (
+                                    <div key={i} className="text-xs text-blue-200">
+                                        {ev.erfolg
+                                            ? `${ev.ships} ship${ev.ships !== 1 ? 's' : ''} from ${ev.sellerName} sold to ${ev.kaeufer} for ${ev.preis.toLocaleString()}€`
+                                            : `${ev.ships} ship${ev.ships !== 1 ? 's' : ''} from ${ev.sellerName} – no qualifying bid, returned to seller`}
                                     </div>
                                 ))}
                             </div>
@@ -1271,6 +1387,52 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                     )
                                 })}
                             </div>
+
+                            {gameState.verlauf.length > 0 && (
+                                <div className="bg-white/10 rounded-xl p-3">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <h3 className="font-bold text-sm">Income & Expenses per Year</h3>
+                                        <select
+                                            value={selectedTeamForIncome}
+                                            onChange={e => setSelectedTeamForIncome(e.target.value)}
+                                            className="bg-white/10 border border-white/20 rounded px-2 py-1 text-xs text-white"
+                                        >
+                                            {gameState.teams.map(t => (
+                                                <option key={t.name} value={t.name} style={{ backgroundColor: '#1e3a5f' }}>{t.farbe} {t.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    {(() => {
+                                        const incomeData = gameState.verlauf.map(v => {
+                                            const rs = v[`${selectedTeamForIncome}_rs`]
+                                            return {
+                                                runde: v.runde,
+                                                Revenue: rs?.fishRevenue ?? 0,
+                                                'Op Costs': rs?.opCosts ?? 0,
+                                                'Net Profit': (rs?.fishRevenue ?? 0) - (rs?.opCosts ?? 0),
+                                            }
+                                        })
+                                        return (
+                                            <ResponsiveContainer width="100%" height={200}>
+                                                <BarChart data={incomeData} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                                                    <XAxis dataKey="runde" tick={{ fill: '#93c5fd', fontSize: 10 }} />
+                                                    <YAxis tick={{ fill: '#93c5fd', fontSize: 10 }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
+                                                    <Tooltip
+                                                        contentStyle={{ backgroundColor: '#1e3a5f', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, fontSize: 11 }}
+                                                        formatter={(value, name) => [`${value.toLocaleString()}€`, name]}
+                                                        labelFormatter={label => `Round ${label}`}
+                                                    />
+                                                    <Legend wrapperStyle={{ fontSize: 10, color: '#93c5fd' }} />
+                                                    <Bar dataKey="Revenue" fill="#22c55e" radius={[2, 2, 0, 0]} />
+                                                    <Bar dataKey="Op Costs" fill="#ef4444" radius={[2, 2, 0, 0]} />
+                                                    <Bar dataKey="Net Profit" fill="#3b82f6" radius={[2, 2, 0, 0]} />
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        )
+                                    })()}
+                                </div>
+                            )}
                         </div>
 
                         {/* Right column: Fish stock + Graph + Fishery Data */}
@@ -1348,6 +1510,44 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                     </table>
                                 )}
                             </div>
+
+                            {gameState.verlauf.length > 0 && (
+                                <div className="bg-white/10 rounded-xl p-3">
+                                    <h3 className="font-bold text-sm mb-2">Fish per Ship per Year</h3>
+                                    {(() => {
+                                        const LINE_COLORS = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7', '#f97316']
+                                        const fishPerShipData = gameState.verlauf.map(v => {
+                                            const entry = { runde: v.runde }
+                                            gameState.teams.forEach(team => {
+                                                const rs = v[`${team.name}_rs`]
+                                                if (rs) {
+                                                    const deployed = Math.max(1, (rs.coastalShips || 0) + (rs.deepSeaShips || 0))
+                                                    entry[team.name] = +((rs.fang || 0) / deployed).toFixed(2)
+                                                }
+                                            })
+                                            return entry
+                                        })
+                                        return (
+                                            <ResponsiveContainer width="100%" height={180}>
+                                                <LineChart data={fishPerShipData} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                                                    <XAxis dataKey="runde" tick={{ fill: '#93c5fd', fontSize: 10 }} />
+                                                    <YAxis tick={{ fill: '#93c5fd', fontSize: 10 }} />
+                                                    <Tooltip
+                                                        contentStyle={{ backgroundColor: '#1e3a5f', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, fontSize: 11 }}
+                                                        formatter={(value, name) => [`${value} fish/ship`, name]}
+                                                        labelFormatter={label => `Round ${label}`}
+                                                    />
+                                                    <Legend wrapperStyle={{ fontSize: 10, color: '#93c5fd' }} />
+                                                    {gameState.teams.map((team, i) => (
+                                                        <Line key={team.name} type="monotone" dataKey={team.name} stroke={LINE_COLORS[i % LINE_COLORS.length]} strokeWidth={2} dot={false} />
+                                                    ))}
+                                                </LineChart>
+                                            </ResponsiveContainer>
+                                        )
+                                    })()}
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
@@ -1355,6 +1555,33 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                 {/* ── Tab 3: Market ─────────────────────────────────────────────── */}
                 {activeTab === 'market' && (
                     <div className="p-3 flex flex-col gap-3">
+
+                        {/* Ship Market Price History */}
+                        {gameState.verlauf.some(v => v.marketShipPrice != null) && (
+                            <div className="bg-white/10 rounded-xl p-3">
+                                <h3 className="font-bold text-sm mb-2">Ship Market Price History</h3>
+                                {(() => {
+                                    const priceData = gameState.verlauf
+                                        .filter(v => v.marketShipPrice != null)
+                                        .map(v => ({ runde: v.runde, Price: v.marketShipPrice }))
+                                    return (
+                                        <ResponsiveContainer width="100%" height={150}>
+                                            <LineChart data={priceData} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                                                <XAxis dataKey="runde" tick={{ fill: '#93c5fd', fontSize: 10 }} />
+                                                <YAxis tick={{ fill: '#93c5fd', fontSize: 10 }} domain={['auto', 'auto']} tickFormatter={v => `${v}€`} />
+                                                <Tooltip
+                                                    contentStyle={{ backgroundColor: '#1e3a5f', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, fontSize: 11 }}
+                                                    formatter={v => [`${v.toLocaleString()}€`, 'Market Price']}
+                                                    labelFormatter={label => `Round ${label}`}
+                                                />
+                                                <Line type="monotone" dataKey="Price" stroke="#f59e0b" strokeWidth={2} dot={false} />
+                                            </LineChart>
+                                        </ResponsiveContainer>
+                                    )
+                                })()}
+                            </div>
+                        )}
 
                         {/* Ship market summary */}
                         <div className="bg-white/10 rounded-xl p-3">
@@ -1404,25 +1631,96 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                         </div>
                                     </div>
 
-                                    {/* Auction — offer ships */}
-                                    <div className="bg-white/5 border border-white/10 rounded-lg p-2.5 mb-2">
-                                        <div className="text-xs font-bold text-blue-200 mb-2">Auction — Offer Ships</div>
-                                        {activeTeam.fleet > 1 ? (
-                                            <>
-                                                <div className="flex items-center gap-2 mb-1.5">
-                                                    <button onClick={() => setCurrentBoatsOffered(Math.max(0, currentBoatsOffered - 1))}
-                                                        className="bg-white/20 hover:bg-white/30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0">−</button>
-                                                    <div className="text-base font-bold w-6 text-center">{currentBoatsOffered}</div>
-                                                    <button onClick={() => setCurrentBoatsOffered(Math.min(activeTeam.fleet - 1, currentBoatsOffered + 1))}
-                                                        className="bg-white/20 hover:bg-white/30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0">+</button>
-                                                    <span className="text-xs text-blue-300">ships offered</span>
+                                    {/* List Ship for Sale */}
+                                    {activeTeam.fleet > 1 && (
+                                        <div className="bg-white/5 border border-white/10 rounded-lg p-2.5 mb-2">
+                                            <div className="text-xs font-bold text-blue-200 mb-2">List Ship for Sale</div>
+                                            <div className="flex gap-2 items-end mb-2 flex-wrap">
+                                                <div>
+                                                    <div className="text-xs text-blue-400 mb-1">Asking price (€)</div>
+                                                    <input
+                                                        type="number"
+                                                        min={1}
+                                                        step={10}
+                                                        value={newListingPrice}
+                                                        onChange={e => setNewListingPrice(Math.max(1, parseInt(e.target.value) || 1))}
+                                                        className="w-24 bg-white/10 border border-white/20 rounded px-2 py-1 text-sm text-white"
+                                                    />
                                                 </div>
-                                                <div className="text-xs text-blue-400">Offer ships to other teams. Highest bidder wins at end of round.</div>
-                                            </>
-                                        ) : (
-                                            <div className="text-xs text-blue-500">Need at least 2 ships to offer at auction.</div>
-                                        )}
-                                    </div>
+                                                <div>
+                                                    <div className="text-xs text-blue-400 mb-1">Ships (max {activeTeam.fleet - 1})</div>
+                                                    <input
+                                                        type="number"
+                                                        min={1}
+                                                        max={activeTeam.fleet - 1}
+                                                        value={newListingCount}
+                                                        onChange={e => setNewListingCount(Math.max(1, Math.min(activeTeam.fleet - 1, parseInt(e.target.value) || 1)))}
+                                                        className="w-16 bg-white/10 border border-white/20 rounded px-2 py-1 text-sm text-white"
+                                                    />
+                                                </div>
+                                                <button
+                                                    onClick={handleListShip}
+                                                    className="bg-blue-500/30 hover:bg-blue-500/50 border border-blue-400/30 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+                                                >
+                                                    List for Sale
+                                                </button>
+                                            </div>
+                                            <div className="text-xs text-blue-400">Highest bid at or above your asking price wins at end of round.</div>
+                                        </div>
+                                    )}
+
+                                    {/* Active listings — open market */}
+                                    {(gameState.auctionListings || []).length > 0 && (
+                                        <div className="bg-indigo-500/10 border border-indigo-400/30 rounded-lg p-2.5 mb-2">
+                                            <div className="text-xs font-bold text-indigo-300 mb-2">Active Listings</div>
+                                            <div className="grid grid-cols-5 gap-x-2 text-xs text-blue-400 font-medium pb-1 mb-1 border-b border-white/10">
+                                                <div>Seller</div>
+                                                <div className="text-center">Ships</div>
+                                                <div className="text-right">Asking</div>
+                                                <div className="text-right">Your Bid</div>
+                                                <div />
+                                            </div>
+                                            {(gameState.auctionListings || []).map(listing => {
+                                                const myBid = listing.bids?.[activeSlot] ?? 0
+                                                return (
+                                                    <div key={listing.id} className="grid grid-cols-5 gap-x-2 text-xs items-center py-1 border-b border-white/5 last:border-0">
+                                                        <div className="text-blue-100 truncate">{listing.sellerFarbe} {listing.sellerName}</div>
+                                                        <div className="text-center text-white">{listing.ships}</div>
+                                                        <div className="text-right text-yellow-300">{listing.askingPrice.toLocaleString()}€</div>
+                                                        <div className="text-right">
+                                                            {listing.sellerSlot !== activeSlot ? (
+                                                                <input
+                                                                    type="number"
+                                                                    min={0}
+                                                                    step={10}
+                                                                    value={myBid || ''}
+                                                                    onChange={e => handlePlaceBid(listing.id, Math.max(0, parseInt(e.target.value) || 0))}
+                                                                    className="w-20 bg-white/10 border border-white/20 rounded px-1.5 py-0.5 text-xs text-white text-right"
+                                                                    placeholder={`${listing.askingPrice}€`}
+                                                                />
+                                                            ) : (
+                                                                <span className="text-blue-500 text-xs">Your listing</span>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-right">
+                                                            {listing.sellerSlot !== activeSlot ? (
+                                                                <button
+                                                                    onClick={() => handlePlaceBid(listing.id, listing.askingPrice)}
+                                                                    className="text-xs bg-green-500/20 hover:bg-green-500/30 border border-green-400/30 px-1.5 py-0.5 rounded transition-colors"
+                                                                >Bid</button>
+                                                            ) : (
+                                                                <button
+                                                                    onClick={() => handleCancelListing(listing.id)}
+                                                                    className="text-xs bg-red-500/20 hover:bg-red-500/30 border border-red-400/30 px-1.5 py-0.5 rounded transition-colors"
+                                                                >Cancel</button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                            <div className="text-xs text-blue-500 mt-1.5">Ships removed from fleet immediately. Bids ≥ asking price resolve at end of round.</div>
+                                        </div>
+                                    )}
 
                                     {/* Auction — pending AI offers (from last round) */}
                                     {(gameState.pendingAuctionOffers || []).length > 0 && (
