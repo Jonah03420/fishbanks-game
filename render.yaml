@@ -2,10 +2,10 @@ services:
   - type: web
     name: fishbanks-backend
     env: node
-    buildCommand: npm install
+    buildCommand: npm install && npm run build
     startCommand: node server.js
     envVars:
       - key: PORT
         value: 10000
-      - key: CORS_ORIGIN
-        value: https://fishbanks-game.vercel.app
+      - key: NODE_ENV
+        value: production

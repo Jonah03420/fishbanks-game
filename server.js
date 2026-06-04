@@ -2,6 +2,10 @@ import express from 'express'
 import http from 'http'
 import { Server } from 'socket.io'
 import cors from 'cors'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 import {
   GAME_CONFIG,
   berechneFischbestand,
@@ -718,6 +722,15 @@ setInterval(() => {
     }
   })
 }, 5 * 60 * 1000)
+
+// ─── Static Frontend (Production) ────────────────────────────────────────────
+
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, 'dist')))
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(__dirname, 'dist', 'index.html'))
+  })
+}
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 

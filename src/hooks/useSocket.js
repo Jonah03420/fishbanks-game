@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL
-  || 'http://localhost:3002'
+  || (import.meta.env.DEV ? 'http://localhost:3002' : window.location.origin)
 
 export function useSocket() {
   const socketRef = useRef(null)
