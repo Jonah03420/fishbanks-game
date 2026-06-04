@@ -14,6 +14,7 @@ function App() {
   const [adminReturnPhase, setAdminReturnPhase] = useState('start')
   const [mySlotIndex, setMySlotIndex] = useState(null)
   const [roomCode, setRoomCode] = useState(null)
+  const [rejoinSession, setRejoinSession] = useState(null)
 
   function handleGameStart(serverGS, slotIndex, rCode) {
     setMySlotIndex(slotIndex)
@@ -26,7 +27,14 @@ function App() {
     setGameState(null)
     setMySlotIndex(null)
     setRoomCode(null)
+    setRejoinSession(null)
     setPhase('start')
+  }
+
+  function handleRejoin(session) {
+    setRejoinSession(session)
+    setLobbyView('join')
+    setPhase('lobby')
   }
 
   function handleOpenAdmin() {
@@ -84,6 +92,7 @@ function App() {
           onCreateGame={() => { setLobbyView('create'); setPhase('lobby') }}
           onJoinGame={() => { setLobbyView('join'); setPhase('lobby') }}
           onOpenAdmin={handleOpenAdmin}
+          onRejoin={handleRejoin}
         />
       )}
       {phase === 'lobby' && (
@@ -92,8 +101,10 @@ function App() {
           connected={connected}
           initialView={lobbyView}
           onStart={handleGameStart}
-          onBack={() => setPhase('start')}
+          onBack={() => { setRejoinSession(null); setPhase('start') }}
           onOpenAdmin={handleOpenAdmin}
+          initialName={rejoinSession?.name ?? ''}
+          initialCode={rejoinSession?.code ?? ''}
         />
       )}
       {phase === 'game' && gameState && (

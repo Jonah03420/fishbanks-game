@@ -445,6 +445,131 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
     }
 }
 
+// ─── AuctionListingCard ───────────────────────────────────────────────────────
+
+function AuctionListingCard({ listing, mySlotIndex, socket, roomCode }) {
+    const [timeLeft, setTimeLeft] = useState(null)
+    const [bidInput, setBidInput] = useState('')
+
+    useEffect(() => {
+        if (!listing.timerEndsAt || listing.status !== 'open') { setTimeLeft(null); return }
+        const update = () => setTimeLeft(Math.max(0, listing.timerEndsAt - Date.now()))
+        update()
+        const iv = setInterval(update, 100)
+        return () => clearInterval(iv)
+    }, [listing.timerEndsAt, listing.status])
+
+    const isSeller  = listing.sellerSlot === mySlotIndex
+    const isWinning = listing.topBidderSlot === mySlotIndex
+    const hasBid    = listing.topBid != null
+    const isPassed  = (listing.passedBy || []).includes(mySlotIndex)
+    const secLeft   = timeLeft != null ? Math.ceil(timeLeft / 1000) : null
+    const minNext   = (listing.topBid != null ? listing.topBid : listing.askingPrice - 1) + 1
+
+    function placeBid() {
+        const amount = parseInt(bidInput) || 0
+        if (amount < listing.askingPrice || amount <= (listing.topBid ?? 0)) return
+        socket.emit('place-bid', { roomCode, listingId: listing.id, amount })
+        setBidInput('')
+    }
+
+    if (listing.status === 'sold') {
+        return (
+            <div className="bg-green-900/30 border border-green-400/30 rounded-lg p-3">
+                <div className="text-xs text-blue-300 mb-1">
+                    {listing.sellerFarbe} {listing.sellerName} — {listing.ships} ship{listing.ships !== 1 ? 's' : ''} @ {listing.askingPrice.toLocaleString()}€
+                </div>
+                <div className="text-sm font-bold text-green-300">
+                    ✅ Sold to {listing.resolution?.buyerName} for {listing.resolution?.price.toLocaleString()}€
+                </div>
+            </div>
+        )
+    }
+
+    if (listing.status === 'returned') {
+        return (
+            <div className="bg-white/5 border border-white/10 rounded-lg p-3 opacity-60">
+                <div className="text-xs text-blue-300 mb-1">
+                    {listing.sellerFarbe} {listing.sellerName} — {listing.ships} ship{listing.ships !== 1 ? 's' : ''} @ {listing.askingPrice.toLocaleString()}€
+                </div>
+                <div className="text-sm text-blue-400">↩️ No bids — ship returned to seller</div>
+            </div>
+        )
+    }
+
+    return (
+        <div className={`border rounded-lg p-3 ${isWinning ? 'border-green-400/40 bg-green-900/20' : 'border-white/15 bg-white/5'}`}>
+            <div className="flex items-start justify-between mb-1.5">
+                <div>
+                    <div className="text-xs font-bold text-white">
+                        {listing.sellerFarbe} {listing.sellerName} — {listing.ships} ship{listing.ships !== 1 ? 's' : ''}
+                    </div>
+                    <div className="text-xs text-blue-300">asking {listing.askingPrice.toLocaleString()}€</div>
+                </div>
+                <div className="shrink-0 ml-2">
+                    {isSeller && <span className="text-xs text-blue-400 bg-white/10 px-2 py-0.5 rounded">Your listing</span>}
+                    {!isSeller && isWinning && <span className="text-xs text-green-300 bg-green-900/40 px-2 py-0.5 rounded">🏆 Winning</span>}
+                    {!isSeller && hasBid && !isWinning && <span className="text-xs text-red-300 bg-red-900/30 px-2 py-0.5 rounded">⚠️ Outbid</span>}
+                    {!isSeller && !hasBid && !isPassed && <span className="text-xs text-blue-500">No bids yet</span>}
+                    {!isSeller && isPassed && !hasBid && <span className="text-xs text-blue-500">Passed</span>}
+                </div>
+            </div>
+
+            {hasBid && (
+                <div className="text-xs text-blue-200 mb-2">
+                    Top bid: <span className="font-bold text-white">{listing.topBid.toLocaleString()}€</span>
+                    {' '}by <span className="text-blue-300">{listing.topBidderName}</span>
+                </div>
+            )}
+
+            {secLeft != null && (
+                <div className="mb-2">
+                    <div className="flex justify-between text-xs mb-0.5">
+                        <span className="text-blue-400">Timer</span>
+                        <span className={secLeft <= 3 ? 'text-red-400 font-bold' : secLeft <= 6 ? 'text-yellow-400' : 'text-green-400'}>{secLeft}s</span>
+                    </div>
+                    <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+                        <div
+                            className={`h-1.5 rounded-full transition-none ${secLeft <= 3 ? 'bg-red-400' : secLeft <= 6 ? 'bg-yellow-400' : 'bg-green-400'}`}
+                            style={{ width: `${Math.min(100, (secLeft / 10) * 100)}%` }}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {!isSeller && !isPassed && (
+                <div className="flex gap-2 items-center mt-1">
+                    <input
+                        type="number"
+                        min={minNext}
+                        step={10}
+                        value={bidInput}
+                        onChange={e => setBidInput(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && placeBid()}
+                        placeholder={`≥ ${minNext.toLocaleString()}€`}
+                        className="flex-1 bg-white/10 border border-white/20 rounded px-2 py-1 text-xs text-white min-w-0"
+                    />
+                    <button
+                        onClick={placeBid}
+                        className="bg-blue-500/30 hover:bg-blue-500/50 border border-blue-400/30 text-xs font-medium px-3 py-1 rounded transition-colors whitespace-nowrap"
+                    >
+                        Bid
+                    </button>
+                    <button
+                        onClick={() => socket.emit('pass-listing', { roomCode, listingId: listing.id })}
+                        className="bg-white/10 hover:bg-white/20 border border-white/10 text-xs text-blue-400 px-3 py-1 rounded transition-colors"
+                    >
+                        Pass
+                    </button>
+                </div>
+            )}
+            {!isSeller && isPassed && (
+                <div className="text-xs text-blue-500 mt-1">You passed on this listing</div>
+            )}
+        </div>
+    )
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
@@ -655,6 +780,16 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
 
     function handleListShip() {
         if (!activeTeam || newListingCount < 1 || activeTeam.fleet - newListingCount < 1 || !newListingPrice) return
+        if (isMultiplayer) {
+            socket.emit('create-listing', {
+                roomCode,
+                ships: newListingCount,
+                askingPrice: Math.max(1, newListingPrice),
+            })
+            setNewListingCount(1)
+            return
+        }
+        // Single-player: client-side listing
         const listing = {
             id: `hl-${activeSlot}-${gameState.runde}-${Date.now()}`,
             sellerSlot: activeSlot,
@@ -782,14 +917,20 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
             setWaitingForServer(false)
         }
 
+        function onListingsUpdated({ listings, teams }) {
+            setGameState(prev => ({ ...prev, auctionListings: listings, teams }))
+        }
+
         socket.on('decision-received', onDecisionReceived)
         socket.on('round-complete', onRoundComplete)
         socket.on('game-ended', onGameEnded)
+        socket.on('listings-updated', onListingsUpdated)
 
         return () => {
             socket.off('decision-received', onDecisionReceived)
             socket.off('round-complete', onRoundComplete)
             socket.off('game-ended', onGameEnded)
+            socket.off('listings-updated', onListingsUpdated)
         }
     }, [socket, isMultiplayer, mySlotIndex])
 
@@ -1075,11 +1216,16 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                         <div className="flex justify-between items-center mb-0.5">
                                             <span className="font-bold text-sm truncate">{team.farbe} {team.name}</span>
                                             <span className="text-xs opacity-70 shrink-0 ml-1">
-                                                {team.istKI ? '🤖' : hasSubmitted ? '✓' : isActive ? '◉' : '…'}
+                                                {team.istKI ? (team.disconnectedHuman ? '🔌' : '🤖') : hasSubmitted ? '✓' : isActive ? '◉' : '…'}
                                             </span>
                                         </div>
                                         {team.istKI && (
-                                            <div className="text-xs text-blue-500 mb-1">{team.aiDifficulty === 'hard' ? 'Hard AI' : 'Easy AI'}</div>
+                                            <div className="text-xs mb-1">
+                                                {team.disconnectedHuman
+                                                    ? <span className="text-orange-400">Disconnected · AI playing</span>
+                                                    : <span className="text-blue-500">{team.aiDifficulty === 'hard' ? 'Hard AI' : 'Easy AI'}</span>
+                                                }
+                                            </div>
                                         )}
                                         <div className="text-xs space-y-0.5 mb-1">
                                             <div className="flex justify-between">
@@ -1671,12 +1817,32 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                                     List for Sale
                                                 </button>
                                             </div>
-                                            <div className="text-xs text-blue-400">Highest bid at or above your asking price wins at end of round.</div>
+                                            <div className="text-xs text-blue-400">
+                                                {isMultiplayer
+                                                    ? 'Ship removed immediately. 10s timer starts on first bid. All players see it live.'
+                                                    : 'Highest bid at or above your asking price wins at end of round.'}
+                                            </div>
                                         </div>
                                     )}
 
-                                    {/* Active listings — open market */}
-                                    {(gameState.auctionListings || []).length > 0 && (
+                                    {/* Multiplayer: real-time auction cards */}
+                                    {isMultiplayer && (gameState.auctionListings || []).length > 0 && (
+                                        <div className="space-y-2 mb-2">
+                                            <div className="text-xs font-bold text-indigo-300">Live Auction</div>
+                                            {(gameState.auctionListings || []).map(listing => (
+                                                <AuctionListingCard
+                                                    key={listing.id}
+                                                    listing={listing}
+                                                    mySlotIndex={mySlotIndex}
+                                                    socket={socket}
+                                                    roomCode={roomCode}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Single-player: existing table UI */}
+                                    {!isMultiplayer && (gameState.auctionListings || []).length > 0 && (
                                         <div className="bg-indigo-500/10 border border-indigo-400/30 rounded-lg p-2.5 mb-2">
                                             <div className="text-xs font-bold text-indigo-300 mb-2">Active Listings</div>
                                             <div className="grid grid-cols-5 gap-x-2 text-xs text-blue-400 font-medium pb-1 mb-1 border-b border-white/10">

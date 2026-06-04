@@ -1,6 +1,15 @@
+import { useState, useEffect } from 'react'
 import { GAME_CONFIG } from '../game/fishLogic'
 
-function StartPage({ connected, onCreateGame, onJoinGame, onOpenAdmin }) {
+function StartPage({ connected, onCreateGame, onJoinGame, onOpenAdmin, onRejoin }) {
+  const [lastSession, setLastSession] = useState(null)
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('fishbanks_session')
+      if (saved) setLastSession(JSON.parse(saved))
+    } catch {}
+  }, [])
   return (
     <div className="w-full h-full bg-blue-900 text-white flex overflow-hidden">
 
@@ -80,6 +89,16 @@ function StartPage({ connected, onCreateGame, onJoinGame, onOpenAdmin }) {
             <div className="font-bold">Join Game</div>
             <div className="text-blue-100 text-sm font-normal">Enter with 4-letter room code</div>
           </button>
+
+          {lastSession && (
+            <button
+              onClick={() => onRejoin(lastSession)}
+              className="w-full bg-orange-500/20 hover:bg-orange-500/40 border border-orange-400/30 text-white font-bold py-5 px-6 rounded-xl text-lg transition-colors text-left"
+            >
+              <div className="font-bold">🔌 Rejoin Game</div>
+              <div className="text-orange-200 text-sm font-normal">{lastSession.name} · Room {lastSession.code}</div>
+            </button>
+          )}
         </div>
 
         <div className="mt-12 bg-white/5 rounded-xl p-5 text-xs text-blue-400">

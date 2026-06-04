@@ -34,6 +34,55 @@ const io = new Server(httpServer, {
 
 const rooms = new Map()
 
+// ─── Listing Timers ───────────────────────────────────────────────────────────
+
+const listingTimers = new Map() // key: `${roomCode}:${listingId}` → timeoutId
+
+function clearListingTimer(roomCode, listingId) {
+  const key = `${roomCode}:${listingId}`
+  const id = listingTimers.get(key)
+  if (id != null) { clearTimeout(id); listingTimers.delete(key) }
+}
+
+function resolveListing(roomCode, listingId) {
+  const room = rooms.get(roomCode)
+  if (!room?.gameState) return
+  const gs = room.gameState
+  const listing = (gs.auctionListings || []).find(l => l.id === listingId)
+  if (!listing || listing.status !== 'open') return
+
+  clearListingTimer(roomCode, listingId)
+  listing.timerEndsAt = null
+
+  const seller = gs.teams[listing.sellerSlot]
+  const buyer = listing.topBidderSlot != null ? gs.teams[listing.topBidderSlot] : null
+  const qualifying = buyer != null
+    && listing.topBid != null
+    && listing.topBid >= listing.askingPrice
+    && buyer.bankBalance >= listing.topBid
+
+  if (qualifying) {
+    seller.bankBalance += listing.topBid
+    buyer.fleet += listing.ships
+    buyer.bankBalance -= listing.topBid
+    seller.netWorth = berechneNetWorth(seller.bankBalance, seller.fleet, gs.marketShipPrice)
+    buyer.netWorth  = berechneNetWorth(buyer.bankBalance,  buyer.fleet,  gs.marketShipPrice)
+    listing.status = 'sold'
+    listing.resolution = { buyerName: buyer.name, price: listing.topBid }
+  } else {
+    if (seller) {
+      seller.fleet += listing.ships
+      seller.netWorth = berechneNetWorth(seller.bankBalance, seller.fleet, gs.marketShipPrice)
+    }
+    listing.status = 'returned'
+    listing.resolution = null
+  }
+
+  room.lastActivity = Date.now()
+  io.to(roomCode).emit('listings-updated', { listings: gs.auctionListings, teams: gs.teams })
+  console.log(`Listing ${listingId} resolved in room ${roomCode}: ${listing.status}`)
+}
+
 const SLOT_COLORS = ['red', 'yellow', 'green', 'blue', 'purple', 'orange']
 
 const SLOT_COLOR_EMOJI = {
@@ -116,7 +165,8 @@ function sanitizeRoom(room) {
     ...rest,
     slots: room.slots.map(slot => ({
       ...slot,
-      socketId: undefined
+      socketId: undefined,
+      disconnectedName: undefined, // keep server-side only for rejoin matching
     }))
   }
 }
@@ -211,9 +261,9 @@ function initGameState(room) {
     marketShipPrice: s.auctionPrice,
     auctionHistory: [],
     pendingAuctionOffers: [],
+    auctionListings: [],
     teams,
     verlauf: [],
-    auctionListings: [],
     params,
   }
 }
@@ -238,6 +288,20 @@ function processRound(room) {
   const gs = room.gameState
   const { params } = gs
   if (!room.pendingDecisions) room.pendingDecisions = {}
+
+  // Close any listings still open when round fires (return ships to sellers)
+  for (const listing of (gs.auctionListings || [])) {
+    if (listing.status === 'open') {
+      clearListingTimer(room.code, listing.id)
+      const seller = gs.teams[listing.sellerSlot]
+      if (seller) {
+        seller.fleet += listing.ships
+        seller.netWorth = berechneNetWorth(seller.bankBalance, seller.fleet, gs.marketShipPrice)
+      }
+      listing.status = 'returned'
+    }
+  }
+  gs.auctionListings = [] // fresh slate for the next round
 
   const wetterfaktor = erzeugeMarktereignis()
   let totalCatch = 0
@@ -463,6 +527,34 @@ io.on('connection', socket => {
       socket.emit('error', { code: 'ROOM_NOT_FOUND', message: 'Room not found.' })
       return
     }
+
+    // Mid-game rejoin: if there's a disconnected slot with a matching name, restore it
+    if (room.phase === 'game' && room.gameState) {
+      const name = playerName.trim()
+      const disconnectedSlot = room.slots.find(s => s.isDisconnected && s.disconnectedName === name)
+      if (disconnectedSlot) {
+        disconnectedSlot.socketId = socket.id
+        disconnectedSlot.isConnected = true
+        disconnectedSlot.isDisconnected = false
+        room.lastActivity = Date.now()
+
+        const team = room.gameState.teams[disconnectedSlot.slotIndex]
+        if (team) {
+          team.istKI = false
+          team.isRealHuman = true
+          team.disconnectedHuman = false
+        }
+
+        socket.join(code)
+        socket.emit('game-started', { gameState: room.gameState, slotIndex: disconnectedSlot.slotIndex })
+        io.to(code).emit('room-updated', { room: sanitizeRoom(room) })
+        console.log(`${name} rejoined room ${code} as slot ${disconnectedSlot.slotIndex}`)
+        return
+      }
+      socket.emit('error', { code: 'GAME_IN_PROGRESS', message: 'Game already started.' })
+      return
+    }
+
     if (room.phase !== 'lobby') {
       socket.emit('error', { code: 'GAME_IN_PROGRESS', message: 'Game already started.' })
       return
@@ -495,7 +587,7 @@ io.on('connection', socket => {
 
   // ── leave-room ──────────────────────────────────────────────────────────────
   socket.on('leave-room', ({ roomCode } = {}) => {
-    handleLeave(socket, roomCode)
+    handleLeave(socket, roomCode, true) // voluntary
   })
 
   // ── update-settings ─────────────────────────────────────────────────────────
@@ -614,7 +706,7 @@ io.on('connection', socket => {
     }
     room.pendingDecisions[slot.slotIndex] = dec
 
-    const humanSlots     = room.slots.filter(s => !s.isAI && s.socketId)
+    const humanSlots     = room.slots.filter(s => !s.isAI && !s.isDisconnected && s.socketId)
     const submittedCount = humanSlots.filter(s => room.pendingDecisions[s.slotIndex] !== undefined).length
 
     io.to(code).emit('decision-received', {
@@ -630,19 +722,122 @@ io.on('connection', socket => {
     }
   })
 
+  // ── create-listing ──────────────────────────────────────────────────────────
+  socket.on('create-listing', ({ roomCode, ships, askingPrice } = {}) => {
+    const code = typeof roomCode === 'string' ? roomCode.toUpperCase() : ''
+    const room = rooms.get(code)
+    if (!room || room.phase !== 'game' || !room.gameState) return
+    const slot = room.slots.find(s => s.socketId === socket.id)
+    if (!slot || slot.isAI || slot.isDisconnected) return
+
+    const team = room.gameState.teams[slot.slotIndex]
+    if (!team) return
+    const count = Math.max(1, parseInt(ships) || 1)
+    const price = Math.max(1, parseInt(askingPrice) || 1)
+    if (team.fleet - count < 1) return // must keep ≥1 ship
+
+    team.fleet -= count
+    team.netWorth = berechneNetWorth(team.bankBalance, team.fleet, room.gameState.marketShipPrice)
+
+    const listing = {
+      id: `${code}-${slot.slotIndex}-${Date.now()}`,
+      sellerSlot: slot.slotIndex,
+      sellerName: team.name,
+      sellerFarbe: team.farbe,
+      ships: count,
+      askingPrice: price,
+      bids: {},
+      topBid: null,
+      topBidderSlot: null,
+      topBidderName: null,
+      status: 'open',
+      timerEndsAt: null,
+      passedBy: [],
+      resolution: null,
+    }
+    if (!room.gameState.auctionListings) room.gameState.auctionListings = []
+    room.gameState.auctionListings.push(listing)
+    room.lastActivity = Date.now()
+
+    io.to(code).emit('listings-updated', { listings: room.gameState.auctionListings, teams: room.gameState.teams })
+    console.log(`Listing ${listing.id} created in room ${code}`)
+  })
+
+  // ── place-bid ───────────────────────────────────────────────────────────────
+  socket.on('place-bid', ({ roomCode, listingId, amount } = {}) => {
+    const code = typeof roomCode === 'string' ? roomCode.toUpperCase() : ''
+    const room = rooms.get(code)
+    if (!room || room.phase !== 'game' || !room.gameState) return
+    const slot = room.slots.find(s => s.socketId === socket.id)
+    if (!slot || slot.isAI || slot.isDisconnected) return
+
+    const listing = (room.gameState.auctionListings || []).find(l => l.id === listingId)
+    if (!listing || listing.status !== 'open' || listing.sellerSlot === slot.slotIndex) return
+
+    const bid = parseInt(amount) || 0
+    if (bid < listing.askingPrice) return
+    if (listing.topBid != null && bid <= listing.topBid) return
+
+    const bidder = room.gameState.teams[slot.slotIndex]
+    if (!bidder || bidder.bankBalance < bid) return
+
+    listing.bids[slot.slotIndex] = bid
+    listing.topBid = bid
+    listing.topBidderSlot = slot.slotIndex
+    listing.topBidderName = bidder.name
+
+    const TIMER_MS = 10000
+    clearListingTimer(code, listingId)
+    listing.timerEndsAt = Date.now() + TIMER_MS
+    const timerId = setTimeout(() => resolveListing(code, listingId), TIMER_MS)
+    listingTimers.set(`${code}:${listingId}`, timerId)
+
+    room.lastActivity = Date.now()
+    io.to(code).emit('listings-updated', { listings: room.gameState.auctionListings, teams: room.gameState.teams })
+    console.log(`Bid on ${listingId} in room ${code}: ${bid}€ by slot ${slot.slotIndex}`)
+  })
+
+  // ── pass-listing ─────────────────────────────────────────────────────────────
+  socket.on('pass-listing', ({ roomCode, listingId } = {}) => {
+    const code = typeof roomCode === 'string' ? roomCode.toUpperCase() : ''
+    const room = rooms.get(code)
+    if (!room || room.phase !== 'game' || !room.gameState) return
+    const slot = room.slots.find(s => s.socketId === socket.id)
+    if (!slot || slot.isAI || slot.isDisconnected) return
+
+    const listing = (room.gameState.auctionListings || []).find(l => l.id === listingId)
+    if (!listing || listing.status !== 'open' || listing.sellerSlot === slot.slotIndex) return
+
+    if (!listing.passedBy.includes(slot.slotIndex)) listing.passedBy.push(slot.slotIndex)
+
+    // Resolve immediately if all non-seller connected humans have passed
+    const nonSellerHumans = room.slots.filter(s =>
+      !s.isAI && !s.isDisconnected && s.socketId && s.slotIndex !== listing.sellerSlot
+    )
+    if (nonSellerHumans.length > 0 && nonSellerHumans.every(s => listing.passedBy.includes(s.slotIndex))) {
+      resolveListing(code, listingId)
+      return
+    }
+
+    room.lastActivity = Date.now()
+    io.to(code).emit('listings-updated', { listings: room.gameState.auctionListings, teams: room.gameState.teams })
+  })
+
   // ── disconnect ──────────────────────────────────────────────────────────────
   socket.on('disconnect', () => {
     console.log(`Socket ${socket.id} disconnected`)
     rooms.forEach(room => {
       const slot = room.slots.find(s => s.socketId === socket.id)
-      if (slot) handleLeave(socket, room.code)
+      if (slot) handleLeave(socket, room.code, false) // involuntary
     })
   })
 })
 
 // ─── Leave Helper ─────────────────────────────────────────────────────────────
+// voluntary=true  → player clicked "Leave" — permanently replace with AI
+// voluntary=false → socket dropped unexpectedly — preserve slot for rejoin
 
-function handleLeave(socket, roomCode) {
+function handleLeave(socket, roomCode, voluntary = false) {
   const code = typeof roomCode === 'string' ? roomCode.toUpperCase() : ''
   const room = rooms.get(code)
   if (!room) return
@@ -650,42 +845,55 @@ function handleLeave(socket, roomCode) {
   const slot = room.slots.find(s => s.socketId === socket.id)
   if (!slot) return
 
-  // If game is running, convert team to AI so the round can still complete
-  if (room.phase === 'game' && room.gameState) {
+  const inActiveGame = room.phase === 'game' && room.gameState
+
+  // Always hand the game-state team to the AI so the round can proceed
+  if (inActiveGame) {
     const team = room.gameState.teams[slot.slotIndex]
     if (team) {
       team.istKI = true
       team.aiDifficulty = room.settings.aiDifficulty
-      team.isRealHuman = false
+      team.disconnectedHuman = !voluntary // flag for UI: was a real human
     }
   }
 
-  // Replace slot with AI placeholder
-  slot.name = AI_NAMES[slot.slotIndex] || `AI Team ${slot.slotIndex + 1}`
-  slot.socketId = null
-  slot.isAI = true
-  slot.isConnected = false
+  if (inActiveGame && !voluntary) {
+    // Unexpected disconnect during game: keep slot open for rejoin
+    slot.disconnectedName = slot.name  // server-side only, for name matching
+    slot.socketId = null
+    slot.isConnected = false
+    slot.isDisconnected = true
+    // isAI stays false — slot is still "human, just away"
+  } else {
+    // Voluntary leave or lobby: permanently replace with AI
+    slot.name = AI_NAMES[slot.slotIndex] || `AI Team ${slot.slotIndex + 1}`
+    slot.socketId = null
+    slot.isAI = true
+    slot.isConnected = false
+    slot.isDisconnected = false
+  }
 
   socket.leave(code)
 
-  // Reassign host if needed
+  // Reassign host — skip disconnected slots (they have no active socket)
   if (room.host === socket.id) {
-    const nextHuman = room.slots.find(s => !s.isAI && s.socketId)
+    const nextHuman = room.slots.find(s => !s.isAI && !s.isDisconnected && s.socketId)
     if (nextHuman) {
       room.host = nextHuman.socketId
     } else {
-      // No humans left — delete room
       rooms.delete(code)
       return
     }
   }
 
-  // If game in progress, check whether the disconnecting player was the last
-  // one to submit — if so, all remaining humans are done, process the round
-  if (room.phase === 'game' && room.gameState && room.pendingDecisions) {
-    const humanSlots = room.slots.filter(s => !s.isAI && s.socketId)
-    const allSubmitted = humanSlots.length > 0 &&
-      humanSlots.every(s => room.pendingDecisions[s.slotIndex] !== undefined)
+  // If game in progress, check whether all remaining connected humans submitted
+  if (inActiveGame && room.pendingDecisions) {
+    const humanSlots = room.slots.filter(s => !s.isAI && !s.isDisconnected && s.socketId)
+    if (humanSlots.length === 0) {
+      rooms.delete(code)
+      return
+    }
+    const allSubmitted = humanSlots.every(s => room.pendingDecisions[s.slotIndex] !== undefined)
     if (allSubmitted) {
       processRound(room)
       return
