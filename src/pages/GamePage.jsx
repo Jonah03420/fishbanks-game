@@ -654,7 +654,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
     }
 
     function handleListShip() {
-        if (!activeTeam || newListingCount < 1 || activeTeam.fleet - newListingCount < 1) return
+        if (!activeTeam || newListingCount < 1 || activeTeam.fleet - newListingCount < 1 || !newListingPrice) return
         const listing = {
             id: `hl-${activeSlot}-${gameState.runde}-${Date.now()}`,
             sellerSlot: activeSlot,
@@ -1005,7 +1005,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
             )}
 
             {/* Header */}
-            <div className="flex-none flex justify-between items-center px-4 py-2 border-b border-white/10">
+            <div className="flex-none relative flex justify-between items-center px-4 py-2 border-b border-white/10">
                 <div className="flex items-center gap-2">
                     <h1 className="text-base font-bold">Fish Banks Game</h1>
                     {isMultiplayer && activeTeam && (
@@ -1019,6 +1019,12 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                         </span>
                     )}
                 </div>
+                {isMultiplayer && totalPlayers > 1 && (
+                    <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5">
+                        <span className="text-xs text-blue-300">Submitted:</span>
+                        <span className="text-sm font-bold text-white">{submittedCount} / {totalPlayers}</span>
+                    </div>
+                )}
                 <div className="text-right">
                     <div className="text-xs text-blue-200 leading-none">Round</div>
                     <div className="text-xl font-bold leading-tight">{gameState.runde} / {maxRunden}</div>
@@ -1165,9 +1171,9 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                         </span>
                                     </div>
                                     {[
-                                        { label: 'Harbor',   color: 'text-gray-300',   hint: '50€/ship · no catch',    val: currentHarbor,  set: setCurrentHarbor },
-                                        { label: 'Coastal',  color: 'text-blue-300',   hint: '150€/ship · max 15/ship', val: currentCoastal, set: setCurrentCoastal },
-                                        { label: 'Deep Sea', color: 'text-yellow-300', hint: '250€/ship · max 25/ship', val: currentDeepSea, set: setCurrentDeepSea },
+                                        { label: 'Harbor',   color: 'text-blue-200',   hint: '50€/ship · no catch',    val: currentHarbor,  set: setCurrentHarbor },
+                                        { label: 'Coastal',  color: 'text-blue-200',   hint: '150€/ship · max 15/ship', val: currentCoastal, set: setCurrentCoastal },
+                                        { label: 'Deep Sea', color: 'text-blue-200',   hint: '250€/ship · max 25/ship', val: currentDeepSea, set: setCurrentDeepSea },
                                     ].map(({ label, color, hint, val, set }) => (
                                         <div key={label} className="flex items-center gap-1.5 mb-1 last:mb-0">
                                             <span className={`text-xs w-16 ${color}`}>{label}</span>
@@ -1208,9 +1214,9 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                             <div className="text-xs font-bold text-blue-200 mb-1">Zone Statistics (current fish density)</div>
                                             <div className="grid grid-cols-4 gap-x-2 text-xs mb-0.5">
                                                 <div />
-                                                <div className="font-medium text-gray-300 text-center">Harbor</div>
-                                                <div className="font-medium text-blue-300 text-center">Coastal</div>
-                                                <div className="font-medium text-yellow-300 text-center">Deep Sea</div>
+                                                <div className="font-medium text-blue-200 text-center">Harbor</div>
+                                                <div className="font-medium text-blue-200 text-center">Coastal</div>
+                                                <div className="font-medium text-blue-200 text-center">Deep Sea</div>
                                             </div>
                                             {rows.map(row => (
                                                 <div key={row.label} className="grid grid-cols-4 gap-x-2 text-xs leading-5 border-t border-white/5">
@@ -1643,7 +1649,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                                         min={1}
                                                         step={10}
                                                         value={newListingPrice}
-                                                        onChange={e => setNewListingPrice(Math.max(1, parseInt(e.target.value) || 1))}
+                                                        onChange={e => setNewListingPrice(e.target.value === '' ? '' : parseInt(e.target.value) || '')}
                                                         className="w-24 bg-white/10 border border-white/20 rounded px-2 py-1 text-sm text-white"
                                                     />
                                                 </div>

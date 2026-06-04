@@ -23,7 +23,8 @@
       "Bash(curl -s http://localhost:3002/health)",
       "Bash(Start-Sleep -Seconds 3)",
       "Bash(curl -s http://localhost:3003/health)",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Bash(git push *)"
     ]
   }
 }
