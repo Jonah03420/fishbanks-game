@@ -981,18 +981,18 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                     if (!isMine) {
                         toasts.push({ id: `${listing.id}-new`, type: 'new', msg: `${listing.sellerName} listed ${listing.ships} ship${listing.ships > 1 ? 's' : ''} for ${listing.askingPrice.toLocaleString()}€` })
                     }
-                } else if (listing.topBid && (!old.topBid || listing.topBid.amount !== old.topBid.amount)) {
-                    // New or higher bid
-                    const bidderName = listing.topBid.bidderName
+                } else if (listing.topBid != null && listing.topBid !== old?.topBid) {
+                    // New or higher bid — topBid is a number, topBidderName is a separate field
+                    const bidderName = listing.topBidderName
                     const isSeller = listing.sellerName === myTeamName
-                    const wasTopBidder = old.topBid?.bidderName === myTeamName
+                    const wasTopBidder = old?.topBidderName === myTeamName
                     const isNewTopBidder = bidderName === myTeamName
                     if (isSeller) {
-                        toasts.push({ id: `${listing.id}-bid-${listing.topBid.amount}`, type: 'bid', msg: `${bidderName} bid ${listing.topBid.amount.toLocaleString()}€ on your listing` })
+                        toasts.push({ id: `${listing.id}-bid-${listing.topBid}`, type: 'bid', msg: `${bidderName} bid ${listing.topBid.toLocaleString()}€ on your listing` })
                     } else if (wasTopBidder && !isNewTopBidder) {
-                        toasts.push({ id: `${listing.id}-outbid`, type: 'outbid', msg: `You were outbid by ${bidderName} (${listing.topBid.amount.toLocaleString()}€)` })
+                        toasts.push({ id: `${listing.id}-outbid`, type: 'outbid', msg: `You were outbid by ${bidderName} (${listing.topBid.toLocaleString()}€)` })
                     } else if (!isNewTopBidder) {
-                        toasts.push({ id: `${listing.id}-bid-${listing.topBid.amount}`, type: 'bid', msg: `${bidderName} bid ${listing.topBid.amount.toLocaleString()}€ on ${listing.sellerName}'s listing` })
+                        toasts.push({ id: `${listing.id}-bid-${listing.topBid}`, type: 'bid', msg: `${bidderName} bid ${listing.topBid.toLocaleString()}€ on ${listing.sellerName}'s listing` })
                     }
                 }
             }
