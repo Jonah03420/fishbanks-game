@@ -1,12 +1,68 @@
 import { GAME_CONFIG } from '../game/fishLogic'
 
+function FishLogo({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 160 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Tail */}
+      <path d="M28 50 L4 22 Q13 50 4 78 Z" fill="#0369a1"/>
+      <path d="M28 50 L4 22 Q17 50 4 78 Z" fill="#38bdf8" opacity="0.45"/>
+      {/* Body */}
+      <ellipse cx="88" cy="50" rx="56" ry="34" fill="#0ea5e9"/>
+      {/* Top highlight */}
+      <ellipse cx="80" cy="38" rx="38" ry="16" fill="#7dd3fc" opacity="0.35"/>
+      {/* Top fin */}
+      <path d="M56 16 C64 2 88 0 98 16" fill="#0284c7"/>
+      {/* Bottom fin */}
+      <path d="M68 84 C74 98 90 100 96 84" fill="#0284c7" opacity="0.8"/>
+      {/* Gill */}
+      <path d="M92 26 Q86 50 92 74" stroke="#075985" strokeWidth="2" fill="none" strokeLinecap="round"/>
+      {/* Eye */}
+      <circle cx="118" cy="44" r="10" fill="white"/>
+      <circle cx="119" cy="44" r="6.5" fill="#0c4a6e"/>
+      <circle cx="119" cy="44" r="3" fill="#082f49"/>
+      <circle cx="121" cy="41" r="2" fill="white"/>
+      {/* Scale hints */}
+      <path d="M68 42 Q78 36 88 42" stroke="#bae6fd" strokeWidth="1" fill="none" opacity="0.5"/>
+      <path d="M58 50 Q68 44 78 50" stroke="#bae6fd" strokeWidth="1" fill="none" opacity="0.5"/>
+      <path d="M78 56 Q88 50 98 56" stroke="#bae6fd" strokeWidth="1" fill="none" opacity="0.5"/>
+    </svg>
+  )
+}
+
 function StartPage({ connected, onCreateGame, onJoinGame, onOpenAdmin }) {
   return (
     <div className="w-full h-full bg-blue-900 text-white flex overflow-hidden">
 
       {/* Left panel — branding + feature highlights */}
-      <div className="flex-1 flex flex-col justify-center px-16 py-12 bg-gradient-to-br from-blue-800 to-blue-950">
-        <div className="text-9xl mb-6 float-fish inline-block">🐟</div>
+      <div className="relative flex-1 flex flex-col justify-center px-16 py-12 bg-gradient-to-br from-blue-800 to-blue-950 overflow-hidden">
+
+        {/* Background depth glows */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-400/[0.06] rounded-full blur-3xl pointer-events-none"/>
+        <div className="absolute bottom-1/3 right-1/4 w-64 h-64 bg-blue-300/[0.05] rounded-full blur-2xl pointer-events-none"/>
+
+        {/* Floating bubbles */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute bottom-20 left-16 w-2 h-2 bg-cyan-300/25 rounded-full bubble-float" style={{animationDelay:'0s'}}/>
+          <div className="absolute bottom-32 left-36 w-3 h-3 bg-blue-300/20 rounded-full bubble-float" style={{animationDelay:'1.8s'}}/>
+          <div className="absolute bottom-16 left-1/2 w-1.5 h-1.5 bg-cyan-200/25 rounded-full bubble-float" style={{animationDelay:'3.2s'}}/>
+          <div className="absolute bottom-40 right-32 w-4 h-4 bg-blue-400/15 rounded-full bubble-float" style={{animationDelay:'0.6s'}}/>
+          <div className="absolute bottom-24 right-20 w-2 h-2 bg-cyan-300/20 rounded-full bubble-float" style={{animationDelay:'2.5s'}}/>
+          <div className="absolute bottom-48 left-1/3 w-2.5 h-2.5 bg-blue-200/20 rounded-full bubble-float" style={{animationDelay:'4.1s'}}/>
+        </div>
+
+        {/* Animated waves at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 h-20 overflow-hidden pointer-events-none">
+          <svg viewBox="0 0 2400 80" preserveAspectRatio="none" className="w-[200%] h-full wave-shift" style={{opacity:0.15}}>
+            <path d="M0,40 C200,70 400,10 600,40 C800,70 1000,10 1200,40 C1400,70 1600,10 1800,40 C2000,70 2200,10 2400,40 L2400,80 L0,80 Z" fill="#7dd3fc"/>
+          </svg>
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 h-12 overflow-hidden pointer-events-none">
+          <svg viewBox="0 0 2400 50" preserveAspectRatio="none" className="w-[200%] h-full wave-shift" style={{opacity:0.10, animationDirection:'reverse', animationDuration:'18s'}}>
+            <path d="M0,25 C300,48 600,4 900,25 C1200,48 1500,4 1800,25 C2100,48 2400,4 2700,25 L2700,50 L0,50 Z" fill="#38bdf8"/>
+          </svg>
+        </div>
+
+        <FishLogo className="w-40 mb-6 float-fish" />
         <h1 className="text-6xl font-bold mb-4 leading-tight">Fish Banks<br />Game</h1>
         <p className="text-blue-200 text-xl mb-10 max-w-md">
           Can you manage fish stocks sustainably – while other teams fish without restraint?
@@ -101,7 +157,7 @@ function StartPage({ connected, onCreateGame, onJoinGame, onOpenAdmin }) {
         </button>
 
         <div className={`mt-6 flex items-center gap-1.5 text-xs ${connected ? 'text-green-500' : 'text-red-400'}`}>
-          <span>{connected ? '🟢' : '🔴'}</span>
+          <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500 server-online' : 'bg-red-400'}`}/>
           {connected ? 'Server online' : 'Server offline'}
         </div>
       </div>
