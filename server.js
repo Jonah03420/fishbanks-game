@@ -72,6 +72,8 @@ function resolveListing(roomCode, listingId) {
     listing.status = 'sold'
     listing.resolution = { buyerName: buyer.name, price: listing.topBid }
     gs.listingEvents.push({ erfolg: true, sellerName: seller?.name || '?', kaeufer: buyer.name, preis: listing.topBid, ships: listing.ships })
+    if (!gs.auctionHistory) gs.auctionHistory = []
+    gs.auctionHistory.push({ runde: gs.runde, sellerName: seller?.name || '?', kaeufer: buyer.name, preis: listing.topBid, ships: listing.ships })
   } else {
     if (seller) {
       seller.fleet += listing.ships

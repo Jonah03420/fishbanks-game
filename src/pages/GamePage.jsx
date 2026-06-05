@@ -2036,7 +2036,10 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                     {[...(gameState.auctionHistory || [])].reverse().map((ev, i) => (
                                         <div key={i} className="flex justify-between text-xs bg-white/5 rounded px-2.5 py-1">
                                             <span className="text-blue-300">Round {ev.runde}</span>
-                                            <span className="text-white">1 ship → {ev.kaeufer}</span>
+                                            <span className="text-white">
+                                                {ev.ships || 1} ship{(ev.ships || 1) !== 1 ? 's' : ''}
+                                                {ev.sellerName ? ` (${ev.sellerName})` : ''} → {ev.kaeufer}
+                                            </span>
                                             <span className="text-yellow-300">{ev.preis.toLocaleString()}€</span>
                                         </div>
                                     ))}
