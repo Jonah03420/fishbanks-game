@@ -618,8 +618,12 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
     const [newListingCount, setNewListingCount] = useState(1)
     const [auctionToasts, setAuctionToasts] = useState([])
     const prevListingsRef = useRef([])
+    const myTeamNameRef = useRef(null)
 
     const isMultiplayer = !!(socket && roomCode)
+
+    // Always-current ref for my team name — avoids stale closure in socket handlers.
+    myTeamNameRef.current = (mySlotIndex != null && gameState.teams?.[mySlotIndex]?.name) || null
 
     // Ref always holds latest allocation values — avoids stale closure in useEffect below.
     const allocRef = useRef({ h: 0, c: 0, d: 0 })
@@ -980,7 +984,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
             // blocks the state update below.
             try {
                 const prev = prevListingsRef.current
-                const myTeamName = mySlotIndex != null ? gameState.teams?.[mySlotIndex]?.name : null
+                const myTeamName = myTeamNameRef.current
                 const toasts = []
 
                 for (const listing of listings) {
@@ -990,17 +994,21 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                         if (!isMine) {
                             toasts.push({ id: `${listing.id}-new`, type: 'new', msg: `${listing.sellerName} listed ${listing.ships} ship${listing.ships > 1 ? 's' : ''} for ${listing.askingPrice.toLocaleString()}€` })
                         }
-                    } else if (listing.topBid != null && listing.topBid !== old?.topBid) {
-                        const bidderName = listing.topBidderName
-                        const isSeller = listing.sellerName === myTeamName
-                        const wasTopBidder = old?.topBidderName === myTeamName
-                        const isNewTopBidder = bidderName === myTeamName
-                        if (isSeller) {
-                            toasts.push({ id: `${listing.id}-bid-${listing.topBid}`, type: 'bid', msg: `${bidderName} bid ${listing.topBid.toLocaleString()}€ on your listing` })
-                        } else if (wasTopBidder && !isNewTopBidder) {
-                            toasts.push({ id: `${listing.id}-outbid`, type: 'outbid', msg: `You were outbid by ${bidderName} (${listing.topBid.toLocaleString()}€)` })
-                        } else if (!isNewTopBidder) {
-                            toasts.push({ id: `${listing.id}-bid-${listing.topBid}`, type: 'bid', msg: `${bidderName} bid ${listing.topBid.toLocaleString()}€ on ${listing.sellerName}'s listing` })
+                    } else {
+                        const topBidChanged = listing.topBid != null && listing.topBid !== (old.topBid ?? null)
+                        if (topBidChanged) {
+                            const bidderName = listing.topBidderName
+                            const isSeller = listing.sellerName === myTeamName
+                            const wasTopBidder = old.topBidderName != null && old.topBidderName === myTeamName
+                            const isNewTopBidder = bidderName === myTeamName
+                            console.log('[toast-bid]', { myTeamName, bidderName, isSeller, wasTopBidder, isNewTopBidder, topBid: listing.topBid, oldTopBid: old.topBid })
+                            if (isSeller) {
+                                toasts.push({ id: `${listing.id}-bid-${listing.topBid}`, type: 'bid', msg: `${bidderName} bid ${Number(listing.topBid).toLocaleString()}€ on your listing` })
+                            } else if (wasTopBidder && !isNewTopBidder) {
+                                toasts.push({ id: `${listing.id}-outbid-${listing.topBid}`, type: 'outbid', msg: `You were outbid by ${bidderName} (${Number(listing.topBid).toLocaleString()}€)` })
+                            } else if (!isNewTopBidder) {
+                                toasts.push({ id: `${listing.id}-bid-${listing.topBid}`, type: 'bid', msg: `${bidderName} bid ${Number(listing.topBid).toLocaleString()}€ on ${listing.sellerName}'s listing` })
+                            }
                         }
                     }
                 }
