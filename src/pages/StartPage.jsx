@@ -65,31 +65,31 @@ function StartPage({ connected, onCreateGame, onJoinGame, onOpenAdmin }) {
           </svg>
         </div>
 
-        {/* Fishing line + hook — diagonal, ends ahead of and below the fish at ~"Banks" level */}
+        {/* Fishing line + hook — straight down, hook opens LEFT toward fish */}
         <svg
-          className="absolute top-0 left-0 pointer-events-none hook-bob"
-          style={{width: '345px', height: '400px', zIndex: 6}}
-          viewBox="0 0 345 400"
+          className="absolute top-0 pointer-events-none hook-bob"
+          style={{left: '240px', width: '24px', height: '265px', zIndex: 6}}
+          viewBox="0 0 24 265"
           fill="none"
         >
           <defs>
-            <linearGradient id="lineGrad" x1="115" y1="0" x2="318" y2="362" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="white" stopOpacity="0.07"/>
-              <stop offset="100%" stopColor="#bfdbfe" stopOpacity="0.42"/>
+            <linearGradient id="lineGrad" x1="12" y1="0" x2="12" y2="225" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="white" stopOpacity="0.06"/>
+              <stop offset="100%" stopColor="#bfdbfe" stopOpacity="0.40"/>
             </linearGradient>
           </defs>
-          {/* Line — curves from above-left to hook below-right of fish */}
-          <path d="M115 0 Q215 178 318 362" stroke="url(#lineGrad)" strokeWidth="1.3" fill="none"/>
-          {/* Hook eye ring */}
-          <circle cx="318" cy="365" r="3.5" stroke="rgba(185,215,255,0.52)" strokeWidth="1.3" fill="none"/>
+          {/* Straight vertical line from panel top */}
+          <line x1="12" y1="0" x2="12" y2="225" stroke="url(#lineGrad)" strokeWidth="1.3"/>
+          {/* Eye ring */}
+          <circle cx="12" cy="228" r="3" stroke="rgba(185,215,255,0.50)" strokeWidth="1.2" fill="none"/>
           {/* Shank */}
-          <line x1="318" y1="369" x2="318" y2="380" stroke="rgba(185,215,255,0.80)" strokeWidth="1.8" strokeLinecap="round"/>
-          {/* Bend */}
-          <path d="M318 380 Q318 393 326 393" stroke="rgba(185,215,255,0.80)" strokeWidth="1.8" fill="none" strokeLinecap="round"/>
-          {/* Point */}
-          <line x1="326" y1="393" x2="326" y2="399" stroke="rgba(185,215,255,0.80)" strokeWidth="1.8" strokeLinecap="round"/>
+          <line x1="12" y1="232" x2="12" y2="244" stroke="rgba(185,215,255,0.82)" strokeWidth="1.9" strokeLinecap="round"/>
+          {/* Bend — curves LEFT */}
+          <path d="M12 244 Q12 258 3 258" stroke="rgba(185,215,255,0.82)" strokeWidth="1.9" fill="none" strokeLinecap="round"/>
+          {/* Point — goes back UP on the left */}
+          <line x1="3" y1="258" x2="3" y2="247" stroke="rgba(185,215,255,0.82)" strokeWidth="1.9" strokeLinecap="round"/>
           {/* Barb */}
-          <path d="M326 397 L322 392" stroke="rgba(185,215,255,0.65)" strokeWidth="1.3" strokeLinecap="round"/>
+          <path d="M3 251 L8 258" stroke="rgba(185,215,255,0.62)" strokeWidth="1.3" strokeLinecap="round"/>
         </svg>
 
         <FishLogo className="w-40 mb-6 float-fish" />
