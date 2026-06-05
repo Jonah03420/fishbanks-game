@@ -969,43 +969,47 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
         }
 
         function onListingsUpdated({ listings, teams }) {
-            const prev = prevListingsRef.current
-            const myTeamName = mySlotIndex != null ? gameState.teams[mySlotIndex]?.name : null
-            const toasts = []
+            // Toast notifications — wrapped in try-catch so any error here never
+            // blocks the state update below.
+            try {
+                const prev = prevListingsRef.current
+                const myTeamName = mySlotIndex != null ? gameState.teams?.[mySlotIndex]?.name : null
+                const toasts = []
 
-            for (const listing of listings) {
-                const old = prev.find(l => l.id === listing.id)
-                if (!old) {
-                    // New listing appeared
-                    const isMine = listing.sellerName === myTeamName
-                    if (!isMine) {
-                        toasts.push({ id: `${listing.id}-new`, type: 'new', msg: `${listing.sellerName} listed ${listing.ships} ship${listing.ships > 1 ? 's' : ''} for ${listing.askingPrice.toLocaleString()}€` })
-                    }
-                } else if (listing.topBid != null && listing.topBid !== old?.topBid) {
-                    // New or higher bid — topBid is a number, topBidderName is a separate field
-                    const bidderName = listing.topBidderName
-                    const isSeller = listing.sellerName === myTeamName
-                    const wasTopBidder = old?.topBidderName === myTeamName
-                    const isNewTopBidder = bidderName === myTeamName
-                    if (isSeller) {
-                        toasts.push({ id: `${listing.id}-bid-${listing.topBid}`, type: 'bid', msg: `${bidderName} bid ${listing.topBid.toLocaleString()}€ on your listing` })
-                    } else if (wasTopBidder && !isNewTopBidder) {
-                        toasts.push({ id: `${listing.id}-outbid`, type: 'outbid', msg: `You were outbid by ${bidderName} (${listing.topBid.toLocaleString()}€)` })
-                    } else if (!isNewTopBidder) {
-                        toasts.push({ id: `${listing.id}-bid-${listing.topBid}`, type: 'bid', msg: `${bidderName} bid ${listing.topBid.toLocaleString()}€ on ${listing.sellerName}'s listing` })
+                for (const listing of listings) {
+                    const old = prev.find(l => l.id === listing.id)
+                    if (!old) {
+                        const isMine = listing.sellerName === myTeamName
+                        if (!isMine) {
+                            toasts.push({ id: `${listing.id}-new`, type: 'new', msg: `${listing.sellerName} listed ${listing.ships} ship${listing.ships > 1 ? 's' : ''} for ${listing.askingPrice.toLocaleString()}€` })
+                        }
+                    } else if (listing.topBid != null && listing.topBid !== old?.topBid) {
+                        const bidderName = listing.topBidderName
+                        const isSeller = listing.sellerName === myTeamName
+                        const wasTopBidder = old?.topBidderName === myTeamName
+                        const isNewTopBidder = bidderName === myTeamName
+                        if (isSeller) {
+                            toasts.push({ id: `${listing.id}-bid-${listing.topBid}`, type: 'bid', msg: `${bidderName} bid ${listing.topBid.toLocaleString()}€ on your listing` })
+                        } else if (wasTopBidder && !isNewTopBidder) {
+                            toasts.push({ id: `${listing.id}-outbid`, type: 'outbid', msg: `You were outbid by ${bidderName} (${listing.topBid.toLocaleString()}€)` })
+                        } else if (!isNewTopBidder) {
+                            toasts.push({ id: `${listing.id}-bid-${listing.topBid}`, type: 'bid', msg: `${bidderName} bid ${listing.topBid.toLocaleString()}€ on ${listing.sellerName}'s listing` })
+                        }
                     }
                 }
-            }
 
-            prevListingsRef.current = listings
-
-            if (toasts.length > 0) {
-                setAuctionToasts(t => [...t, ...toasts])
-                toasts.forEach(toast => {
-                    setTimeout(() => {
-                        setAuctionToasts(t => t.filter(x => x.id !== toast.id))
-                    }, 5000)
-                })
+                if (toasts.length > 0) {
+                    setAuctionToasts(t => [...t, ...toasts])
+                    toasts.forEach(toast => {
+                        setTimeout(() => {
+                            setAuctionToasts(t => t.filter(x => x.id !== toast.id))
+                        }, 5000)
+                    })
+                }
+            } catch (e) {
+                console.warn('Auction toast error (non-fatal):', e)
+            } finally {
+                prevListingsRef.current = listings
             }
 
             setGameState(prev => ({ ...prev, auctionListings: listings, teams }))
