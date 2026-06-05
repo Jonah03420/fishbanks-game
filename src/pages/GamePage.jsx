@@ -616,6 +616,8 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
         () => gameState.marketShipPrice || GAME_CONFIG.auctionPreis
     )
     const [newListingCount, setNewListingCount] = useState(1)
+    const [auctionToasts, setAuctionToasts] = useState([])
+    const prevListingsRef = useRef([])
 
     const isMultiplayer = !!(socket && roomCode)
 
@@ -967,6 +969,45 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
         }
 
         function onListingsUpdated({ listings, teams }) {
+            const prev = prevListingsRef.current
+            const myTeamName = mySlotIndex != null ? gameState.teams[mySlotIndex]?.name : null
+            const toasts = []
+
+            for (const listing of listings) {
+                const old = prev.find(l => l.id === listing.id)
+                if (!old) {
+                    // New listing appeared
+                    const isMine = listing.sellerName === myTeamName
+                    if (!isMine) {
+                        toasts.push({ id: `${listing.id}-new`, type: 'new', msg: `${listing.sellerName} listed ${listing.ships} ship${listing.ships > 1 ? 's' : ''} for ${listing.askingPrice.toLocaleString()}€` })
+                    }
+                } else if (listing.topBid && (!old.topBid || listing.topBid.amount !== old.topBid.amount)) {
+                    // New or higher bid
+                    const bidderName = listing.topBid.bidderName
+                    const isSeller = listing.sellerName === myTeamName
+                    const wasTopBidder = old.topBid?.bidderName === myTeamName
+                    const isNewTopBidder = bidderName === myTeamName
+                    if (isSeller) {
+                        toasts.push({ id: `${listing.id}-bid-${listing.topBid.amount}`, type: 'bid', msg: `${bidderName} bid ${listing.topBid.amount.toLocaleString()}€ on your listing` })
+                    } else if (wasTopBidder && !isNewTopBidder) {
+                        toasts.push({ id: `${listing.id}-outbid`, type: 'outbid', msg: `You were outbid by ${bidderName} (${listing.topBid.amount.toLocaleString()}€)` })
+                    } else if (!isNewTopBidder) {
+                        toasts.push({ id: `${listing.id}-bid-${listing.topBid.amount}`, type: 'bid', msg: `${bidderName} bid ${listing.topBid.amount.toLocaleString()}€ on ${listing.sellerName}'s listing` })
+                    }
+                }
+            }
+
+            prevListingsRef.current = listings
+
+            if (toasts.length > 0) {
+                setAuctionToasts(t => [...t, ...toasts])
+                toasts.forEach(toast => {
+                    setTimeout(() => {
+                        setAuctionToasts(t => t.filter(x => x.id !== toast.id))
+                    }, 5000)
+                })
+            }
+
             setGameState(prev => ({ ...prev, auctionListings: listings, teams }))
         }
 
@@ -1005,6 +1046,29 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
             {devToast && (
                 <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] bg-gray-800 text-gray-200 text-xs px-4 py-2 rounded-full shadow-xl border border-white/10">
                     Simulating game…
+                </div>
+            )}
+
+            {/* Auction notification toasts */}
+            {auctionToasts.length > 0 && (
+                <div className="fixed top-4 right-4 z-[60] flex flex-col gap-2 items-end pointer-events-none">
+                    {auctionToasts.map(toast => (
+                        <div
+                            key={toast.id}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-xl shadow-xl border text-sm font-medium max-w-xs animate-fade-in
+                                ${toast.type === 'outbid'
+                                    ? 'bg-red-900/90 border-red-500/50 text-red-100'
+                                    : toast.type === 'bid'
+                                    ? 'bg-blue-800/90 border-blue-400/50 text-blue-100'
+                                    : 'bg-green-900/90 border-green-500/50 text-green-100'
+                                }`}
+                        >
+                            <span>
+                                {toast.type === 'outbid' ? '⚠' : toast.type === 'bid' ? '🔨' : '🏷'}
+                            </span>
+                            <span>{toast.msg}</span>
+                        </div>
+                    ))}
                 </div>
             )}
 
