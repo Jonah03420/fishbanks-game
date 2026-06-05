@@ -68,28 +68,28 @@ function StartPage({ connected, onCreateGame, onJoinGame, onOpenAdmin }) {
         {/* Fishing line + hook — straight down, hook opens LEFT toward fish */}
         <svg
           className="absolute top-0 pointer-events-none hook-bob"
-          style={{left: '240px', width: '24px', height: '265px', zIndex: 6}}
-          viewBox="0 0 24 265"
+          style={{left: '240px', width: '24px', height: '210px', zIndex: 6}}
+          viewBox="0 0 24 210"
           fill="none"
         >
           <defs>
-            <linearGradient id="lineGrad" x1="12" y1="0" x2="12" y2="225" gradientUnits="userSpaceOnUse">
+            <linearGradient id="lineGrad" x1="12" y1="0" x2="12" y2="170" gradientUnits="userSpaceOnUse">
               <stop offset="0%" stopColor="white" stopOpacity="0.06"/>
               <stop offset="100%" stopColor="#bfdbfe" stopOpacity="0.40"/>
             </linearGradient>
           </defs>
           {/* Straight vertical line from panel top */}
-          <line x1="12" y1="0" x2="12" y2="225" stroke="url(#lineGrad)" strokeWidth="1.3"/>
+          <line x1="12" y1="0" x2="12" y2="170" stroke="url(#lineGrad)" strokeWidth="1.3"/>
           {/* Eye ring */}
-          <circle cx="12" cy="228" r="3" stroke="rgba(185,215,255,0.50)" strokeWidth="1.2" fill="none"/>
+          <circle cx="12" cy="173" r="3" stroke="rgba(185,215,255,0.50)" strokeWidth="1.2" fill="none"/>
           {/* Shank */}
-          <line x1="12" y1="232" x2="12" y2="244" stroke="rgba(185,215,255,0.82)" strokeWidth="1.9" strokeLinecap="round"/>
+          <line x1="12" y1="177" x2="12" y2="189" stroke="rgba(185,215,255,0.82)" strokeWidth="1.9" strokeLinecap="round"/>
           {/* Bend — curves LEFT */}
-          <path d="M12 244 Q12 258 3 258" stroke="rgba(185,215,255,0.82)" strokeWidth="1.9" fill="none" strokeLinecap="round"/>
+          <path d="M12 189 Q12 203 3 203" stroke="rgba(185,215,255,0.82)" strokeWidth="1.9" fill="none" strokeLinecap="round"/>
           {/* Point — goes back UP on the left */}
-          <line x1="3" y1="258" x2="3" y2="247" stroke="rgba(185,215,255,0.82)" strokeWidth="1.9" strokeLinecap="round"/>
+          <line x1="3" y1="203" x2="3" y2="192" stroke="rgba(185,215,255,0.82)" strokeWidth="1.9" strokeLinecap="round"/>
           {/* Barb */}
-          <path d="M3 251 L8 258" stroke="rgba(185,215,255,0.62)" strokeWidth="1.3" strokeLinecap="round"/>
+          <path d="M3 196 L8 203" stroke="rgba(185,215,255,0.62)" strokeWidth="1.3" strokeLinecap="round"/>
         </svg>
 
         <FishLogo className="w-40 mb-6 float-fish" />
@@ -188,7 +188,7 @@ function StartPage({ connected, onCreateGame, onJoinGame, onOpenAdmin }) {
             Instructor Settings
           </button>
           <div className={`flex items-center gap-1.5 text-xs ${connected ? 'text-green-500' : 'text-red-400'}`}>
-            <span className={`w-3 h-3 rounded-full flex-shrink-0 ${connected ? 'bg-green-500 server-online' : 'bg-red-400'}`}/>
+            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${connected ? 'bg-green-500 server-online' : 'bg-red-400'}`}/>
             {connected ? 'Server online' : 'Server offline'}
           </div>
         </div>
