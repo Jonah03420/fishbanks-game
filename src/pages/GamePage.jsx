@@ -772,7 +772,12 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
         const myTeamInNew = isMultiplayer && mySlotIndex != null
             ? newState.teams[mySlotIndex]
             : newState.teams.find(t => !t.istKI)
-        setGameState(newState)
+        // Preserve any listings created while this popup was open
+        setGameState(prev => ({
+            ...newState,
+            auctionListings: prev.auctionListings?.length ? prev.auctionListings : (newState.auctionListings || []),
+            teams: prev.auctionListings?.length ? prev.teams : newState.teams,
+        }))
         setRundenErgebnis(null)
         setHumanDecisions({})
         setHumanBids({})
