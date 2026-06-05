@@ -65,34 +65,32 @@ function StartPage({ connected, onCreateGame, onJoinGame, onOpenAdmin }) {
           </svg>
         </div>
 
-        {/* Fishing line + hook — bobs slightly ahead of the fish */}
-        <div className="absolute top-0 pointer-events-none hook-bob" style={{left: '183px', zIndex: 6}}>
-          <svg width="22" height="0" viewBox="0 0 22 0" style={{overflow:'visible', display:'block'}}>
-            {/* Line with natural drape curve */}
-            <line x1="11" y1="0" x2="11" y2="10000" stroke="none"/>
-          </svg>
-          {/* Line as a div for responsive height */}
-          <div style={{
-            width: '1.5px',
-            height: '18vh',
-            background: 'linear-gradient(to bottom, rgba(255,255,255,0.08) 0%, rgba(200,225,255,0.38) 100%)',
-            margin: '0 auto',
-            borderRadius: '1px'
-          }}/>
-          {/* Hook */}
-          <svg width="22" height="36" viewBox="0 0 22 36" fill="none" style={{display:'block', marginLeft:'0px'}}>
-            {/* Eye ring at top of hook */}
-            <circle cx="5" cy="4" r="3.2" stroke="rgba(185,215,255,0.55)" strokeWidth="1.2" fill="none"/>
-            {/* Shank */}
-            <line x1="5" y1="7" x2="5" y2="18" stroke="rgba(185,215,255,0.78)" strokeWidth="1.8" strokeLinecap="round"/>
-            {/* Bend */}
-            <path d="M5 18 Q5 31 14 31" stroke="rgba(185,215,255,0.78)" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-            {/* Point */}
-            <line x1="14" y1="31" x2="14" y2="36" stroke="rgba(185,215,255,0.78)" strokeWidth="1.8" strokeLinecap="round"/>
-            {/* Barb */}
-            <path d="M14 34 L10 29" stroke="rgba(185,215,255,0.65)" strokeWidth="1.3" strokeLinecap="round"/>
-          </svg>
-        </div>
+        {/* Fishing line + hook — diagonal, ends ahead of and below the fish at ~"Banks" level */}
+        <svg
+          className="absolute top-0 left-0 pointer-events-none hook-bob"
+          style={{width: '345px', height: '400px', zIndex: 6}}
+          viewBox="0 0 345 400"
+          fill="none"
+        >
+          <defs>
+            <linearGradient id="lineGrad" x1="115" y1="0" x2="318" y2="362" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="white" stopOpacity="0.07"/>
+              <stop offset="100%" stopColor="#bfdbfe" stopOpacity="0.42"/>
+            </linearGradient>
+          </defs>
+          {/* Line — curves from above-left to hook below-right of fish */}
+          <path d="M115 0 Q215 178 318 362" stroke="url(#lineGrad)" strokeWidth="1.3" fill="none"/>
+          {/* Hook eye ring */}
+          <circle cx="318" cy="365" r="3.5" stroke="rgba(185,215,255,0.52)" strokeWidth="1.3" fill="none"/>
+          {/* Shank */}
+          <line x1="318" y1="369" x2="318" y2="380" stroke="rgba(185,215,255,0.80)" strokeWidth="1.8" strokeLinecap="round"/>
+          {/* Bend */}
+          <path d="M318 380 Q318 393 326 393" stroke="rgba(185,215,255,0.80)" strokeWidth="1.8" fill="none" strokeLinecap="round"/>
+          {/* Point */}
+          <line x1="326" y1="393" x2="326" y2="399" stroke="rgba(185,215,255,0.80)" strokeWidth="1.8" strokeLinecap="round"/>
+          {/* Barb */}
+          <path d="M326 397 L322 392" stroke="rgba(185,215,255,0.65)" strokeWidth="1.3" strokeLinecap="round"/>
+        </svg>
 
         <FishLogo className="w-40 mb-6 float-fish" />
         <h1 className="text-6xl font-bold mb-4 leading-tight">Fish Banks<br />Game</h1>
@@ -181,16 +179,18 @@ function StartPage({ connected, onCreateGame, onJoinGame, onOpenAdmin }) {
           </ol>
         </div>
 
-        <button
-          onClick={onOpenAdmin}
-          className="mt-4 text-blue-600 hover:text-blue-400 text-xs flex items-center gap-1 transition-colors"
-        >
-          ⚙ Instructor Settings
-        </button>
-
-        <div className={`mt-6 flex items-center gap-1.5 text-xs ${connected ? 'text-green-500' : 'text-red-400'}`}>
-          <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500 server-online' : 'bg-red-400'}`}/>
-          {connected ? 'Server online' : 'Server offline'}
+        <div className="mt-6 flex flex-col gap-3">
+          <button
+            onClick={onOpenAdmin}
+            className="text-blue-600 hover:text-blue-400 text-xs flex items-center gap-1.5 transition-colors"
+          >
+            <span className="w-3 h-3 text-[10px] flex items-center justify-center flex-shrink-0 leading-none">⚙</span>
+            Instructor Settings
+          </button>
+          <div className={`flex items-center gap-1.5 text-xs ${connected ? 'text-green-500' : 'text-red-400'}`}>
+            <span className={`w-3 h-3 rounded-full flex-shrink-0 ${connected ? 'bg-green-500 server-online' : 'bg-red-400'}`}/>
+            {connected ? 'Server online' : 'Server offline'}
+          </div>
         </div>
       </div>
     </div>
