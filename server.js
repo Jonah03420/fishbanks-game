@@ -61,6 +61,8 @@ function resolveListing(roomCode, listingId) {
     && listing.topBid >= listing.askingPrice
     && buyer.bankBalance >= listing.topBid
 
+  if (!gs.listingEvents) gs.listingEvents = []
+
   if (qualifying) {
     seller.bankBalance += listing.topBid
     buyer.fleet += listing.ships
@@ -69,6 +71,7 @@ function resolveListing(roomCode, listingId) {
     buyer.netWorth  = berechneNetWorth(buyer.bankBalance,  buyer.fleet,  gs.marketShipPrice)
     listing.status = 'sold'
     listing.resolution = { buyerName: buyer.name, price: listing.topBid }
+    gs.listingEvents.push({ erfolg: true, sellerName: seller?.name || '?', kaeufer: buyer.name, preis: listing.topBid, ships: listing.ships })
   } else {
     if (seller) {
       seller.fleet += listing.ships
@@ -76,6 +79,7 @@ function resolveListing(roomCode, listingId) {
     }
     listing.status = 'returned'
     listing.resolution = null
+    gs.listingEvents.push({ erfolg: false, sellerName: seller?.name || '?', ships: listing.ships })
   }
 
   room.lastActivity = Date.now()
@@ -262,6 +266,7 @@ function initGameState(room) {
     auctionHistory: [],
     pendingAuctionOffers: [],
     auctionListings: [],
+    listingEvents: [],
     teams,
     verlauf: [],
     params,
@@ -290,6 +295,7 @@ function processRound(room) {
   if (!room.pendingDecisions) room.pendingDecisions = {}
 
   // Close any listings still open when round fires (return ships to sellers)
+  if (!gs.listingEvents) gs.listingEvents = []
   for (const listing of (gs.auctionListings || [])) {
     if (listing.status === 'open') {
       clearListingTimer(room.code, listing.id)
@@ -299,6 +305,7 @@ function processRound(room) {
         seller.netWorth = berechneNetWorth(seller.bankBalance, seller.fleet, gs.marketShipPrice)
       }
       listing.status = 'returned'
+      gs.listingEvents.push({ erfolg: false, sellerName: seller?.name || '?', ships: listing.ships })
     }
   }
   gs.auctionListings = [] // fresh slate for the next round
@@ -439,11 +446,13 @@ function processRound(room) {
   gs.verlauf.push(verlaufEintrag)
 
   // Attach top-level round data for the round result modal
-  gs.letzterWetterfaktor = wetterfaktor
-  gs.letzterGesamtFang   = totalCatch
-  gs.letzteAuktionEvents = []
-  gs.roundDeliveries     = roundDeliveries
-  gs.aiShipPurchases     = aiShipPurchases
+  gs.letzterWetterfaktor  = wetterfaktor
+  gs.letzterGesamtFang    = totalCatch
+  gs.letzteAuktionEvents  = []
+  gs.letzteListingEvents  = gs.listingEvents || []
+  gs.listingEvents        = []
+  gs.roundDeliveries      = roundDeliveries
+  gs.aiShipPurchases      = aiShipPurchases
 
   // Step 12: Game end — max rounds reached or fish stock collapsed
   const isOver = gs.runde >= gs.maxRunden || gs.fischbestand <= 0
