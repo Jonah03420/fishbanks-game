@@ -16,6 +16,7 @@ export const ADMIN_DEFAULTS = {
   fishReproductionRate: 0.05,
   schwierigkeitsgrad: 'leicht',
   aiDifficulties: [null, 'easy', 'easy', 'easy'],
+  aiPersonalities: ['gierig', 'gierig', 'gierig', 'gierig'],
   showFishStock: true,
   showOtherCatches: true,
 }
@@ -30,6 +31,9 @@ export function getAdminSettings() {
       ...parsed,
       aiDifficulties: ADMIN_DEFAULTS.aiDifficulties.map((d, i) =>
         parsed.aiDifficulties?.[i] ?? d
+      ),
+      aiPersonalities: ADMIN_DEFAULTS.aiPersonalities.map((d, i) =>
+        parsed.aiPersonalities?.[i] ?? d
       ),
     }
   } catch {

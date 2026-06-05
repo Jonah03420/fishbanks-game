@@ -68,20 +68,7 @@ function BtnGroup({ value, options, onChange }) {
 }
 
 export default function AdminPage({ onBack }) {
-  const [authenticated, setAuthenticated] = useState(false)
-  const [passwordInput, setPasswordInput] = useState('')
-  const [passwordError, setPasswordError] = useState(false)
   const [settings, setSettings] = useState(() => getAdminSettings())
-
-  function handlePasswordSubmit(e) {
-    e.preventDefault()
-    if (passwordInput === 'jmu26') {
-      setAuthenticated(true)
-    } else {
-      setPasswordError(true)
-      setPasswordInput('')
-    }
-  }
 
   function set(key, value) {
     setSettings(s => ({ ...s, [key]: value }))
@@ -103,40 +90,6 @@ export default function AdminPage({ onBack }) {
   function handleSave() {
     saveAdminSettings(settings)
     onBack()
-  }
-
-  // ── Password gate ─────────────────────────────────────────────────────────
-  if (!authenticated) {
-    return (
-      <div className="w-full h-full bg-blue-900 text-white flex items-center justify-center">
-        <div className="bg-blue-800/80 border border-white/10 rounded-2xl p-8 w-full max-w-sm shadow-2xl">
-          <div className="text-center mb-6">
-            <div className="text-4xl mb-3">⚙</div>
-            <h2 className="text-xl font-bold">Instructor Settings</h2>
-            <p className="text-blue-300 text-sm mt-1">Enter the instructor password to continue</p>
-          </div>
-          <form onSubmit={handlePasswordSubmit} className="space-y-3">
-            <input
-              type="password"
-              value={passwordInput}
-              onChange={e => { setPasswordInput(e.target.value); setPasswordError(false) }}
-              placeholder="Password"
-              autoFocus
-              className={`w-full bg-white/10 border ${passwordError ? 'border-red-400' : 'border-white/20'} rounded-xl px-4 py-3 text-white placeholder-blue-400 focus:outline-none focus:border-blue-400 transition-colors`}
-            />
-            {passwordError && (
-              <p className="text-red-300 text-xs text-center">Incorrect password. Try again.</p>
-            )}
-            <button type="submit" className="w-full bg-green-500 hover:bg-green-400 font-bold py-3 rounded-xl text-sm transition-colors">
-              Enter
-            </button>
-            <button type="button" onClick={onBack} className="w-full text-blue-400 hover:text-white text-sm py-2 transition-colors">
-              ← Back
-            </button>
-          </form>
-        </div>
-      </div>
-    )
   }
 
   // ── Settings panel ────────────────────────────────────────────────────────
@@ -265,7 +218,7 @@ export default function AdminPage({ onBack }) {
                   key={slot}
                   label={`${TEAM_COLORS[slot]} Slot ${slot + 1} personality`}
                   hint="Only active if this slot has no human player"
-                >1
+                >
                   <BtnGroup
                     value={settings.aiPersonalities[slot] || 'gierig'}
                     options={PERSONALITIES.map(p => ({ value: p, label: PERSONALITY_LABEL[p] }))}
