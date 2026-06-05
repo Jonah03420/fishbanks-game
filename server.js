@@ -256,6 +256,8 @@ function initGameState(room) {
     istKI: slot.isAI,
     aiDifficulty: slot.isAI ? s.aiDifficulty : null,
     isRealHuman: !slot.isAI,
+    instantBuyCount: 0,
+    instantSellCount: 0,
   }))
 
   return {
@@ -333,6 +335,12 @@ function processRound(room) {
     room.pendingDecisions[i] = fn(team, gs, params)
   }
 
+  // Reset per-round instant buy/sell counts
+  for (const team of gs.teams) {
+    team.instantBuyCount  = 0
+    team.instantSellCount = 0
+  }
+
   // Steps 3–7: Per-team processing
   const aiShipPurchases = []
 
@@ -341,16 +349,22 @@ function processRound(room) {
     const dec  = room.pendingDecisions[i]
     if (!dec) continue
 
-    // Step 3: Auction buy / sell — applied before minBalance tracking (matches client sim)
-    const toBuy  = Math.max(0, dec.shipsToBuy  ?? 0)
-    const toSell = Math.min(Math.max(0, dec.shipsToSell ?? 0), team.fleet)
+    // Step 3: Emergency buy / distress sell — capped at 2 per round, premium/discount pricing
+    const emergencyBuyPrice  = Math.round(gs.marketShipPrice * 1.5 / 10) * 10
+    const distressSalePrice  = Math.round(gs.marketShipPrice * 0.5 / 10) * 10
+    if (!team.instantBuyCount)  team.instantBuyCount  = 0
+    if (!team.instantSellCount) team.instantSellCount = 0
+    const toBuy  = Math.min(Math.max(0, dec.shipsToBuy  ?? 0), Math.max(0, 2 - team.instantBuyCount))
+    const toSell = Math.min(Math.min(Math.max(0, dec.shipsToSell ?? 0), team.fleet), Math.max(0, 2 - team.instantSellCount))
     team.fleet  += toBuy - toSell
     team.auctionPurchases = toBuy
-    team.bankBalance -= toBuy  * gs.marketShipPrice
-    team.bankBalance += toSell * gs.marketShipPrice
+    team.bankBalance -= toBuy  * emergencyBuyPrice
+    team.bankBalance += toSell * distressSalePrice
+    team.instantBuyCount  += toBuy
+    team.instantSellCount += toSell
 
     if (team.istKI && toBuy > 0) {
-      aiShipPurchases.push({ name: team.name, farbe: team.farbe, count: toBuy, price: gs.marketShipPrice })
+      aiShipPurchases.push({ name: team.name, farbe: team.farbe, count: toBuy, price: emergencyBuyPrice })
     }
 
     // startBalance = balance after auction, before op costs (matches client roundSummary)
@@ -423,7 +437,19 @@ function processRound(room) {
   const fischbestandVor = gs.fischbestand
   gs.fischbestand = berechneFischbestand(gs.fischbestand, totalCatch, params)
 
-  // Step 9: Market price unchanged in Phase 4
+  // Step 9: Market price — blend toward auction avg if sales occurred, else supply/demand
+  const auctionSales = (gs.listingEvents || []).filter(e => e.erfolg)
+  if (auctionSales.length > 0) {
+    const totalRevenue   = auctionSales.reduce((s, e) => s + e.preis * (e.ships || 1), 0)
+    const totalShipsSold = auctionSales.reduce((s, e) => s + (e.ships || 1), 0)
+    const avgPrice = totalRevenue / totalShipsSold
+    gs.marketShipPrice = Math.max(150, Math.min(1500, Math.round((gs.marketShipPrice * 0.4 + avgPrice * 0.6) / 10) * 10))
+  } else {
+    const totalShips = gs.teams.reduce((s, t) => s + t.fleet, 0)
+    if (totalShips > 15) gs.marketShipPrice = Math.round(gs.marketShipPrice * 0.95 / 10) * 10
+    else if (totalShips < 9) gs.marketShipPrice = Math.round(gs.marketShipPrice * 1.05 / 10) * 10
+    gs.marketShipPrice = Math.max(150, Math.min(1500, gs.marketShipPrice))
+  }
 
   // Step 10: Recalculate net worth for all teams
   for (const team of gs.teams) {

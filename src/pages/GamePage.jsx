@@ -46,12 +46,19 @@ if (import.meta.env.DEV) {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function aktualisiereMarktpreis(aktuellPreis, alleTeams) {
+function aktualisiereMarktpreis(aktuellPreis, alleTeams, listingEvents = []) {
+    const successfulSales = listingEvents.filter(e => e.erfolg)
+    if (successfulSales.length > 0) {
+        const totalRevenue   = successfulSales.reduce((s, e) => s + e.preis * (e.ships || 1), 0)
+        const totalShipsSold = successfulSales.reduce((s, e) => s + (e.ships || 1), 0)
+        const avgPrice = totalRevenue / totalShipsSold
+        return Math.max(150, Math.min(1500, Math.round((aktuellPreis * 0.4 + avgPrice * 0.6) / 10) * 10))
+    }
     const totalBoote = alleTeams.reduce((sum, t) => sum + t.fleet, 0)
     let neuerPreis = aktuellPreis
     if (totalBoote > 15) neuerPreis *= 0.95
     else if (totalBoote < 9) neuerPreis *= 1.05
-    return Math.max(150, Math.min(1000, Math.round(neuerPreis / 10) * 10))
+    return Math.max(150, Math.min(1500, Math.round(neuerPreis / 10) * 10))
 }
 
 function kiMaxGebot(team, fischbestand, marketShipPrice) {
@@ -159,7 +166,7 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         if (delivered > 0) {
             roundDeliveries.push({ name: team.name, farbe: team.farbe, count: delivered })
         }
-        return { ...team, fleet: team.fleet + delivered, shipsInDelivery: 0, auctionPurchases: 0 }
+        return { ...team, fleet: team.fleet + delivered, shipsInDelivery: 0, auctionPurchases: 0, instantBuyCount: 0, instantSellCount: 0 }
     })
 
     if (import.meta.env.DEV) {
@@ -403,7 +410,7 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
         }
     })
 
-    const neuerMarktpreis = aktualisiereMarktpreis(marketShipPrice, teamsNachRunde)
+    const neuerMarktpreis = aktualisiereMarktpreis(marketShipPrice, teamsNachRunde, listingAuctionEvents)
     const finalTeams = teamsNachRunde.map(team => ({
         ...team,
         netWorth: berechneNetWorth(team.bankBalance, team.fleet, neuerMarktpreis),
@@ -645,16 +652,20 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
     const maxShipOrder = activeTeam ? Math.ceil(activeTeam.fleet / 2) : 0
     const safeShipsOrdered = Math.min(currentShipsOrdered, maxShipOrder)
 
-    // Buy ship instantly at market price (Step 2 auction purchase — immediate)
+    const emergencyBuyPrice  = Math.round(marketShipPrice * 1.5 / 10) * 10
+    const distressSalePrice  = Math.round(marketShipPrice * 0.5 / 10) * 10
+    const buyCount  = activeTeam?.instantBuyCount  || 0
+    const sellCount = activeTeam?.instantSellCount || 0
+
     function handleBootKaufen() {
-        if (activeSlot === null || activeTeam.bankBalance < marketShipPrice) return
+        if (activeSlot === null || buyCount >= 2 || activeTeam.bankBalance < emergencyBuyPrice) return
         const neueBoote = activeTeam.fleet + 1
         setGameState({
             ...gameState,
             teams: gameState.teams.map((team, i) => {
                 if (i !== activeSlot) return team
-                const newBankBalance = team.bankBalance - marketShipPrice
-                return { ...team, fleet: neueBoote, bankBalance: newBankBalance, auctionPurchases: (team.auctionPurchases || 0) + 1, netWorth: berechneNetWorth(newBankBalance, neueBoote, marketShipPrice) }
+                const newBankBalance = team.bankBalance - emergencyBuyPrice
+                return { ...team, fleet: neueBoote, bankBalance: newBankBalance, instantBuyCount: buyCount + 1, auctionPurchases: (team.auctionPurchases || 0) + 1, netWorth: berechneNetWorth(newBankBalance, neueBoote, marketShipPrice) }
             })
         })
         if (isMultiplayer) setPendingBuys(prev => prev + 1)
@@ -662,11 +673,9 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
         setTimeout(() => setBuyConfirm(false), 2000)
     }
 
-    // Sell ship instantly at market price (Step 2 auction sale — immediate)
     function handleBootVerkaufen() {
-        if (activeSlot === null || activeTeam.fleet <= 1) return
+        if (activeSlot === null || activeTeam.fleet <= 1 || sellCount >= 2) return
         const neueBoote = activeTeam.fleet - 1
-        // Shrink zone allocation to match new fleet — reduce deepSea first, then coastal, then harbor
         let h = currentHarbor, c = currentCoastal, d = currentDeepSea
         if (h + c + d > neueBoote) {
             if (d > 0) d--
@@ -680,8 +689,8 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
             ...gameState,
             teams: gameState.teams.map((team, i) => {
                 if (i !== activeSlot) return team
-                const newBankBalance = team.bankBalance + marketShipPrice
-                return { ...team, fleet: neueBoote, bankBalance: newBankBalance, netWorth: berechneNetWorth(newBankBalance, neueBoote, marketShipPrice) }
+                const newBankBalance = team.bankBalance + distressSalePrice
+                return { ...team, fleet: neueBoote, bankBalance: newBankBalance, instantSellCount: sellCount + 1, netWorth: berechneNetWorth(newBankBalance, neueBoote, marketShipPrice) }
             })
         })
         if (isMultiplayer) setPendingSells(prev => prev + 1)
@@ -1774,33 +1783,33 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                             {activeTeam && (
                                 <>
                                     <div className="grid grid-cols-2 gap-3 mb-2">
-                                        {/* Instant Sale */}
+                                        {/* Distress Sale */}
                                         <div className="bg-white/5 border border-white/10 rounded-lg p-2.5">
-                                            <div className="text-xs font-bold text-blue-200 mb-2">Instant Sale</div>
+                                            <div className="text-xs font-bold text-orange-300 mb-1">Distress Sale <span className="text-blue-400 font-normal">({sellCount}/2 used)</span></div>
                                             <button
                                                 onClick={handleBootVerkaufen}
-                                                disabled={activeTeam.fleet <= 1}
+                                                disabled={activeTeam.fleet <= 1 || sellCount >= 2}
                                                 className="w-full bg-white/15 hover:bg-white/25 disabled:opacity-40 disabled:cursor-not-allowed font-medium py-1.5 px-2 rounded-lg transition-colors text-xs text-blue-100 border border-white/10 mb-1.5"
                                             >
-                                                Sell 1 Ship – receive {marketShipPrice.toLocaleString()}€ instantly
-                                                {activeTeam.fleet <= 1 && <span className="block text-xs text-blue-400 mt-0.5">(min. 1 ship)</span>}
+                                                {sellCount >= 2 ? 'Used this round' : `Sell 1 Ship – receive ${distressSalePrice.toLocaleString()}€`}
+                                                {activeTeam.fleet <= 1 && sellCount < 2 && <span className="block text-xs text-blue-400 mt-0.5">(min. 1 ship)</span>}
                                             </button>
-                                            <div className="text-xs text-blue-400">Sell at current market price immediately.</div>
+                                            <div className="text-xs text-orange-400/80">½ market price · max 2/round</div>
                                         </div>
 
-                                        {/* Instant Purchase */}
+                                        {/* Emergency Buy */}
                                         <div className="bg-white/5 border border-white/10 rounded-lg p-2.5">
-                                            <div className="text-xs font-bold text-blue-200 mb-2">Instant Purchase</div>
+                                            <div className="text-xs font-bold text-orange-300 mb-1">Emergency Buy <span className="text-blue-400 font-normal">({buyCount}/2 used)</span></div>
                                             <button
                                                 onClick={handleBootKaufen}
-                                                disabled={activeTeam.bankBalance < marketShipPrice}
+                                                disabled={activeTeam.bankBalance < emergencyBuyPrice || buyCount >= 2}
                                                 className="w-full bg-white/15 hover:bg-white/25 disabled:opacity-40 disabled:cursor-not-allowed font-medium py-1.5 px-2 rounded-lg transition-colors text-xs text-blue-100 border border-white/10 mb-1.5"
                                             >
-                                                Buy 1 Ship – pay {marketShipPrice.toLocaleString()}€ instantly
-                                                {activeTeam.bankBalance < marketShipPrice && <span className="block text-xs text-blue-400 mt-0.5">(insufficient funds)</span>}
+                                                {buyCount >= 2 ? 'Used this round' : `Buy 1 Ship – pay ${emergencyBuyPrice.toLocaleString()}€`}
+                                                {activeTeam.bankBalance < emergencyBuyPrice && buyCount < 2 && <span className="block text-xs text-blue-400 mt-0.5">(insufficient funds)</span>}
                                             </button>
-                                            {buyConfirm && <div className="text-xs text-green-300 mb-1">+1 ship purchased for {marketShipPrice.toLocaleString()}€</div>}
-                                            <div className="text-xs text-blue-400">Buy at current market price immediately.</div>
+                                            {buyConfirm && <div className="text-xs text-green-300 mb-1">+1 ship purchased for {emergencyBuyPrice.toLocaleString()}€</div>}
+                                            <div className="text-xs text-orange-400/80">1.5× market price · max 2/round</div>
                                         </div>
                                     </div>
 
