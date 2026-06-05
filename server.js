@@ -166,7 +166,7 @@ function sanitizeRoom(room) {
     slots: room.slots.map(slot => ({
       ...slot,
       socketId: undefined,
-      disconnectedName: undefined, // keep server-side only for rejoin matching
+      disconnectedName: undefined,
     }))
   }
 }
@@ -528,33 +528,6 @@ io.on('connection', socket => {
       return
     }
 
-    // Mid-game rejoin: if there's a disconnected slot with a matching name, restore it
-    if (room.phase === 'game' && room.gameState) {
-      const name = playerName.trim()
-      const disconnectedSlot = room.slots.find(s => s.isDisconnected && s.disconnectedName === name)
-      if (disconnectedSlot) {
-        disconnectedSlot.socketId = socket.id
-        disconnectedSlot.isConnected = true
-        disconnectedSlot.isDisconnected = false
-        room.lastActivity = Date.now()
-
-        const team = room.gameState.teams[disconnectedSlot.slotIndex]
-        if (team) {
-          team.istKI = false
-          team.isRealHuman = true
-          team.disconnectedHuman = false
-        }
-
-        socket.join(code)
-        socket.emit('game-started', { gameState: room.gameState, slotIndex: disconnectedSlot.slotIndex })
-        io.to(code).emit('room-updated', { room: sanitizeRoom(room) })
-        console.log(`${name} rejoined room ${code} as slot ${disconnectedSlot.slotIndex}`)
-        return
-      }
-      socket.emit('error', { code: 'GAME_IN_PROGRESS', message: 'Game already started.' })
-      return
-    }
-
     if (room.phase !== 'lobby') {
       socket.emit('error', { code: 'GAME_IN_PROGRESS', message: 'Game already started.' })
       return
@@ -706,7 +679,7 @@ io.on('connection', socket => {
     }
     room.pendingDecisions[slot.slotIndex] = dec
 
-    const humanSlots     = room.slots.filter(s => !s.isAI && !s.isDisconnected && s.socketId)
+    const humanSlots     = room.slots.filter(s => !s.isAI && s.socketId)
     const submittedCount = humanSlots.filter(s => room.pendingDecisions[s.slotIndex] !== undefined).length
 
     io.to(code).emit('decision-received', {
@@ -728,7 +701,7 @@ io.on('connection', socket => {
     const room = rooms.get(code)
     if (!room || room.phase !== 'game' || !room.gameState) return
     const slot = room.slots.find(s => s.socketId === socket.id)
-    if (!slot || slot.isAI || slot.isDisconnected) return
+    if (!slot || slot.isAI) return
 
     const team = room.gameState.teams[slot.slotIndex]
     if (!team) return
@@ -769,7 +742,7 @@ io.on('connection', socket => {
     const room = rooms.get(code)
     if (!room || room.phase !== 'game' || !room.gameState) return
     const slot = room.slots.find(s => s.socketId === socket.id)
-    if (!slot || slot.isAI || slot.isDisconnected) return
+    if (!slot || slot.isAI) return
 
     const listing = (room.gameState.auctionListings || []).find(l => l.id === listingId)
     if (!listing || listing.status !== 'open' || listing.sellerSlot === slot.slotIndex) return
@@ -797,13 +770,39 @@ io.on('connection', socket => {
     console.log(`Bid on ${listingId} in room ${code}: ${bid}€ by slot ${slot.slotIndex}`)
   })
 
+  // ── cancel-listing ───────────────────────────────────────────────────────────
+  socket.on('cancel-listing', ({ roomCode, listingId } = {}) => {
+    const code = typeof roomCode === 'string' ? roomCode.toUpperCase() : ''
+    const room = rooms.get(code)
+    if (!room || room.phase !== 'game' || !room.gameState) return
+    const slot = room.slots.find(s => s.socketId === socket.id)
+    if (!slot || slot.isAI) return
+
+    const listings = room.gameState.auctionListings || []
+    const listing = listings.find(l => l.id === listingId)
+    if (!listing || listing.status !== 'open' || listing.sellerSlot !== slot.slotIndex) return
+    if (listing.topBid != null) return // bids placed — cannot cancel
+
+    clearListingTimer(code, listingId)
+    const seller = room.gameState.teams[slot.slotIndex]
+    if (seller) {
+      seller.fleet += listing.ships
+      seller.netWorth = berechneNetWorth(seller.bankBalance, seller.fleet, room.gameState.marketShipPrice)
+    }
+    room.gameState.auctionListings = listings.filter(l => l.id !== listingId)
+    room.lastActivity = Date.now()
+
+    io.to(code).emit('listings-updated', { listings: room.gameState.auctionListings, teams: room.gameState.teams })
+    console.log(`Listing ${listingId} cancelled in room ${code}`)
+  })
+
   // ── pass-listing ─────────────────────────────────────────────────────────────
   socket.on('pass-listing', ({ roomCode, listingId } = {}) => {
     const code = typeof roomCode === 'string' ? roomCode.toUpperCase() : ''
     const room = rooms.get(code)
     if (!room || room.phase !== 'game' || !room.gameState) return
     const slot = room.slots.find(s => s.socketId === socket.id)
-    if (!slot || slot.isAI || slot.isDisconnected) return
+    if (!slot || slot.isAI) return
 
     const listing = (room.gameState.auctionListings || []).find(l => l.id === listingId)
     if (!listing || listing.status !== 'open' || listing.sellerSlot === slot.slotIndex) return
@@ -812,7 +811,7 @@ io.on('connection', socket => {
 
     // Resolve immediately if all non-seller connected humans have passed
     const nonSellerHumans = room.slots.filter(s =>
-      !s.isAI && !s.isDisconnected && s.socketId && s.slotIndex !== listing.sellerSlot
+      !s.isAI && s.socketId && s.slotIndex !== listing.sellerSlot
     )
     if (nonSellerHumans.length > 0 && nonSellerHumans.every(s => listing.passedBy.includes(s.slotIndex))) {
       resolveListing(code, listingId)
@@ -834,8 +833,8 @@ io.on('connection', socket => {
 })
 
 // ─── Leave Helper ─────────────────────────────────────────────────────────────
-// voluntary=true  → player clicked "Leave" — permanently replace with AI
-// voluntary=false → socket dropped unexpectedly — preserve slot for rejoin
+// voluntary=true  → player clicked "Leave"
+// voluntary=false → socket dropped (team gets disconnectedHuman flag for UI)
 
 function handleLeave(socket, roomCode, voluntary = false) {
   const code = typeof roomCode === 'string' ? roomCode.toUpperCase() : ''
@@ -847,37 +846,27 @@ function handleLeave(socket, roomCode, voluntary = false) {
 
   const inActiveGame = room.phase === 'game' && room.gameState
 
-  // Always hand the game-state team to the AI so the round can proceed
+  // Hand the team to AI; flag unexpected disconnects for the UI
   if (inActiveGame) {
     const team = room.gameState.teams[slot.slotIndex]
     if (team) {
       team.istKI = true
       team.aiDifficulty = room.settings.aiDifficulty
-      team.disconnectedHuman = !voluntary // flag for UI: was a real human
+      team.disconnectedHuman = !voluntary
     }
   }
 
-  if (inActiveGame && !voluntary) {
-    // Unexpected disconnect during game: keep slot open for rejoin
-    slot.disconnectedName = slot.name  // server-side only, for name matching
-    slot.socketId = null
-    slot.isConnected = false
-    slot.isDisconnected = true
-    // isAI stays false — slot is still "human, just away"
-  } else {
-    // Voluntary leave or lobby: permanently replace with AI
-    slot.name = AI_NAMES[slot.slotIndex] || `AI Team ${slot.slotIndex + 1}`
-    slot.socketId = null
-    slot.isAI = true
-    slot.isConnected = false
-    slot.isDisconnected = false
-  }
+  // Always replace slot with AI placeholder
+  slot.name = AI_NAMES[slot.slotIndex] || `AI Team ${slot.slotIndex + 1}`
+  slot.socketId = null
+  slot.isAI = true
+  slot.isConnected = false
 
   socket.leave(code)
 
-  // Reassign host — skip disconnected slots (they have no active socket)
+  // Reassign host if needed
   if (room.host === socket.id) {
-    const nextHuman = room.slots.find(s => !s.isAI && !s.isDisconnected && s.socketId)
+    const nextHuman = room.slots.find(s => !s.isAI && s.socketId)
     if (nextHuman) {
       room.host = nextHuman.socketId
     } else {
@@ -886,9 +875,9 @@ function handleLeave(socket, roomCode, voluntary = false) {
     }
   }
 
-  // If game in progress, check whether all remaining connected humans submitted
+  // If game in progress, check whether all remaining humans submitted
   if (inActiveGame && room.pendingDecisions) {
-    const humanSlots = room.slots.filter(s => !s.isAI && !s.isDisconnected && s.socketId)
+    const humanSlots = room.slots.filter(s => !s.isAI && s.socketId)
     if (humanSlots.length === 0) {
       rooms.delete(code)
       return

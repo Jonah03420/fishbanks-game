@@ -22,25 +22,21 @@ function SlotList({ slots, mySlotIndex }) {
           className={`flex items-center gap-3 rounded-xl px-4 py-3 ${
             slot.isAI
               ? 'bg-white/5 border border-dashed border-white/20 text-blue-400'
-              : slot.isDisconnected
-                ? 'bg-orange-900/20 border border-orange-400/20 text-orange-300'
-                : 'bg-white/10'
+              : 'bg-white/10'
           }`}>
           <span className="text-xl">{COLOR_EMOJI[slot.color] || '⚪'}</span>
           <span className="flex-1 font-medium">
             {slot.name}
-            {slot.slotIndex === 0 && !slot.isAI && !slot.isDisconnected && (
+            {slot.slotIndex === 0 && !slot.isAI && (
               <span className="text-xs text-yellow-300 ml-2">Host</span>
             )}
-            {slot.slotIndex === mySlotIndex && !slot.isAI && !slot.isDisconnected && (
+            {slot.slotIndex === mySlotIndex && !slot.isAI && (
               <span className="text-xs text-blue-300 ml-2">(You)</span>
             )}
           </span>
           {slot.isAI
             ? <span className="text-xs text-blue-500">AI</span>
-            : slot.isDisconnected
-              ? <span className="text-xs text-orange-400">🔌 Disconnected</span>
-              : <span className="text-green-400 text-sm">Connected</span>
+            : <span className="text-green-400 text-sm">Connected</span>
           }
         </div>
       ))}
@@ -61,21 +57,19 @@ function Layout({ leftContent, rightContent }) {
   )
 }
 
-export default function LobbyPage({ socket, connected, onStart, onBack, initialView = 'create', onOpenAdmin, initialName = '', initialCode = '' }) {
+export default function LobbyPage({ socket, connected, onStart, onBack, initialView = 'create', onOpenAdmin }) {
   const [view, setView] = useState(initialView)
-  const [playerName, setPlayerName] = useState(initialName)
-  const [joinCode, setJoinCode] = useState(initialCode)
+  const [playerName, setPlayerName] = useState('')
+  const [joinCode, setJoinCode] = useState('')
   const [error, setError] = useState('')
   const [room, setRoom] = useState(null)
   const [mySlotIndex, setMySlotIndex] = useState(null)
   const [isHost, setIsHost] = useState(false)
-  const pendingNameRef = { current: '' }
 
   useEffect(() => {
     if (!socket) return
 
     function onRoomCreated({ slotIndex, room: r }) {
-      try { localStorage.setItem('fishbanks_session', JSON.stringify({ name: pendingNameRef.current, code: r.code })) } catch {}
       setRoom(r)
       setMySlotIndex(slotIndex)
       setIsHost(true)
@@ -84,7 +78,6 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
     }
 
     function onRoomJoined({ slotIndex, room: r }) {
-      try { localStorage.setItem('fishbanks_session', JSON.stringify({ name: pendingNameRef.current, code: r.code })) } catch {}
       setRoom(r)
       setMySlotIndex(slotIndex)
       setIsHost(false)
@@ -131,9 +124,7 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
   function doCreate() {
     if (!socket || !connected) { setError('Not connected to server.'); return }
     setError('')
-    const name = playerName.trim() || 'Player 1'
-    pendingNameRef.current = name
-    socket.emit('create-room', { playerName: name, settings: {} })
+    socket.emit('create-room', { playerName: playerName.trim() || 'Player 1', settings: {} })
   }
 
   function doJoin() {
@@ -141,9 +132,7 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
     setError('')
     const code = joinCode.toUpperCase().replace(/[^A-Z]/g, '')
     if (code.length !== 4) { setError('Please enter a 4-letter code.'); return }
-    const name = playerName.trim() || 'Player'
-    pendingNameRef.current = name
-    socket.emit('join-room', { playerName: name, roomCode: code })
+    socket.emit('join-room', { playerName: playerName.trim() || 'Player', roomCode: code })
   }
 
   function changeSetting(key, value) {

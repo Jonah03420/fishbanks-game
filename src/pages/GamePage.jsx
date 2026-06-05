@@ -507,7 +507,15 @@ function AuctionListingCard({ listing, mySlotIndex, socket, roomCode }) {
                     <div className="text-xs text-blue-300">asking {listing.askingPrice.toLocaleString()}€</div>
                 </div>
                 <div className="shrink-0 ml-2">
-                    {isSeller && <span className="text-xs text-blue-400 bg-white/10 px-2 py-0.5 rounded">Your listing</span>}
+                    {isSeller && !hasBid && (
+                        <button
+                            onClick={() => socket.emit('cancel-listing', { roomCode, listingId: listing.id })}
+                            className="text-xs bg-red-500/20 hover:bg-red-500/40 border border-red-400/30 px-2 py-0.5 rounded transition-colors text-red-300"
+                        >
+                            Cancel
+                        </button>
+                    )}
+                    {isSeller && hasBid && <span className="text-xs text-blue-400 bg-white/10 px-2 py-0.5 rounded">Your listing</span>}
                     {!isSeller && isWinning && <span className="text-xs text-green-300 bg-green-900/40 px-2 py-0.5 rounded">🏆 Winning</span>}
                     {!isSeller && hasBid && !isWinning && <span className="text-xs text-red-300 bg-red-900/30 px-2 py-0.5 rounded">⚠️ Outbid</span>}
                     {!isSeller && !hasBid && !isPassed && <span className="text-xs text-blue-500">No bids yet</span>}
@@ -582,7 +590,6 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
     })
     const [currentShipsOrdered, setCurrentShipsOrdered] = useState(0)
     const [humanBids, setHumanBids] = useState({})
-    const [showHandoff, setShowHandoff] = useState(false)
     const [rundenErgebnis, setRundenErgebnis] = useState(null)
     const [activeTab, setActiveTab] = useState('dashboard')
     const [devToast, setDevToast] = useState(false)
@@ -734,7 +741,6 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
             setCurrentCoastal(0)
             setCurrentShipsOrdered(0)
             setHumanBids({})
-            if (humanTeams.length > 1) setShowHandoff(true)
         }
     }
 
@@ -951,25 +957,6 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
 
     return (
         <div className="w-full h-screen bg-blue-900 text-white flex flex-col">
-
-            {/* Handoff overlay (same-device multiplayer) */}
-            {showHandoff && nextEntry && (
-                <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50">
-                    <div className="bg-blue-900 border border-blue-600 rounded-xl p-6 max-w-sm w-full text-center shadow-2xl">
-                        <h2 className="text-xl font-bold mb-2">Decision Submitted!</h2>
-                        <p className="text-blue-300 mb-4">Please pass the device to:</p>
-                        <div className="text-2xl font-bold mb-5">
-                            {gameState.teams[nextEntry.slotIndex].farbe} {gameState.teams[nextEntry.slotIndex].name}
-                        </div>
-                        <button
-                            onClick={() => setShowHandoff(false)}
-                            className="w-full bg-green-500 hover:bg-green-400 font-bold py-3 rounded-xl text-base transition-colors"
-                        >
-                            I'm ready →
-                        </button>
-                    </div>
-                </div>
-            )}
 
             {/* DEV shortcut toast */}
             {devToast && (
