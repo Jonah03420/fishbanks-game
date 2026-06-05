@@ -612,6 +612,9 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
 
     const isMultiplayer = !!(socket && roomCode)
 
+    // Ref always holds latest allocation values — avoids stale closure in useEffect below.
+    const allocRef = useRef({ h: 0, c: 0, d: 0 })
+
     const maxRunden = gameState.maxRunden || GAME_CONFIG.maxRunden
     const schwierigkeit = gameState.schwierigkeitsgrad || 'leicht'
     const marketShipPrice = gameState.marketShipPrice || GAME_CONFIG.auctionPreis
@@ -852,6 +855,30 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
         }
         setGameState({ ...state, phase: 'ende' })
     }
+
+    // Keep allocRef current every render so the fleet-trim effect reads fresh values.
+    allocRef.current = { h: currentHarbor, c: currentCoastal, d: currentDeepSea }
+
+    // When fleet shrinks (ship listed/sold via auction), trim zone allocations so they
+    // never exceed fleet size — prevents the "Allocate X ships first" deadlock.
+    useEffect(() => {
+        if (!isMultiplayer || mySlotIndex === null) return
+        const team = gameState.teams[mySlotIndex]
+        if (!team) return
+        const { h, c, d } = allocRef.current
+        const excess = (h + c + d) - team.fleet
+        if (excess <= 0) return
+        let nh = h, nc = c, nd = d
+        for (let i = 0; i < excess; i++) {
+            if (nd > 0) nd--
+            else if (nc > 0) nc--
+            else if (nh > 0) nh--
+        }
+        setCurrentHarbor(nh)
+        setCurrentCoastal(nc)
+        setCurrentDeepSea(nd)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [gameState.teams[mySlotIndex ?? 0]?.fleet, isMultiplayer, mySlotIndex])
 
     // Keyboard shortcut Ctrl/Cmd+Shift+S triggers full simulation (DEV only, disabled in multiplayer)
     devSkipRef.current = handleDevSkip
@@ -1313,7 +1340,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                             <button onClick={() => set(Math.max(0, val - 1))} disabled={val === 0}
                                                 className="bg-white/20 hover:bg-white/30 disabled:opacity-30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0">−</button>
                                             <span className="w-5 text-center font-bold text-sm">{val}</span>
-                                            <button onClick={() => set(val + 1)} disabled={allAllocated}
+                                            <button onClick={() => set(val + 1)} disabled={totalAllocated >= fleetSize}
                                                 className="bg-white/20 hover:bg-white/30 disabled:opacity-30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0">+</button>
                                             <span className={`text-xs ${color} opacity-70`}>{hint}</span>
                                         </div>
