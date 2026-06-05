@@ -670,6 +670,8 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                 return { ...team, fleet: neueBoote, bankBalance: newBankBalance, instantBuyCount: buyCount + 1, auctionPurchases: (team.auctionPurchases || 0) + 1, netWorth: berechneNetWorth(newBankBalance, neueBoote, marketShipPrice) }
             })
         })
+        // Auto-allocate the new ship to deep sea so allAllocated stays true
+        setCurrentDeepSea(prev => prev + 1)
         if (isMultiplayer) setPendingBuys(prev => prev + 1)
         setBuyConfirm(true)
         setTimeout(() => setBuyConfirm(false), 2000)
@@ -968,6 +970,11 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
             setWaitingForServer(false)
         }
 
+        function onRoundError({ message }) {
+            setWaitingForServer(false)
+            alert(`Round error: ${message}`)
+        }
+
         function onListingsUpdated({ listings, teams }) {
             // Toast notifications — wrapped in try-catch so any error here never
             // blocks the state update below.
@@ -1019,12 +1026,14 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
         socket.on('round-complete', onRoundComplete)
         socket.on('game-ended', onGameEnded)
         socket.on('listings-updated', onListingsUpdated)
+        socket.on('round-error', onRoundError)
 
         return () => {
             socket.off('decision-received', onDecisionReceived)
             socket.off('round-complete', onRoundComplete)
             socket.off('game-ended', onGameEnded)
             socket.off('listings-updated', onListingsUpdated)
+            socket.off('round-error', onRoundError)
         }
     }, [socket, isMultiplayer, mySlotIndex])
 

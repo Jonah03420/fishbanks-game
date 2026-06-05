@@ -728,7 +728,14 @@ io.on('connection', socket => {
     console.log(`Decision from slot ${slot.slotIndex} in room ${code} (${submittedCount}/${humanSlots.length})`)
 
     if (submittedCount === humanSlots.length) {
-      processRound(room)
+      try {
+        processRound(room)
+      } catch (err) {
+        console.error(`processRound error in room ${code}:`, err)
+        // Reset pending decisions so players can retry
+        room.pendingDecisions = {}
+        io.to(code).emit('round-error', { message: 'Server error processing round. Please resubmit.' })
+      }
     }
   })
 
