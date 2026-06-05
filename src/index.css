@@ -43,6 +43,20 @@ html, body, #root {
   animation: slideInRight 0.25s ease forwards;
 }
 
+/* Hook bob — same rhythm as fish but slightly phase-shifted so fish appears to chase */
+@keyframes hookBob {
+  0%   { transform: translateY(0px); }
+  25%  { transform: translateY(-9px); }
+  50%  { transform: translateY(-5px); }
+  75%  { transform: translateY(-13px); }
+  100% { transform: translateY(0px); }
+}
+.hook-bob {
+  display: inline-block;
+  animation: hookBob 3s ease-in-out infinite;
+  animation-delay: -0.7s; /* phase ahead of floatFish so fish chases hook */
+}
+
 /* Wave shift for start page background */
 @keyframes waveShift {
   0%   { transform: translateX(0); }

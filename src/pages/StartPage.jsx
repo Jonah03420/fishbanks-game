@@ -37,28 +37,60 @@ function StartPage({ connected, onCreateGame, onJoinGame, onOpenAdmin }) {
       <div className="relative flex-1 flex flex-col justify-center px-16 py-12 bg-gradient-to-br from-blue-800 to-blue-950 overflow-hidden">
 
         {/* Background depth glows */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-400/[0.06] rounded-full blur-3xl pointer-events-none"/>
-        <div className="absolute bottom-1/3 right-1/4 w-64 h-64 bg-blue-300/[0.05] rounded-full blur-2xl pointer-events-none"/>
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-400/[0.13] rounded-full blur-3xl pointer-events-none"/>
+        <div className="absolute bottom-1/3 right-1/4 w-64 h-64 bg-blue-300/[0.10] rounded-full blur-2xl pointer-events-none"/>
+        <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-sky-300/[0.06] rounded-full blur-3xl pointer-events-none -translate-x-1/2 -translate-y-1/2"/>
 
         {/* Floating bubbles */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute bottom-20 left-16 w-2 h-2 bg-cyan-300/25 rounded-full bubble-float" style={{animationDelay:'0s'}}/>
-          <div className="absolute bottom-32 left-36 w-3 h-3 bg-blue-300/20 rounded-full bubble-float" style={{animationDelay:'1.8s'}}/>
-          <div className="absolute bottom-16 left-1/2 w-1.5 h-1.5 bg-cyan-200/25 rounded-full bubble-float" style={{animationDelay:'3.2s'}}/>
-          <div className="absolute bottom-40 right-32 w-4 h-4 bg-blue-400/15 rounded-full bubble-float" style={{animationDelay:'0.6s'}}/>
-          <div className="absolute bottom-24 right-20 w-2 h-2 bg-cyan-300/20 rounded-full bubble-float" style={{animationDelay:'2.5s'}}/>
-          <div className="absolute bottom-48 left-1/3 w-2.5 h-2.5 bg-blue-200/20 rounded-full bubble-float" style={{animationDelay:'4.1s'}}/>
+          <div className="absolute bottom-20 left-16 w-2.5 h-2.5 bg-cyan-300/45 rounded-full bubble-float" style={{animationDelay:'0s'}}/>
+          <div className="absolute bottom-32 left-36 w-3.5 h-3.5 bg-blue-300/35 rounded-full bubble-float" style={{animationDelay:'1.8s'}}/>
+          <div className="absolute bottom-16 left-1/2 w-2 h-2 bg-cyan-200/45 rounded-full bubble-float" style={{animationDelay:'3.2s'}}/>
+          <div className="absolute bottom-40 right-32 w-4 h-4 bg-blue-400/30 rounded-full bubble-float" style={{animationDelay:'0.6s'}}/>
+          <div className="absolute bottom-24 right-20 w-2.5 h-2.5 bg-cyan-300/38 rounded-full bubble-float" style={{animationDelay:'2.5s'}}/>
+          <div className="absolute bottom-48 left-1/3 w-3 h-3 bg-blue-200/35 rounded-full bubble-float" style={{animationDelay:'4.1s'}}/>
+          <div className="absolute bottom-60 left-24 w-1.5 h-1.5 bg-cyan-400/40 rounded-full bubble-float" style={{animationDelay:'5.3s'}}/>
+          <div className="absolute bottom-36 right-1/2 w-2 h-2 bg-sky-300/32 rounded-full bubble-float" style={{animationDelay:'2.0s'}}/>
         </div>
 
         {/* Animated waves at bottom */}
         <div className="absolute bottom-0 left-0 right-0 h-20 overflow-hidden pointer-events-none">
-          <svg viewBox="0 0 2400 80" preserveAspectRatio="none" className="w-[200%] h-full wave-shift" style={{opacity:0.15}}>
+          <svg viewBox="0 0 2400 80" preserveAspectRatio="none" className="w-[200%] h-full wave-shift" style={{opacity:0.24}}>
             <path d="M0,40 C200,70 400,10 600,40 C800,70 1000,10 1200,40 C1400,70 1600,10 1800,40 C2000,70 2200,10 2400,40 L2400,80 L0,80 Z" fill="#7dd3fc"/>
           </svg>
         </div>
         <div className="absolute bottom-0 left-0 right-0 h-12 overflow-hidden pointer-events-none">
-          <svg viewBox="0 0 2400 50" preserveAspectRatio="none" className="w-[200%] h-full wave-shift" style={{opacity:0.10, animationDirection:'reverse', animationDuration:'18s'}}>
+          <svg viewBox="0 0 2400 50" preserveAspectRatio="none" className="w-[200%] h-full wave-shift" style={{opacity:0.18, animationDirection:'reverse', animationDuration:'18s'}}>
             <path d="M0,25 C300,48 600,4 900,25 C1200,48 1500,4 1800,25 C2100,48 2400,4 2700,25 L2700,50 L0,50 Z" fill="#38bdf8"/>
+          </svg>
+        </div>
+
+        {/* Fishing line + hook — bobs slightly ahead of the fish */}
+        <div className="absolute top-0 pointer-events-none hook-bob" style={{left: '183px', zIndex: 6}}>
+          <svg width="22" height="0" viewBox="0 0 22 0" style={{overflow:'visible', display:'block'}}>
+            {/* Line with natural drape curve */}
+            <line x1="11" y1="0" x2="11" y2="10000" stroke="none"/>
+          </svg>
+          {/* Line as a div for responsive height */}
+          <div style={{
+            width: '1.5px',
+            height: '18vh',
+            background: 'linear-gradient(to bottom, rgba(255,255,255,0.08) 0%, rgba(200,225,255,0.38) 100%)',
+            margin: '0 auto',
+            borderRadius: '1px'
+          }}/>
+          {/* Hook */}
+          <svg width="22" height="36" viewBox="0 0 22 36" fill="none" style={{display:'block', marginLeft:'0px'}}>
+            {/* Eye ring at top of hook */}
+            <circle cx="5" cy="4" r="3.2" stroke="rgba(185,215,255,0.55)" strokeWidth="1.2" fill="none"/>
+            {/* Shank */}
+            <line x1="5" y1="7" x2="5" y2="18" stroke="rgba(185,215,255,0.78)" strokeWidth="1.8" strokeLinecap="round"/>
+            {/* Bend */}
+            <path d="M5 18 Q5 31 14 31" stroke="rgba(185,215,255,0.78)" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+            {/* Point */}
+            <line x1="14" y1="31" x2="14" y2="36" stroke="rgba(185,215,255,0.78)" strokeWidth="1.8" strokeLinecap="round"/>
+            {/* Barb */}
+            <path d="M14 34 L10 29" stroke="rgba(185,215,255,0.65)" strokeWidth="1.3" strokeLinecap="round"/>
           </svg>
         </div>
 
