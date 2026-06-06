@@ -68,28 +68,28 @@ function StartPage({ connected, onCreateGame, onJoinGame, onOpenAdmin }) {
         {/* Fishing line + hook — straight down, hook opens LEFT toward fish */}
         <svg
           className="absolute top-0 pointer-events-none hook-bob"
-          style={{left: '240px', width: '24px', height: '177px', zIndex: 6}}
-          viewBox="0 0 24 177"
+          style={{left: '240px', width: '24px', height: '162px', zIndex: 6}}
+          viewBox="0 0 24 162"
           fill="none"
         >
           <defs>
-            <linearGradient id="lineGrad" x1="12" y1="0" x2="12" y2="135" gradientUnits="userSpaceOnUse">
+            <linearGradient id="lineGrad" x1="12" y1="0" x2="12" y2="120" gradientUnits="userSpaceOnUse">
               <stop offset="0%" stopColor="white" stopOpacity="0.06"/>
               <stop offset="100%" stopColor="#bfdbfe" stopOpacity="0.40"/>
             </linearGradient>
           </defs>
           {/* Straight vertical line from panel top */}
-          <line x1="12" y1="0" x2="12" y2="135" stroke="url(#lineGrad)" strokeWidth="1.3"/>
+          <line x1="12" y1="0" x2="12" y2="120" stroke="url(#lineGrad)" strokeWidth="1.3"/>
           {/* Eye ring */}
-          <circle cx="12" cy="138" r="3" stroke="rgba(185,215,255,0.50)" strokeWidth="1.2" fill="none"/>
+          <circle cx="12" cy="123" r="3" stroke="rgba(185,215,255,0.50)" strokeWidth="1.2" fill="none"/>
           {/* Shank */}
-          <line x1="12" y1="142" x2="12" y2="154" stroke="rgba(185,215,255,0.82)" strokeWidth="1.9" strokeLinecap="round"/>
+          <line x1="12" y1="127" x2="12" y2="139" stroke="rgba(185,215,255,0.82)" strokeWidth="1.9" strokeLinecap="round"/>
           {/* Bend — curves LEFT */}
-          <path d="M12 154 Q12 168 3 168" stroke="rgba(185,215,255,0.82)" strokeWidth="1.9" fill="none" strokeLinecap="round"/>
+          <path d="M12 139 Q12 153 3 153" stroke="rgba(185,215,255,0.82)" strokeWidth="1.9" fill="none" strokeLinecap="round"/>
           {/* Point — goes back UP on the left */}
-          <line x1="3" y1="168" x2="3" y2="157" stroke="rgba(185,215,255,0.82)" strokeWidth="1.9" strokeLinecap="round"/>
+          <line x1="3" y1="153" x2="3" y2="142" stroke="rgba(185,215,255,0.82)" strokeWidth="1.9" strokeLinecap="round"/>
           {/* Barb */}
-          <path d="M3 161 L8 168" stroke="rgba(185,215,255,0.62)" strokeWidth="1.3" strokeLinecap="round"/>
+          <path d="M3 146 L8 153" stroke="rgba(185,215,255,0.62)" strokeWidth="1.3" strokeLinecap="round"/>
         </svg>
 
         <FishLogo className="w-40 mb-6 float-fish" />
