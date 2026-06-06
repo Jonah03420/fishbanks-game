@@ -7,19 +7,19 @@ const PERSONALITY_LABEL = { gierig: 'Greedy', kooperativ: 'Cooperative', rationa
 
 function Section({ title, children }) {
   return (
-    <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-      <h3 className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-3">{title}</h3>
-      <div className="space-y-3">{children}</div>
+    <div className="bg-white/5 border border-white/10 rounded-xl px-4 pt-4 pb-1">
+      <h3 className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-1">{title}</h3>
+      <div className="divide-y divide-white/[0.06]">{children}</div>
     </div>
   )
 }
 
 function Row({ label, hint, children }) {
   return (
-    <div className="flex items-center justify-between gap-3">
+    <div className="flex items-center justify-between gap-3 py-3">
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium text-white leading-tight">{label}</div>
-        {hint && <div className="text-xs text-blue-400 mt-0.5">{hint}</div>}
+        {hint && <div className="text-xs text-blue-500 mt-0.5">{hint}</div>}
       </div>
       <div className="flex-none">{children}</div>
     </div>
@@ -56,7 +56,7 @@ function BtnGroup({ value, options, onChange }) {
           onClick={() => onChange(opt.value)}
           className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
             value === opt.value
-              ? 'bg-green-500 text-white'
+              ? (opt.activeClass ?? 'bg-green-500 text-white')
               : 'bg-white/10 hover:bg-white/20 text-blue-200'
           }`}
         >
@@ -110,7 +110,7 @@ export default function AdminPage({ onBack }) {
         <div className="flex gap-2">
           <button
             onClick={handleReset}
-            className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-medium transition-colors"
+            className="px-3 py-2 bg-orange-500/15 hover:bg-orange-500/25 border border-orange-500/30 text-orange-300 rounded-xl text-xs font-medium transition-colors"
           >
             Reset to Defaults
           </button>
@@ -125,7 +125,7 @@ export default function AdminPage({ onBack }) {
 
       {/* Scrollable content */}
       <div className="flex-1 min-h-0 overflow-y-auto p-5">
-        <div className="grid grid-cols-2 gap-4 max-w-4xl mx-auto">
+        <div className="grid grid-cols-2 gap-4">
 
           {/* Left column */}
           <div className="space-y-4">
@@ -209,7 +209,10 @@ export default function AdminPage({ onBack }) {
               <Row label="AI difficulty" hint="Applies to all AI-controlled slots">
                 <BtnGroup
                   value={settings.schwierigkeitsgrad}
-                  options={[{value:'leicht',label:'Easy'},{value:'schwer',label:'Hard'}]}
+                  options={[
+                    {value:'leicht', label:'Easy', activeClass:'bg-green-500 text-white'},
+                    {value:'schwer', label:'Hard', activeClass:'bg-orange-500 text-white'},
+                  ]}
                   onChange={v => set('schwierigkeitsgrad', v)}
                 />
               </Row>
@@ -232,14 +235,20 @@ export default function AdminPage({ onBack }) {
               <Row label="Fish stock visible to players" hint="Hide for advanced sessions: players can only infer stock from catch rates">
                 <BtnGroup
                   value={settings.showFishStock ? 'show' : 'hide'}
-                  options={[{value:'show',label:'Show'},{value:'hide',label:'Hide'}]}
+                  options={[
+                    {value:'show', label:'Show', activeClass:'bg-green-500 text-white'},
+                    {value:'hide', label:'Hide', activeClass:'bg-amber-500 text-white'},
+                  ]}
                   onChange={v => set('showFishStock', v === 'show')}
                 />
               </Row>
               <Row label="Other teams' results visible" hint="Hide so each team only sees their own round summary">
                 <BtnGroup
                   value={settings.showOtherCatches ? 'show' : 'hide'}
-                  options={[{value:'show',label:'Show'},{value:'hide',label:'Hide'}]}
+                  options={[
+                    {value:'show', label:'Show', activeClass:'bg-green-500 text-white'},
+                    {value:'hide', label:'Hide', activeClass:'bg-amber-500 text-white'},
+                  ]}
                   onChange={v => set('showOtherCatches', v === 'show')}
                 />
               </Row>
