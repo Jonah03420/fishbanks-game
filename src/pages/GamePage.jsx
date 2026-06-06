@@ -1635,10 +1635,10 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                         </div>
 
                         {/* Two-column content — each column scrolls independently */}
-                        <div className="flex-1 min-h-0 flex gap-3">
+                        <div className="flex-1 min-h-0 flex gap-3 overflow-hidden">
 
                         {/* Left column: Annual Report */}
-                        <div className="flex-1 flex flex-col gap-2 min-w-0 overflow-y-auto pr-1">
+                        <div className="flex-1 flex flex-col gap-2 min-w-0 overflow-y-auto overflow-x-hidden">
                                 {(showOtherCatches ? gameState.teams : gameState.teams.filter(t => !t.istKI)).map(team => {
                                     const rows = []
 
@@ -1732,15 +1732,22 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                 <div className="bg-white/10 rounded-xl p-3">
                                     <div className="flex justify-between items-center mb-2">
                                         <h3 className="font-bold text-sm">Income & Expenses per Year</h3>
-                                        <select
-                                            value={selectedTeamForIncome}
-                                            onChange={e => setSelectedTeamForIncome(e.target.value)}
-                                            className="bg-white/10 border border-white/20 rounded px-2 py-1 text-xs text-white"
-                                        >
+                                        <div className="flex gap-1">
                                             {gameState.teams.map(t => (
-                                                <option key={t.name} value={t.name} style={{ backgroundColor: '#1e3a5f' }}>{t.farbe} {t.name}</option>
+                                                <button
+                                                    key={t.name}
+                                                    onClick={() => setSelectedTeamForIncome(t.name)}
+                                                    className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors ${
+                                                        selectedTeamForIncome === t.name
+                                                            ? 'bg-white/20 text-white'
+                                                            : 'bg-white/5 text-blue-300 hover:bg-white/15'
+                                                    }`}
+                                                >
+                                                    <TeamDot farbe={t.farbe} />
+                                                    <span>{t.name}</span>
+                                                </button>
                                             ))}
-                                        </select>
+                                        </div>
                                     </div>
                                     {(() => {
                                         const incomeData = gameState.verlauf.map(v => {
