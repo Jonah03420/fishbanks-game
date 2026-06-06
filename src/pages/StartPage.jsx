@@ -98,50 +98,52 @@ function StartPage({ connected, onCreateGame, onJoinGame, onOpenAdmin }) {
           Can you manage fish stocks sustainably – while other teams fish without restraint?
         </p>
 
-        <div className="grid grid-cols-2 gap-4 max-w-lg">
-          <div className="bg-white/10 rounded-xl p-4">
+        <div className="grid grid-cols-2 gap-3 max-w-lg">
+          <div className="bg-white/10 rounded-xl p-4 border border-white/5">
+            <div className="w-7 h-7 rounded-lg bg-cyan-500/20 flex items-center justify-center mb-2 text-cyan-400">
+              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M1 11 Q4 8 8 11 Q12 14 15 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M1 7 Q4 4 8 7 Q12 10 15 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            </div>
             <div className="font-bold text-sm mb-1">Shared Resource</div>
             <div className="text-blue-300 text-xs">All teams share the same fish stock – overfishing destroys it for everyone.</div>
           </div>
-          <div className="bg-white/10 rounded-xl p-4">
+          <div className="bg-white/10 rounded-xl p-4 border border-white/5">
+            <div className="w-7 h-7 rounded-lg bg-cyan-500/20 flex items-center justify-center mb-2 text-cyan-400">
+              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><rect x="4" y="4" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M4 7H2M4 9H2M12 7H14M12 9H14M7 4V2M9 4V2M7 12V14M9 12V14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/></svg>
+            </div>
             <div className="font-bold text-sm mb-1">AI fills empty slots</div>
             <div className="text-blue-300 text-xs">Easy or Hard AI teams automatically fill empty spots.</div>
           </div>
-          <div className="bg-white/10 rounded-xl p-4">
+          <div className="bg-white/10 rounded-xl p-4 border border-white/5">
+            <div className="w-7 h-7 rounded-lg bg-cyan-500/20 flex items-center justify-center mb-2 text-cyan-400">
+              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M2 11 L5 7.5 L8 9.5 L11 4.5 L14 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><line x1="2" y1="13.5" x2="14" y2="13.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.5"/></svg>
+            </div>
             <div className="font-bold text-sm mb-1">Live Analysis</div>
             <div className="text-blue-300 text-xs">Track fish stock and balance of all teams across the entire game.</div>
           </div>
-          <div className="bg-white/10 rounded-xl p-4">
+          <div className="bg-white/10 rounded-xl p-4 border border-white/5">
+            <div className="w-7 h-7 rounded-lg bg-cyan-500/20 flex items-center justify-center mb-2 text-cyan-400">
+              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M8 13 Q4 11.5 2 12.5 L2 3.5 Q4 2.5 8 4 Q12 2.5 14 3.5 L14 12.5 Q12 11.5 8 13Z" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinejoin="round"/><line x1="8" y1="4" x2="8" y2="13" stroke="currentColor" strokeWidth="1.4"/></svg>
+            </div>
             <div className="font-bold text-sm mb-1">Learning Game</div>
             <div className="text-blue-300 text-xs">Based on Garrett Hardin's "Tragedy of the Commons" and Elinor Ostrom's research.</div>
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 max-w-lg mt-2 text-xs text-blue-300">
-          <div className="bg-white/5 rounded-xl px-3 py-2 text-center">
-            <div className="font-bold text-white">{GAME_CONFIG.initialBoote} ships</div>
-            <div>Starting fleet (config.)</div>
-          </div>
-          <div className="bg-white/5 rounded-xl px-3 py-2 text-center">
-            <div className="font-bold text-white">{GAME_CONFIG.startGuthaben.toLocaleString()}€</div>
-            <div>Starting balance (config.)</div>
-          </div>
-          <div className="bg-white/5 rounded-xl px-3 py-2 text-center">
-            <div className="font-bold text-white">{GAME_CONFIG.startFischbestand.toLocaleString()} / {GAME_CONFIG.maxFischbestand.toLocaleString()}</div>
-            <div>Fish stock (Start / Max)</div>
-          </div>
-          <div className="bg-white/5 rounded-xl px-3 py-2 text-center">
-            <div className="font-bold text-white">{GAME_CONFIG.fischPreis}€ / fish</div>
-            <div>Fish price</div>
-          </div>
-          <div className="bg-white/5 rounded-xl px-3 py-2 text-center">
-            <div className="font-bold text-white">{GAME_CONFIG.bootKosten}€ new</div>
-            <div>Buy ship (Shipyard)</div>
-          </div>
-          <div className="bg-white/5 rounded-xl px-3 py-2 text-center">
-            <div className="font-bold text-white">{GAME_CONFIG.auctionPreis}€ auction</div>
-            <div>Buy / sell ships</div>
-          </div>
+        {/* Stats — unified strip with internal dividers */}
+        <div className="grid grid-cols-3 max-w-lg mt-3 rounded-xl overflow-hidden border border-white/10 bg-white/[0.04] text-xs text-blue-300">
+          {[
+            { value: `${GAME_CONFIG.initialBoote} ships`,                                          label: 'Starting fleet' },
+            { value: `${GAME_CONFIG.startGuthaben.toLocaleString()}€`,                            label: 'Starting balance' },
+            { value: `${GAME_CONFIG.startFischbestand.toLocaleString()} / ${GAME_CONFIG.maxFischbestand.toLocaleString()}`, label: 'Fish stock (start/max)' },
+            { value: `${GAME_CONFIG.fischPreis}€ / fish`,                                         label: 'Fish price' },
+            { value: `${GAME_CONFIG.bootKosten}€`,                                                label: 'New ship' },
+            { value: `${GAME_CONFIG.auctionPreis}€`,                                              label: 'Auction price' },
+          ].map((s, i) => (
+            <div key={i} className={`px-3 py-2.5 text-center ${i % 3 < 2 ? 'border-r border-white/10' : ''} ${i < 3 ? 'border-b border-white/10' : ''}`}>
+              <div className="font-bold text-white text-sm leading-tight">{s.value}</div>
+              <div className="text-[10px] leading-tight mt-0.5">{s.label}</div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -153,18 +155,28 @@ function StartPage({ connected, onCreateGame, onJoinGame, onOpenAdmin }) {
         <div className="flex flex-col gap-4">
           <button
             onClick={onCreateGame}
-            className="w-full bg-green-500 hover:bg-green-400 text-white font-bold py-5 px-6 rounded-xl text-lg transition-colors text-left"
+            className="w-full bg-gradient-to-br from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 text-white font-bold py-5 px-6 rounded-xl text-lg transition-all hover:-translate-y-0.5 shadow-lg hover:shadow-green-900/40 text-left group"
           >
-            <div className="font-bold">Create Game</div>
-            <div className="text-green-100 text-sm font-normal">Open a room as host</div>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-bold">Create Game</div>
+                <div className="text-green-100 text-sm font-normal">Open a room as host</div>
+              </div>
+              <svg className="w-5 h-5 text-green-200 flex-shrink-0 group-hover:translate-x-0.5 transition-transform" viewBox="0 0 20 20" fill="none"><path d="M4 10h12M11 5l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </div>
           </button>
 
           <button
             onClick={onJoinGame}
-            className="w-full bg-blue-500 hover:bg-blue-400 text-white font-bold py-5 px-6 rounded-xl text-lg transition-colors text-left"
+            className="w-full bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 text-white font-bold py-5 px-6 rounded-xl text-lg transition-all hover:-translate-y-0.5 shadow-lg hover:shadow-blue-900/40 text-left group"
           >
-            <div className="font-bold">Join Game</div>
-            <div className="text-blue-100 text-sm font-normal">Enter with 4-letter room code</div>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-bold">Join Game</div>
+                <div className="text-blue-100 text-sm font-normal">Enter with 4-letter room code</div>
+              </div>
+              <svg className="w-5 h-5 text-blue-200 flex-shrink-0 group-hover:translate-x-0.5 transition-transform" viewBox="0 0 20 20" fill="none"><path d="M4 10h12M11 5l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </div>
           </button>
 
         </div>
