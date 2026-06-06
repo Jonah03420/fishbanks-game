@@ -95,7 +95,7 @@ function StartPage({ connected, onCreateGame, onJoinGame, onOpenAdmin }) {
         <FishLogo className="w-40 mb-6 float-fish" />
         <h1 className="text-6xl font-bold mb-4 leading-tight">Fish Banks<br />Game</h1>
         <p className="text-blue-200 text-xl mb-10 max-w-md">
-          Can you manage fish stocks sustainably – while other teams fish without restraint?
+          A shared ocean. Competing teams. Will anyone fish sustainably?
         </p>
 
         <div className="grid grid-cols-2 gap-3 max-w-lg">
@@ -104,28 +104,28 @@ function StartPage({ connected, onCreateGame, onJoinGame, onOpenAdmin }) {
               <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M1 11 Q4 8 8 11 Q12 14 15 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M1 7 Q4 4 8 7 Q12 10 15 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
             </div>
             <div className="font-bold text-sm mb-1">Shared Resource</div>
-            <div className="text-blue-300 text-xs">All teams share the same fish stock – overfishing destroys it for everyone.</div>
+            <div className="text-blue-300 text-xs">All teams fish from the same ocean. One team's greed becomes everyone's loss.</div>
           </div>
           <div className="bg-white/10 rounded-xl p-4 border border-white/5">
             <div className="w-7 h-7 rounded-lg bg-cyan-500/20 flex items-center justify-center mb-2 text-cyan-400">
               <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><rect x="4" y="4" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M4 7H2M4 9H2M12 7H14M12 9H14M7 4V2M9 4V2M7 12V14M9 12V14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/></svg>
             </div>
             <div className="font-bold text-sm mb-1">AI fills empty slots</div>
-            <div className="text-blue-300 text-xs">Easy or Hard AI teams automatically fill empty spots.</div>
+            <div className="text-blue-300 text-xs">Missing players? AI teams fill open slots on Easy or Hard difficulty.</div>
           </div>
           <div className="bg-white/10 rounded-xl p-4 border border-white/5">
             <div className="w-7 h-7 rounded-lg bg-cyan-500/20 flex items-center justify-center mb-2 text-cyan-400">
               <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M2 11 L5 7.5 L8 9.5 L11 4.5 L14 6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><line x1="2" y1="13.5" x2="14" y2="13.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.5"/></svg>
             </div>
             <div className="font-bold text-sm mb-1">Live Analysis</div>
-            <div className="text-blue-300 text-xs">Track fish stock and balance of all teams across the entire game.</div>
+            <div className="text-blue-300 text-xs">See every team's balance and fish stock in real time throughout the session.</div>
           </div>
           <div className="bg-white/10 rounded-xl p-4 border border-white/5">
             <div className="w-7 h-7 rounded-lg bg-cyan-500/20 flex items-center justify-center mb-2 text-cyan-400">
               <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M8 13 Q4 11.5 2 12.5 L2 3.5 Q4 2.5 8 4 Q12 2.5 14 3.5 L14 12.5 Q12 11.5 8 13Z" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinejoin="round"/><line x1="8" y1="4" x2="8" y2="13" stroke="currentColor" strokeWidth="1.4"/></svg>
             </div>
             <div className="font-bold text-sm mb-1">Learning Game</div>
-            <div className="text-blue-300 text-xs">Based on Garrett Hardin's "Tragedy of the Commons" and Elinor Ostrom's research.</div>
+            <div className="text-blue-300 text-xs">Inspired by Hardin's Tragedy of the Commons. Can cooperation beat self-interest?</div>
           </div>
         </div>
 
@@ -150,7 +150,7 @@ function StartPage({ connected, onCreateGame, onJoinGame, onOpenAdmin }) {
       {/* Right panel — action */}
       <div className="w-96 flex flex-col justify-center px-10 py-12 bg-blue-950/60 border-l border-white/10">
         <h2 className="text-2xl font-bold mb-2">Start Game</h2>
-        <p className="text-blue-300 text-sm mb-10">Create a room as host or join an ongoing game.</p>
+        <p className="text-blue-300 text-sm mb-10">Host a session or join with a room code.</p>
 
         <div className="flex flex-col gap-4">
           <button
@@ -184,10 +184,10 @@ function StartPage({ connected, onCreateGame, onJoinGame, onOpenAdmin }) {
         <div className="mt-12 bg-white/5 rounded-xl p-5 text-xs text-blue-400">
           <div className="font-bold text-blue-300 mb-2">How it works</div>
           <ol className="space-y-1.5 list-decimal list-inside">
-            <li>Host creates room &amp; shares the code with participants</li>
-            <li>Players join – empty slots are filled by AI</li>
-            <li>Each round: decide how many ships to deploy</li>
-            <li>Manage sustainably – or risk the collapse!</li>
+            <li>Host opens a room and shares the 4-letter code</li>
+            <li>Players join. Empty slots are taken by AI teams.</li>
+            <li>Each round, choose how many ships to send out</li>
+            <li>Fish sustainably. Or watch the stock collapse.</li>
           </ol>
         </div>
 
