@@ -4,17 +4,17 @@ import './index.css'
 import App from './App.jsx'
 
 function applyViewportScale() {
-  const threshold = 1440
+  const designW = 1920
   const vw = window.innerWidth
+  const vh = window.innerHeight
   const root = document.getElementById('root')
-  if (vw >= threshold) {
+  if (vw >= designW) {
     root.style.cssText = ''
     document.body.style.cssText = ''
     return
   }
-  const scale = vw / threshold
-  const vh = window.innerHeight
-  root.style.width = threshold + 'px'
+  const scale = vw / designW
+  root.style.width = designW + 'px'
   root.style.height = Math.ceil(vh / scale) + 'px'
   root.style.transform = 'scale(' + scale + ')'
   root.style.transformOrigin = 'top left'
