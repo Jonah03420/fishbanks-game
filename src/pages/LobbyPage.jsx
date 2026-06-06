@@ -168,14 +168,6 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
   if (view === 'create') return (
     <div className="w-full h-full bg-blue-900 text-white flex overflow-hidden">
       <LeftPanel>
-        <div className="w-14 h-14 rounded-2xl bg-cyan-500/20 border border-cyan-400/20 flex items-center justify-center mb-6 text-cyan-400">
-          <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="5" r="2" stroke="currentColor" strokeWidth="1.5"/>
-            <line x1="12" y1="7" x2="12" y2="19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            <path d="M8 19 Q12 21 16 19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
-            <path d="M6 12 L12 7 L18 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-          </svg>
-        </div>
         <h2 className="text-4xl font-bold mb-3">Create Room</h2>
         <p className="text-blue-200 text-lg mb-8 max-w-sm leading-relaxed">
           Open a room as host, invite teams, and start the game when everyone is ready.
@@ -260,13 +252,6 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
   if (view === 'join') return (
     <div className="w-full h-full bg-blue-900 text-white flex overflow-hidden">
       <LeftPanel>
-        <div className="w-14 h-14 rounded-2xl bg-blue-500/20 border border-blue-400/20 flex items-center justify-center mb-6 text-blue-300">
-          <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none">
-            <rect x="2" y="4" width="14" height="16" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-            <path d="M16 9l4 3-4 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            <line x1="16" y1="12" x2="9" y2="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          </svg>
-        </div>
         <h2 className="text-4xl font-bold mb-3">Join Room</h2>
         <p className="text-blue-200 text-lg mb-8 max-w-sm leading-relaxed">
           Enter the 4-letter code that the host shared with you to join the session.
