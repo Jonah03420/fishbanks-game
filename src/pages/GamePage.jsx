@@ -1780,8 +1780,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                         {/* Right column: Graph + Fishery Data */}
                         <div className="w-[32%] flex-none flex flex-col gap-3">
 
-                            {/* Spacer matching the "Annual Report" label height so both columns start level */}
-                            <h3 className="text-xs font-medium uppercase tracking-wide mb-1 invisible" aria-hidden="true">Annual Report</h3>
+                            <h3 className="text-xs font-medium text-blue-400 uppercase tracking-wide mb-1">Fishery Report</h3>
 
                             {/* FishGraph — component has its own bg-white/10 rounded-xl */}
                             <div style={{ height: 300 }}>
