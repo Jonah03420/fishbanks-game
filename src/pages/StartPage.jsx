@@ -43,14 +43,14 @@ function StartPage({ connected, onCreateGame, onJoinGame, onOpenAdmin }) {
 
         {/* Floating bubbles */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute bottom-20 left-16 w-2.5 h-2.5 bg-cyan-300/45 rounded-full bubble-float" style={{animationDelay:'0s'}}/>
-          <div className="absolute bottom-32 left-36 w-3.5 h-3.5 bg-blue-300/35 rounded-full bubble-float" style={{animationDelay:'1.8s'}}/>
-          <div className="absolute bottom-16 left-1/2 w-2 h-2 bg-cyan-200/45 rounded-full bubble-float" style={{animationDelay:'3.2s'}}/>
-          <div className="absolute bottom-40 right-32 w-4 h-4 bg-blue-400/30 rounded-full bubble-float" style={{animationDelay:'0.6s'}}/>
-          <div className="absolute bottom-24 right-20 w-2.5 h-2.5 bg-cyan-300/38 rounded-full bubble-float" style={{animationDelay:'2.5s'}}/>
-          <div className="absolute bottom-48 left-1/3 w-3 h-3 bg-blue-200/35 rounded-full bubble-float" style={{animationDelay:'4.1s'}}/>
-          <div className="absolute bottom-60 left-24 w-1.5 h-1.5 bg-cyan-400/40 rounded-full bubble-float" style={{animationDelay:'5.3s'}}/>
-          <div className="absolute bottom-36 right-1/2 w-2 h-2 bg-sky-300/32 rounded-full bubble-float" style={{animationDelay:'2.0s'}}/>
+          <div className="absolute bottom-20 left-16 w-2.5 h-2.5 bg-cyan-300/45 rounded-full bubble-float" style={{animationDelay:'-6s'}}/>
+          <div className="absolute bottom-32 left-36 w-3.5 h-3.5 bg-blue-300/35 rounded-full bubble-float" style={{animationDelay:'-4.2s'}}/>
+          <div className="absolute bottom-16 left-1/2 w-2 h-2 bg-cyan-200/45 rounded-full bubble-float" style={{animationDelay:'-2.1s'}}/>
+          <div className="absolute bottom-40 right-32 w-4 h-4 bg-blue-400/30 rounded-full bubble-float" style={{animationDelay:'-5.4s'}}/>
+          <div className="absolute bottom-24 right-20 w-2.5 h-2.5 bg-cyan-300/38 rounded-full bubble-float" style={{animationDelay:'-3.3s'}}/>
+          <div className="absolute bottom-48 left-1/3 w-3 h-3 bg-blue-200/35 rounded-full bubble-float" style={{animationDelay:'-1.5s'}}/>
+          <div className="absolute bottom-60 left-24 w-1.5 h-1.5 bg-cyan-400/40 rounded-full bubble-float" style={{animationDelay:'-0.8s'}}/>
+          <div className="absolute bottom-36 right-1/2 w-2 h-2 bg-sky-300/32 rounded-full bubble-float" style={{animationDelay:'-3.8s'}}/>
         </div>
 
         {/* Animated waves at bottom */}
