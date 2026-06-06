@@ -483,7 +483,7 @@ function AuctionListingCard({ listing, mySlotIndex, socket, roomCode }) {
     if (listing.status === 'sold') {
         return (
             <div className="bg-green-900/30 border border-green-400/30 rounded-lg p-3">
-                <div className="text-xs text-blue-300 mb-1">
+                <div className="text-xs text-teal-300 mb-1">
                     {listing.sellerFarbe} {listing.sellerName} — {listing.ships} ship{listing.ships !== 1 ? 's' : ''} @ {listing.askingPrice.toLocaleString()}€
                 </div>
                 <div className="text-sm font-bold text-green-300">
@@ -496,10 +496,10 @@ function AuctionListingCard({ listing, mySlotIndex, socket, roomCode }) {
     if (listing.status === 'returned') {
         return (
             <div className="bg-white/5 border border-white/10 rounded-lg p-3 opacity-60">
-                <div className="text-xs text-blue-300 mb-1">
+                <div className="text-xs text-teal-300 mb-1">
                     {listing.sellerFarbe} {listing.sellerName} — {listing.ships} ship{listing.ships !== 1 ? 's' : ''} @ {listing.askingPrice.toLocaleString()}€
                 </div>
-                <div className="text-sm text-blue-400">↩️ No bids — ship returned to seller</div>
+                <div className="text-sm text-slate-400">↩️ No bids — ship returned to seller</div>
             </div>
         )
     }
@@ -511,7 +511,7 @@ function AuctionListingCard({ listing, mySlotIndex, socket, roomCode }) {
                     <div className="text-xs font-bold text-white">
                         {listing.sellerFarbe} {listing.sellerName} — {listing.ships} ship{listing.ships !== 1 ? 's' : ''}
                     </div>
-                    <div className="text-xs text-blue-300">asking {listing.askingPrice.toLocaleString()}€</div>
+                    <div className="text-xs text-teal-300">asking {listing.askingPrice.toLocaleString()}€</div>
                 </div>
                 <div className="shrink-0 ml-2">
                     {isSeller && !hasBid && (
@@ -522,25 +522,25 @@ function AuctionListingCard({ listing, mySlotIndex, socket, roomCode }) {
                             Cancel
                         </button>
                     )}
-                    {isSeller && hasBid && <span className="text-xs text-blue-400 bg-white/10 px-2 py-0.5 rounded">Your listing</span>}
+                    {isSeller && hasBid && <span className="text-xs text-slate-400 bg-white/10 px-2 py-0.5 rounded">Your listing</span>}
                     {!isSeller && isWinning && <span className="text-xs text-green-300 bg-green-900/40 px-2 py-0.5 rounded">🏆 Winning</span>}
                     {!isSeller && hasBid && !isWinning && <span className="text-xs text-red-300 bg-red-900/30 px-2 py-0.5 rounded">⚠️ Outbid</span>}
-                    {!isSeller && !hasBid && !isPassed && <span className="text-xs text-blue-500">No bids yet</span>}
-                    {!isSeller && isPassed && !hasBid && <span className="text-xs text-blue-500">Passed</span>}
+                    {!isSeller && !hasBid && !isPassed && <span className="text-xs text-slate-500">No bids yet</span>}
+                    {!isSeller && isPassed && !hasBid && <span className="text-xs text-slate-500">Passed</span>}
                 </div>
             </div>
 
             {hasBid && (
-                <div className="text-xs text-blue-200 mb-2">
+                <div className="text-xs text-teal-200 mb-2">
                     Top bid: <span className="font-bold text-white">{listing.topBid.toLocaleString()}€</span>
-                    {' '}by <span className="text-blue-300">{listing.topBidderName}</span>
+                    {' '}by <span className="text-teal-300">{listing.topBidderName}</span>
                 </div>
             )}
 
             {secLeft != null && (
                 <div className="mb-2">
                     <div className="flex justify-between text-xs mb-0.5">
-                        <span className="text-blue-400">Timer</span>
+                        <span className="text-slate-400">Timer</span>
                         <span className={secLeft <= 3 ? 'text-red-400 font-bold' : secLeft <= 6 ? 'text-yellow-400' : 'text-green-400'}>{secLeft}s</span>
                     </div>
                     <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
@@ -566,20 +566,20 @@ function AuctionListingCard({ listing, mySlotIndex, socket, roomCode }) {
                     />
                     <button
                         onClick={placeBid}
-                        className="bg-blue-500/30 hover:bg-blue-500/50 border border-blue-400/30 text-xs font-medium px-3 py-1 rounded transition-colors whitespace-nowrap"
+                        className="bg-teal-800/40 hover:bg-teal-700/50 border border-teal-400/30 text-xs font-medium px-3 py-1 rounded transition-colors whitespace-nowrap"
                     >
                         Bid
                     </button>
                     <button
                         onClick={() => socket.emit('pass-listing', { roomCode, listingId: listing.id })}
-                        className="bg-white/10 hover:bg-white/20 border border-white/10 text-xs text-blue-400 px-3 py-1 rounded transition-colors"
+                        className="bg-white/10 hover:bg-white/20 border border-white/10 text-xs text-slate-400 px-3 py-1 rounded transition-colors"
                     >
                         Pass
                     </button>
                 </div>
             )}
             {!isSeller && isPassed && (
-                <div className="text-xs text-blue-500 mt-1">You passed on this listing</div>
+                <div className="text-xs text-slate-500 mt-1">You passed on this listing</div>
             )}
         </div>
     )
@@ -1100,7 +1100,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
     }
 
     return (
-        <div className="w-full h-screen bg-gradient-to-b from-slate-950 via-blue-950 to-blue-900 text-white flex flex-col">
+        <div className="w-full h-screen text-white flex flex-col" style={{ background: 'radial-gradient(ellipse at top, #0d2d4a 0%, #030f1e 55%, #010810 100%)' }}>
 
             {/* DEV shortcut toast */}
             {devToast && (
@@ -1119,7 +1119,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                 ${toast.type === 'outbid'
                                     ? 'bg-red-900/90 border-red-500/50 text-red-100'
                                     : toast.type === 'bid'
-                                    ? 'bg-blue-800/90 border-blue-400/50 text-blue-100'
+                                    ? 'bg-teal-900/90 border-teal-400/50 text-teal-100'
                                     : 'bg-green-900/90 border-green-500/50 text-green-100'
                                 }`}
                         >
@@ -1135,9 +1135,9 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
             {/* Round result modal */}
             {rundenErgebnis && (
                 <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-                    <div className="bg-blue-900 border border-blue-600 rounded-xl p-5 max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+                    <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
                         <h2 className="text-xl font-bold mb-0.5 text-center">Round {rundenErgebnis.runde} Complete</h2>
-                        <p className="text-blue-400 text-xs text-center mb-4">End of year {rundenErgebnis.runde}</p>
+                        <p className="text-slate-400 text-xs text-center mb-4">End of year {rundenErgebnis.runde}</p>
 
                         {rundenErgebnis.roundDeliveries.length > 0 && (
                             <div className="bg-green-500/15 border border-green-400/30 rounded-lg p-2.5 mb-4">
@@ -1152,10 +1152,10 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
 
                         {/* AI ship purchases this round */}
                         {(rundenErgebnis.aiShipPurchases || []).length > 0 && (
-                            <div className="bg-blue-500/15 border border-blue-400/30 rounded-lg p-2.5 mb-4">
-                                <div className="font-bold text-xs text-blue-300 mb-1">AI Ship Purchases</div>
+                            <div className="bg-teal-900/30 border border-teal-500/30 rounded-lg p-2.5 mb-4">
+                                <div className="font-bold text-xs text-teal-300 mb-1">AI Ship Purchases</div>
                                 {rundenErgebnis.aiShipPurchases.map((p, i) => (
-                                    <div key={i} className="text-xs text-blue-200">
+                                    <div key={i} className="text-xs text-teal-200">
                                         {p.farbe} {p.name} purchased {p.count} ship{p.count !== 1 ? 's' : ''} at auction ({p.price.toLocaleString()}€ each)
                                     </div>
                                 ))}
@@ -1167,7 +1167,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                             <div className="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-2.5 mb-4">
                                 <div className="font-bold text-xs text-yellow-300 mb-1">Ships Offered at Auction</div>
                                 {rundenErgebnis.newPendingOffers.map((offer, i) => (
-                                    <div key={i} className="text-xs text-blue-200">
+                                    <div key={i} className="text-xs text-teal-200">
                                         {offer.sellerFarbe} {offer.sellerName} offered {offer.count} ship{offer.count !== 1 ? 's' : ''} at auction — bid in the Market tab next round
                                     </div>
                                 ))}
@@ -1176,7 +1176,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
 
                         {/* YOUR RESULTS */}
                         <div className="mb-4">
-                            <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">Your Results</div>
+                            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Your Results</div>
                             {(showOtherCatches ? rundenErgebnis.teams : rundenErgebnis.teams.filter(t => !t.istKI)).map(team => {
                                 const s = team.roundSummary
                                 if (!s) return null
@@ -1186,34 +1186,34 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                     <div key={team.name} className="bg-white/10 rounded-lg p-3 mb-2 last:mb-0">
                                         <div className="flex items-center gap-2 mb-2">
                                             <span className="font-bold text-sm">{team.farbe} {team.name}</span>
-                                            {team.istKI && <span className="text-xs text-blue-400">🤖 AI</span>}
+                                            {team.istKI && <span className="text-xs text-slate-400">🤖 AI</span>}
                                             {team.shipsInDelivery > 0 && (
                                                 <span className="text-xs text-green-400 ml-auto">+{team.shipsInDelivery} ship{team.shipsInDelivery !== 1 ? 's' : ''} arriving next round</span>
                                             )}
                                         </div>
                                         <div className="space-y-0.5 text-xs">
-                                            <div className="flex justify-between text-blue-200">
+                                            <div className="flex justify-between text-teal-200">
                                                 <span>Balance at start of round</span>
                                                 <span className="text-white">{s.startBalance.toLocaleString()}€</span>
                                             </div>
-                                            <div className="flex justify-between text-blue-200">
+                                            <div className="flex justify-between text-teal-200">
                                                 <span>Operating costs ({s.harborShips}H / {s.coastalShips}C / {s.deepSeaShips}D ships)</span>
                                                 <span className="text-red-300">−{s.opCosts.toLocaleString()}€</span>
                                             </div>
-                                            <div className="flex justify-between text-blue-200">
+                                            <div className="flex justify-between text-teal-200">
                                                 <span>Fish caught: {s.fang} fish × {fishP}€/fish</span>
                                                 <span className="text-green-300">+{s.fishRevenue.toLocaleString()}€</span>
                                             </div>
-                                            <div className="flex justify-between text-blue-400 italic">
+                                            <div className="flex justify-between text-slate-400 italic">
                                                 <span>Min balance (basis for interest)</span>
                                                 <span>{s.minBalance.toLocaleString()}€</span>
                                             </div>
-                                            <div className="flex justify-between text-blue-200">
+                                            <div className="flex justify-between text-teal-200">
                                                 <span>Interest ({(intRate * 100).toFixed(0)}% on min balance)</span>
                                                 <span className={s.zinsen >= 0 ? 'text-green-300' : 'text-red-300'}>{s.zinsen >= 0 ? '+' : ''}{s.zinsen.toLocaleString()}€</span>
                                             </div>
                                             {s.actualOrder > 0 && (
-                                                <div className="flex justify-between text-blue-200">
+                                                <div className="flex justify-between text-teal-200">
                                                     <span>Ship orders ({s.actualOrder} × {(s.newShipPrice ?? newShipPriceUI).toLocaleString()}€)</span>
                                                     <span className="text-red-300">−{s.orderCost.toLocaleString()}€</span>
                                                 </div>
@@ -1223,7 +1223,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                                 <span>{s.finalBalance.toLocaleString()}€</span>
                                             </div>
                                         </div>
-                                        <div className="mt-2 pt-1.5 border-t border-white/10 grid grid-cols-3 gap-x-2 text-xs text-blue-400">
+                                        <div className="mt-2 pt-1.5 border-t border-white/10 grid grid-cols-3 gap-x-2 text-xs text-slate-400">
                                             <div>Harbor ({s.harborShips}): no catch</div>
                                             <div>Coastal ({s.coastalShips}): {s.coastalFang} fish</div>
                                             <div>Deep Sea ({s.deepSeaShips}): {s.deepSeaFang} fish</div>
@@ -1238,13 +1238,13 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                             const naturalGrowth = rundenErgebnis.neuerFischbestand - rundenErgebnis.alterFischbestand + (rundenErgebnis.gesamtFang || 0)
                             return (
                                 <div className="mb-4">
-                                    <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">Fishery Update</div>
+                                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Fishery Update</div>
                                     <div className={`rounded-lg p-3 ${rundenErgebnis.fischDelta < 0 ? 'bg-red-500/20 border border-red-400/30' : 'bg-green-500/15 border border-green-400/20'}`}>
                                         <div className="grid grid-cols-2 gap-x-3 text-xs leading-relaxed mb-2">
-                                            <div className="text-blue-200">Total catch: <span className="text-white font-bold">{(rundenErgebnis.gesamtFang || 0).toLocaleString()} fish</span></div>
-                                            <div className="text-blue-200">Weather factor: <span className="text-white font-bold">{rundenErgebnis.wetterfaktor != null ? rundenErgebnis.wetterfaktor.toFixed(2) : '—'}×</span></div>
-                                            <div className="text-blue-200">Natural growth: <span className={naturalGrowth >= 0 ? 'text-green-300' : 'text-red-300'}>{naturalGrowth >= 0 ? '+' : ''}{naturalGrowth.toLocaleString()} fish</span></div>
-                                            <div className="text-blue-200">Net stock change: <span className={rundenErgebnis.fischDelta >= 0 ? 'text-green-300' : 'text-red-300'}>{rundenErgebnis.fischDelta >= 0 ? '+' : ''}{rundenErgebnis.fischDelta.toLocaleString()} fish</span></div>
+                                            <div className="text-teal-200">Total catch: <span className="text-white font-bold">{(rundenErgebnis.gesamtFang || 0).toLocaleString()} fish</span></div>
+                                            <div className="text-teal-200">Weather factor: <span className="text-white font-bold">{rundenErgebnis.wetterfaktor != null ? rundenErgebnis.wetterfaktor.toFixed(2) : '—'}×</span></div>
+                                            <div className="text-teal-200">Natural growth: <span className={naturalGrowth >= 0 ? 'text-green-300' : 'text-red-300'}>{naturalGrowth >= 0 ? '+' : ''}{naturalGrowth.toLocaleString()} fish</span></div>
+                                            <div className="text-teal-200">Net stock change: <span className={rundenErgebnis.fischDelta >= 0 ? 'text-green-300' : 'text-red-300'}>{rundenErgebnis.fischDelta >= 0 ? '+' : ''}{rundenErgebnis.fischDelta.toLocaleString()} fish</span></div>
                                         </div>
                                         <div className={`font-bold text-sm text-center ${rundenErgebnis.fischDelta < 0 ? 'text-red-200' : 'text-green-200'}`}>
                                             Fish stock: {Math.max(0, rundenErgebnis.alterFischbestand).toLocaleString()} → {Math.max(0, rundenErgebnis.neuerFischbestand).toLocaleString()}
@@ -1258,7 +1258,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                             <div className="bg-yellow-500/10 border border-yellow-400/20 rounded-lg p-2.5 mb-4">
                                 <div className="font-bold text-xs text-yellow-300 mb-1">Auction Result</div>
                                 {rundenErgebnis.auctionEvents.map((ev, i) => (
-                                    <div key={i} className="text-xs text-blue-200">
+                                    <div key={i} className="text-xs text-teal-200">
                                         {ev.erfolg
                                             ? `1 ship sold to ${ev.kaeufer} for ${ev.preis.toLocaleString()}€`
                                             : 'No bid received – ship not sold'}
@@ -1271,7 +1271,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                             <div className="bg-indigo-500/10 border border-indigo-400/20 rounded-lg p-2.5 mb-4">
                                 <div className="font-bold text-xs text-indigo-300 mb-1">Open Market Results</div>
                                 {rundenErgebnis.listingEvents.map((ev, i) => (
-                                    <div key={i} className="text-xs text-blue-200">
+                                    <div key={i} className="text-xs text-teal-200">
                                         {ev.erfolg
                                             ? `${ev.ships} ship${ev.ships !== 1 ? 's' : ''} from ${ev.sellerName} sold to ${ev.kaeufer} for ${ev.preis.toLocaleString()}€`
                                             : `${ev.ships} ship${ev.ships !== 1 ? 's' : ''} from ${ev.sellerName} – no qualifying bid, returned to seller`}
@@ -1300,17 +1300,17 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
             )}
 
             {/* Header */}
-            <div className="flex-none relative flex justify-between items-center px-4 py-2 border-b border-white/10">
+            <div className="flex-none relative flex justify-between items-center px-4 py-2 border-b border-teal-900/60" style={{ background: 'rgba(5,20,38,0.8)' }}>
                 <div className="flex items-center gap-2">
                     <h1 className="text-base font-bold">Fish Banks Game</h1>
                     {isMultiplayer && activeTeam && (
-                        <span className="flex items-center gap-1.5 text-xs px-2 py-0.5 rounded font-medium bg-white/10 text-blue-200">
+                        <span className="flex items-center gap-1.5 text-xs px-2 py-0.5 rounded font-medium bg-teal-900/40 text-teal-200">
                             <TeamDot farbe={activeTeam.farbe} />
                             {activeTeam.name} (You)
                         </span>
                     )}
                     {!isMultiplayer && humanTeams.length > 1 && activeTeam && (
-                        <span className="flex items-center gap-1.5 text-xs px-2 py-0.5 rounded font-medium bg-white/10 text-blue-200">
+                        <span className="flex items-center gap-1.5 text-xs px-2 py-0.5 rounded font-medium bg-teal-900/40 text-teal-200">
                             <TeamDot farbe={activeTeam.farbe} />
                             {activeTeam.name} ({hotSeatEntryIdx + 1}/{humanTeams.length})
                         </span>
@@ -1318,26 +1318,26 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                 </div>
                 {isMultiplayer && totalPlayers > 1 && (
                     <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5">
-                        <span className="text-xs text-blue-300">Submitted:</span>
+                        <span className="text-xs text-teal-300">Submitted:</span>
                         <span className="text-sm font-bold text-white">{submittedCount} / {totalPlayers}</span>
                     </div>
                 )}
                 <div className="text-right">
-                    <div className="text-xs text-blue-200 leading-none">Round</div>
+                    <div className="text-xs text-teal-200 leading-none">Round</div>
                     <div className="text-xl font-bold leading-tight">{gameState.runde} / {maxRunden}</div>
                 </div>
             </div>
 
             {/* Tab bar */}
-            <div className="flex-none flex border-b border-white/10 bg-blue-950/40">
+            <div className="flex-none flex border-b border-white/8 bg-black/40">
                 {tabs.map(tab => (
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
                         className={`px-5 py-2 text-sm font-medium transition-colors border-b-2 ${
                             activeTab === tab.id
-                                ? 'border-blue-400 text-white'
-                                : 'border-transparent text-blue-400 hover:text-blue-200'
+                                ? 'border-teal-400 text-teal-100'
+                                : 'border-transparent text-slate-500 hover:text-teal-300'
                         }`}
                     >
                         {tab.label}
@@ -1386,22 +1386,22 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                             <div className="text-xs mb-1">
                                                 {team.disconnectedHuman
                                                     ? <span className="text-orange-400">Disconnected · AI playing</span>
-                                                    : <span className="text-blue-500">{team.aiDifficulty === 'hard' ? 'Hard AI' : 'Easy AI'}</span>
+                                                    : <span className="text-slate-500">{team.aiDifficulty === 'hard' ? 'Hard AI' : 'Easy AI'}</span>
                                                 }
                                             </div>
                                         )}
                                         <div className="text-xs space-y-0.5 mb-1">
                                             <div className="flex justify-between">
-                                                <span className="text-blue-300">Balance</span>
+                                                <span className="text-teal-300">Balance</span>
                                                 <span className="text-white">{team.bankBalance.toLocaleString()}€</span>
                                             </div>
                                             <div className="flex justify-between">
-                                                <span className="text-blue-300">Fleet</span>
+                                                <span className="text-teal-300">Fleet</span>
                                                 <span className="text-yellow-300">{team.fleet} × {marketShipPrice.toLocaleString()}€ = {fleetVal.toLocaleString()}€</span>
                                             </div>
                                             <div className="border-t border-white/20" />
                                             <div className="flex justify-between font-bold">
-                                                <span className="text-blue-200">Net Worth</span>
+                                                <span className="text-teal-200">Net Worth</span>
                                                 <span className="text-white text-sm">{team.netWorth.toLocaleString()}€</span>
                                             </div>
                                         </div>
@@ -1409,7 +1409,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                             <div className="text-xs text-green-400 mb-0.5">+{team.shipsInDelivery} arriving next round</div>
                                         )}
                                         {rs && (
-                                            <div className="text-xs border-t border-white/10 pt-0.5 mt-0.5 text-blue-400">
+                                            <div className="text-xs border-t border-white/10 pt-0.5 mt-0.5 text-slate-400">
                                                 Rnd {gameState.runde - 1}: {rs.fang} fish ·{' '}
                                                 <span className={lastNetIncome >= 0 ? 'text-green-400' : 'text-red-400'}>
                                                     {lastNetIncome >= 0 ? '+' : ''}{lastNetIncome.toLocaleString()}€
@@ -1422,12 +1422,12 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                         </div>
 
                         {/* Fish stock bar */}
-                        <div className={`flex-none bg-white/10 rounded-xl px-3 py-2 ${fishDichte <= 0.30 ? 'pulse-critical' : ''}`}>
+                        <div className={`flex-none bg-white/8 border border-teal-900/50 rounded-xl px-3 py-2 ${fishDichte <= 0.30 ? 'pulse-critical' : ''}`}>
                             <div className="flex justify-between items-center mb-1">
                                 <span className="font-bold text-sm">Fish Stock</span>
                                 {showFishStock
                                     ? <span className="font-bold text-sm">{Math.max(0, gameState.fischbestand).toLocaleString()} / {maxFischUI.toLocaleString()}</span>
-                                    : <span className="font-bold text-sm text-blue-400">Hidden by instructor</span>
+                                    : <span className="font-bold text-sm text-slate-400">Hidden by instructor</span>
                                 }
                             </div>
                             <div className="w-full rounded-full h-3 overflow-hidden mb-1 relative" style={{ background: 'rgba(255,255,255,0.12)' }}>
@@ -1445,7 +1445,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                     <div className="absolute inset-0 rounded-full fish-bar-transition" style={{ background: '#3b82f6' }} />
                                 )}
                             </div>
-                            <div className={`text-xs ${showFishStock ? (fishDichte > 0.60 ? 'text-green-300' : fishDichte > 0.30 ? 'text-yellow-300' : 'text-red-300') : 'text-blue-400'}`}>
+                            <div className={`text-xs ${showFishStock ? (fishDichte > 0.60 ? 'text-green-300' : fishDichte > 0.30 ? 'text-yellow-300' : 'text-red-300') : 'text-slate-400'}`}>
                                 {showFishStock ? (fishDichte > 0.60 ? 'Healthy' : fishDichte > 0.30 ? 'Endangered' : 'Critical!') : 'Observe catch rates to estimate stock'}
                             </div>
                         </div>
@@ -1453,19 +1453,19 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                         {/* Decision panel */}
                         {waitingForServer ? (
                             <div className="flex-1 min-h-0 bg-white/10 rounded-xl p-3 flex flex-col items-center justify-center gap-3">
-                                <p className="text-blue-200 text-sm font-medium">Decision submitted!</p>
+                                <p className="text-teal-200 text-sm font-medium">Decision submitted!</p>
                                 {totalPlayers > 1 && (
-                                    <p className="text-blue-400 text-xs">Waiting for other players… {submittedCount} / {totalPlayers}</p>
+                                    <p className="text-slate-400 text-xs">Waiting for other players… {submittedCount} / {totalPlayers}</p>
                                 )}
                                 <div className="w-32 h-1.5 bg-white/20 rounded-full overflow-hidden">
                                     <div
-                                        className="h-full bg-blue-400 rounded-full transition-all duration-300"
+                                        className="h-full bg-teal-400 rounded-full transition-all duration-300"
                                         style={{ width: `${totalPlayers > 0 ? (submittedCount / totalPlayers) * 100 : 50}%` }}
                                     />
                                 </div>
                             </div>
                         ) : activeTeam ? (
-                            <div className="flex-1 min-h-0 bg-white/10 rounded-xl p-3 flex flex-col gap-2">
+                            <div className="flex-1 min-h-0 bg-white/8 border border-teal-900/50 rounded-xl p-3 flex flex-col gap-2">
 
                                 <h2 className="font-bold text-sm">{activeTeam.name} – Ship Allocation</h2>
 
@@ -1478,7 +1478,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                 {/* Zone allocator */}
                                 <div className="bg-white/5 rounded-lg p-2.5">
                                     <div className="flex justify-between items-center mb-1.5">
-                                        <span className="text-xs font-bold text-blue-200">Deploy {fleetSize} ships:</span>
+                                        <span className="text-xs font-bold text-teal-200">Deploy {fleetSize} ships:</span>
                                         <span className={`text-xs font-bold ${allAllocated ? 'text-green-300' : 'text-yellow-300'}`}>
                                             {totalAllocated} / {fleetSize}
                                         </span>
@@ -1489,7 +1489,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                         { label: 'Deep Sea', icon: <IconDeepSea />,  hint: '250€/ship · max 25/ship', val: currentDeepSea, set: setCurrentDeepSea },
                                     ].map(({ label, icon, hint, val, set }) => (
                                         <div key={label} className="flex items-center gap-1.5 mb-1 last:mb-0">
-                                            <div className="flex items-center gap-1 w-[72px] text-blue-300">
+                                            <div className="flex items-center gap-1 w-[72px] text-teal-300">
                                                 {icon}
                                                 <span className="text-xs">{label}</span>
                                             </div>
@@ -1498,7 +1498,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                             <span className="w-5 text-center font-bold text-sm">{val}</span>
                                             <button onClick={() => set(val + 1)} disabled={totalAllocated >= fleetSize}
                                                 className="bg-white/20 hover:bg-white/30 disabled:opacity-30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0">+</button>
-                                            <span className="text-xs text-blue-300 opacity-70">{hint}</span>
+                                            <span className="text-xs text-teal-300 opacity-70">{hint}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -1527,28 +1527,28 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                     ]
                                     return (
                                         <div className="bg-white/5 rounded-lg p-2.5">
-                                            <div className="text-xs font-bold text-blue-200 mb-1">Zone Statistics (current fish density)</div>
+                                            <div className="text-xs font-bold text-teal-200 mb-1">Zone Statistics (current fish density)</div>
                                             <div className="grid grid-cols-4 gap-x-2 text-xs mb-0.5">
                                                 <div />
-                                                <div className="font-medium text-blue-200 text-center">Harbor</div>
-                                                <div className="font-medium text-blue-200 text-center">Coastal</div>
-                                                <div className="font-medium text-blue-200 text-center">Deep Sea</div>
+                                                <div className="font-medium text-teal-200 text-center">Harbor</div>
+                                                <div className="font-medium text-teal-200 text-center">Coastal</div>
+                                                <div className="font-medium text-teal-200 text-center">Deep Sea</div>
                                             </div>
                                             {rows.map(row => (
                                                 <div key={row.label} className="grid grid-cols-4 gap-x-2 text-xs leading-5 border-t border-white/5">
-                                                    <div className="text-blue-400">{row.label}</div>
-                                                    <div className="text-center text-blue-100">{row.h}</div>
-                                                    <div className="text-center text-blue-100">{row.c}</div>
-                                                    <div className="text-center text-blue-100">{row.d}</div>
+                                                    <div className="text-slate-400">{row.label}</div>
+                                                    <div className="text-center text-slate-100">{row.h}</div>
+                                                    <div className="text-center text-slate-100">{row.c}</div>
+                                                    <div className="text-center text-slate-100">{row.d}</div>
                                                 </div>
                                             ))}
                                             <div className="grid grid-cols-4 gap-x-2 text-xs leading-5 border-t border-white/10 mt-0.5 pt-0.5 font-bold">
-                                                <div className="text-blue-400">Profit/Ship</div>
+                                                <div className="text-slate-400">Profit/Ship</div>
                                                 <div className={`text-center ${pCls(hProfit)}`}>−{hCost}€</div>
                                                 <div className={`text-center ${pCls(cProfit)}`}>{cProfit >= 0 ? '+' : ''}{fmt(cProfit)}€</div>
                                                 <div className={`text-center ${pCls(dProfit)}`}>{dProfit >= 0 ? '+' : ''}{fmt(dProfit)}€</div>
                                             </div>
-                                            <div className="text-xs text-blue-500 mt-1">Based on current fish density: {fishPct}%</div>
+                                            <div className="text-xs text-slate-500 mt-1">Based on current fish density: {fishPct}%</div>
                                         </div>
                                     )
                                 })()}
@@ -1566,14 +1566,14 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                     const expNet = expRev - expOp
                                     return (
                                         <div className="bg-white/5 rounded-lg p-2.5">
-                                            <div className="text-xs font-bold text-blue-200 mb-1.5">Expected This Round</div>
+                                            <div className="text-xs font-bold text-teal-200 mb-1.5">Expected This Round</div>
                                             <div className="grid grid-cols-3 gap-x-3 text-xs leading-relaxed mb-2">
-                                                <div className="text-blue-300">Catch: <span className="text-white font-bold">~{expCatch}</span></div>
-                                                <div className="text-blue-300">Revenue: <span className="text-green-300">+{expRev.toLocaleString()}€</span></div>
-                                                <div className="text-blue-300">Op costs: <span className="text-red-300">−{expOp.toLocaleString()}€</span></div>
+                                                <div className="text-teal-300">Catch: <span className="text-white font-bold">~{expCatch}</span></div>
+                                                <div className="text-teal-300">Revenue: <span className="text-green-300">+{expRev.toLocaleString()}€</span></div>
+                                                <div className="text-teal-300">Op costs: <span className="text-red-300">−{expOp.toLocaleString()}€</span></div>
                                             </div>
                                             <div className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 ${expNet >= 0 ? 'bg-green-500/15 border border-green-400/20' : 'bg-red-500/15 border border-red-400/20'}`}>
-                                                <span className="text-xs font-bold text-blue-200">Net income</span>
+                                                <span className="text-xs font-bold text-teal-200">Net income</span>
                                                 <span className={`font-bold text-base ${expNet >= 0 ? 'text-green-300' : 'text-red-300'}`}>
                                                     {expNet >= 0 ? '+' : ''}{expNet.toLocaleString()}€
                                                 </span>
@@ -1584,10 +1584,10 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
 
                                 {/* Order New Ships */}
                                 <div className="flex gap-2 items-start">
-                                    <div className="flex-1 bg-blue-500/20 border border-blue-400/20 rounded-lg px-2.5 py-1.5">
-                                        <div className="text-xs font-bold text-blue-200 mb-1">
+                                    <div className="flex-1 bg-teal-900/30 border border-teal-500/20 rounded-lg px-2.5 py-1.5">
+                                        <div className="text-xs font-bold text-teal-200 mb-1">
                                             Order New Ships
-                                            <span className="font-normal text-blue-400"> · {newShipPriceUI.toLocaleString()}€ · next round · max {maxShipOrder}</span>
+                                            <span className="font-normal text-slate-400"> · {newShipPriceUI.toLocaleString()}€ · next round · max {maxShipOrder}</span>
                                         </div>
                                         <div className="flex items-center gap-1 flex-wrap">
                                             {Array.from({ length: maxShipOrder + 1 }, (_, i) => (
@@ -1595,12 +1595,12 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                                     key={i}
                                                     onClick={() => setCurrentShipsOrdered(i)}
                                                     className={`min-w-[1.75rem] h-7 rounded px-1 font-bold text-sm transition-colors ${
-                                                        safeShipsOrdered === i ? 'bg-blue-500 text-white' : 'bg-white/20 hover:bg-white/30 text-white'
+                                                        safeShipsOrdered === i ? 'bg-teal-500 text-white' : 'bg-white/20 hover:bg-white/30 text-white'
                                                     }`}
                                                 >{i}</button>
                                             ))}
                                             {safeShipsOrdered > 0 && (
-                                                <span className="text-xs text-blue-300 ml-0.5">−{(safeShipsOrdered * newShipPriceUI).toLocaleString()}€</span>
+                                                <span className="text-xs text-teal-300 ml-0.5">−{(safeShipsOrdered * newShipPriceUI).toLocaleString()}€</span>
                                             )}
                                         </div>
                                     </div>
@@ -1617,7 +1617,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                             </div>
                         ) : (
                             <div className="flex-1 min-h-0 bg-white/10 rounded-xl p-3 flex items-center justify-center">
-                                <p className="text-blue-300 text-center text-xs">All decisions submitted.<br />Processing round…</p>
+                                <p className="text-teal-300 text-center text-xs">All decisions submitted.<br />Processing round…</p>
                             </div>
                         )}
                     </div>
@@ -1661,12 +1661,12 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                         <div key={team.name} className="mb-4 last:mb-0">
                                             <div className="flex items-center gap-2 mb-1.5">
                                                 <span className="font-bold text-xs">{team.farbe} {team.name}</span>
-                                                {team.istKI && <span className="text-xs text-blue-500">🤖 {team.aiDifficulty === 'hard' ? 'Hard' : 'Easy'}</span>}
+                                                {team.istKI && <span className="text-xs text-slate-500">🤖 {team.aiDifficulty === 'hard' ? 'Hard' : 'Easy'}</span>}
                                             </div>
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-xs border-collapse">
                                                     <thead>
-                                                        <tr className="text-blue-400 border-b border-white/10">
+                                                        <tr className="text-slate-400 border-b border-white/10">
                                                             <th className="text-left py-1 pr-2 font-medium">Rnd</th>
                                                             <th className="text-right py-1 px-1 font-medium">Catch</th>
                                                             <th className="text-right py-1 px-1 font-medium">Revenue</th>
@@ -1679,7 +1679,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                                     <tbody>
                                                         {rows.map((r, i) => (
                                                             <tr key={i} className={`border-b border-white/5 ${i % 2 !== 0 ? 'bg-white/5' : ''}`}>
-                                                                <td className="py-0.5 pr-2 text-blue-400">{r.isStart ? 'Start' : r.runde}</td>
+                                                                <td className="py-0.5 pr-2 text-slate-400">{r.isStart ? 'Start' : r.runde}</td>
                                                                 <td className="py-0.5 px-1 text-right">{r.isStart ? '—' : (r.fang || 0)}</td>
                                                                 <td className="py-0.5 px-1 text-right text-green-400">{r.isStart ? '—' : `+${(r.fishRevenue || 0).toLocaleString()}€`}</td>
                                                                 <td className="py-0.5 px-1 text-right text-red-400">{r.isStart ? '—' : `−${(r.opCosts || 0).toLocaleString()}€`}</td>
@@ -1697,7 +1697,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                                             </tr>
                                                         ))}
                                                         {dataRows.length > 0 && (
-                                                            <tr className="border-t border-white/20 font-bold text-blue-200 bg-white/5">
+                                                            <tr className="border-t border-white/20 font-bold text-teal-200 bg-white/5">
                                                                 <td className="py-1 pr-2">Total</td>
                                                                 <td className="py-1 px-1 text-right">{totCatch}</td>
                                                                 <td className="py-1 px-1 text-right text-green-400">+{totRev.toLocaleString()}€</td>
@@ -1771,7 +1771,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                     <span className="font-bold text-sm">Fish Stock</span>
                                     {showFishStock
                                         ? <span className="font-bold text-sm">{Math.max(0, gameState.fischbestand).toLocaleString()} / {maxFischUI.toLocaleString()}</span>
-                                        : <span className="font-bold text-sm text-blue-400">Hidden</span>
+                                        : <span className="font-bold text-sm text-slate-400">Hidden</span>
                                     }
                                 </div>
                                 <div className="w-full bg-white/20 rounded-full h-2.5 overflow-hidden mb-1">
@@ -1785,7 +1785,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                         }}
                                     />
                                 </div>
-                                <div className={`text-xs ${showFishStock ? (fishDichte > 0.60 ? 'text-green-300' : fishDichte > 0.30 ? 'text-yellow-300' : 'text-red-300') : 'text-blue-400'}`}>
+                                <div className={`text-xs ${showFishStock ? (fishDichte > 0.60 ? 'text-green-300' : fishDichte > 0.30 ? 'text-yellow-300' : 'text-red-300') : 'text-slate-400'}`}>
                                     {showFishStock ? (fishDichte > 0.60 ? 'Healthy' : fishDichte > 0.30 ? 'Endangered' : 'Critical!') : 'Observe catch rates to estimate stock'}
                                 </div>
                             </div>
@@ -1799,11 +1799,11 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                             <div className="bg-white/10 rounded-xl p-3">
                                 <h3 className="font-bold text-sm mb-2">Fishery Data</h3>
                                 {gameState.verlauf.length === 0 ? (
-                                    <p className="text-sm text-blue-400">No data yet – complete the first round.</p>
+                                    <p className="text-sm text-slate-400">No data yet – complete the first round.</p>
                                 ) : (
                                     <table className="w-full text-sm border-collapse">
                                         <thead>
-                                            <tr className="text-blue-400 border-b border-white/10">
+                                            <tr className="text-slate-400 border-b border-white/10">
                                                 <th className="text-left py-1.5 pr-3 font-medium">Rnd</th>
                                                 <th className="text-right py-1.5 px-2 font-medium">Stock</th>
                                                 <th className="text-right py-1.5 px-2 font-medium">Catch</th>
@@ -1811,7 +1811,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <tr className="border-b border-white/5 text-blue-500">
+                                            <tr className="border-b border-white/5 text-slate-500">
                                                 <td className="py-1 pr-3">Start</td>
                                                 <td className="py-1 px-2 text-right">{(gameState.params?.startingFishStock ?? GAME_CONFIG.startFischbestand).toLocaleString()}</td>
                                                 <td className="py-1 px-2 text-right">—</td>
@@ -1824,7 +1824,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                                 const growth = fishAfter - (v.fischbestand ?? 0) + (v.gesamtFang ?? 0)
                                                 return (
                                                     <tr key={i} className={`border-b border-white/5 ${i % 2 !== 0 ? 'bg-white/5' : ''}`}>
-                                                        <td className="py-1 pr-3 text-blue-400">{v.runde}</td>
+                                                        <td className="py-1 pr-3 text-slate-400">{v.runde}</td>
                                                         <td className="py-1 px-2 text-right">{(v.fischbestand ?? 0).toLocaleString()}</td>
                                                         <td className="py-1 px-2 text-right text-red-300">{(v.gesamtFang ?? 0).toLocaleString()}</td>
                                                         <td className={`py-1 pl-2 text-right ${growth >= 0 ? 'text-green-300' : 'text-red-300'}`}>
@@ -1915,14 +1915,14 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                             <h3 className="font-bold text-sm mb-2">Ship Market</h3>
                             <div className="grid grid-cols-2 gap-3 text-sm mb-3">
                                 <div className="bg-white/5 rounded-lg p-2.5">
-                                    <div className="text-xs text-blue-300 mb-0.5">Current market price</div>
+                                    <div className="text-xs text-teal-300 mb-0.5">Current market price</div>
                                     <div className="text-xl font-bold text-yellow-300">{marketShipPrice.toLocaleString()}€</div>
-                                    <div className="text-xs text-blue-400 mt-0.5">per ship · buy or sell instantly</div>
+                                    <div className="text-xs text-slate-400 mt-0.5">per ship · buy or sell instantly</div>
                                 </div>
                                 <div className="bg-white/5 rounded-lg p-2.5">
-                                    <div className="text-xs text-blue-300 mb-0.5">New ship (shipyard)</div>
-                                    <div className="text-xl font-bold text-blue-300">{newShipPriceUI.toLocaleString()}€</div>
-                                    <div className="text-xs text-blue-400 mt-0.5">{newShipPriceUI.toLocaleString()}€ each · arrives next round</div>
+                                    <div className="text-xs text-teal-300 mb-0.5">New ship (shipyard)</div>
+                                    <div className="text-xl font-bold text-teal-300">{newShipPriceUI.toLocaleString()}€</div>
+                                    <div className="text-xs text-slate-400 mt-0.5">{newShipPriceUI.toLocaleString()}€ each · arrives next round</div>
                                 </div>
                             </div>
                             {activeTeam && (
@@ -1930,28 +1930,28 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                     <div className="grid grid-cols-2 gap-3 mb-2">
                                         {/* Distress Sale */}
                                         <div className="bg-white/5 border border-white/10 rounded-lg p-2.5">
-                                            <div className="text-xs font-bold text-orange-300 mb-1">Distress Sale <span className="text-blue-400 font-normal">({sellCount}/2 used)</span></div>
+                                            <div className="text-xs font-bold text-orange-300 mb-1">Distress Sale <span className="text-slate-400 font-normal">({sellCount}/2 used)</span></div>
                                             <button
                                                 onClick={handleBootVerkaufen}
                                                 disabled={activeTeam.fleet <= 1 || sellCount >= 2}
-                                                className="w-full bg-white/15 hover:bg-white/25 disabled:opacity-40 disabled:cursor-not-allowed font-medium py-1.5 px-2 rounded-lg transition-colors text-xs text-blue-100 border border-white/10 mb-1.5"
+                                                className="w-full bg-white/15 hover:bg-white/25 disabled:opacity-40 disabled:cursor-not-allowed font-medium py-1.5 px-2 rounded-lg transition-colors text-xs text-slate-100 border border-white/10 mb-1.5"
                                             >
                                                 {sellCount >= 2 ? 'Used this round' : `Sell 1 Ship – receive ${distressSalePrice.toLocaleString()}€`}
-                                                {activeTeam.fleet <= 1 && sellCount < 2 && <span className="block text-xs text-blue-400 mt-0.5">(min. 1 ship)</span>}
+                                                {activeTeam.fleet <= 1 && sellCount < 2 && <span className="block text-xs text-slate-400 mt-0.5">(min. 1 ship)</span>}
                                             </button>
                                             <div className="text-xs text-orange-400/80">½ market price · max 2/round</div>
                                         </div>
 
                                         {/* Emergency Buy */}
                                         <div className="bg-white/5 border border-white/10 rounded-lg p-2.5">
-                                            <div className="text-xs font-bold text-orange-300 mb-1">Emergency Buy <span className="text-blue-400 font-normal">({buyCount}/2 used)</span></div>
+                                            <div className="text-xs font-bold text-orange-300 mb-1">Emergency Buy <span className="text-slate-400 font-normal">({buyCount}/2 used)</span></div>
                                             <button
                                                 onClick={handleBootKaufen}
                                                 disabled={activeTeam.bankBalance < emergencyBuyPrice || buyCount >= 2}
-                                                className="w-full bg-white/15 hover:bg-white/25 disabled:opacity-40 disabled:cursor-not-allowed font-medium py-1.5 px-2 rounded-lg transition-colors text-xs text-blue-100 border border-white/10 mb-1.5"
+                                                className="w-full bg-white/15 hover:bg-white/25 disabled:opacity-40 disabled:cursor-not-allowed font-medium py-1.5 px-2 rounded-lg transition-colors text-xs text-slate-100 border border-white/10 mb-1.5"
                                             >
                                                 {buyCount >= 2 ? 'Used this round' : `Buy 1 Ship – pay ${emergencyBuyPrice.toLocaleString()}€`}
-                                                {activeTeam.bankBalance < emergencyBuyPrice && buyCount < 2 && <span className="block text-xs text-blue-400 mt-0.5">(insufficient funds)</span>}
+                                                {activeTeam.bankBalance < emergencyBuyPrice && buyCount < 2 && <span className="block text-xs text-slate-400 mt-0.5">(insufficient funds)</span>}
                                             </button>
                                             {buyConfirm && <div className="text-xs text-green-300 mb-1">+1 ship purchased for {emergencyBuyPrice.toLocaleString()}€</div>}
                                             <div className="text-xs text-orange-400/80">1.5× market price · max 2/round</div>
@@ -1961,10 +1961,10 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                     {/* List Ship for Sale */}
                                     {activeTeam.fleet > 1 && (
                                         <div className="bg-white/5 border border-white/10 rounded-lg p-2.5 mb-2">
-                                            <div className="text-xs font-bold text-blue-200 mb-2">List Ship for Sale</div>
+                                            <div className="text-xs font-bold text-teal-200 mb-2">List Ship for Sale</div>
                                             <div className="flex gap-2 items-end mb-2 flex-wrap">
                                                 <div>
-                                                    <div className="text-xs text-blue-400 mb-1">Asking price (€)</div>
+                                                    <div className="text-xs text-slate-400 mb-1">Asking price (€)</div>
                                                     <input
                                                         type="number"
                                                         min={1}
@@ -1975,7 +1975,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                                     />
                                                 </div>
                                                 <div>
-                                                    <div className="text-xs text-blue-400 mb-1">Ships (max {activeTeam.fleet - 1})</div>
+                                                    <div className="text-xs text-slate-400 mb-1">Ships (max {activeTeam.fleet - 1})</div>
                                                     <input
                                                         type="number"
                                                         min={1}
@@ -1987,12 +1987,12 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                                 </div>
                                                 <button
                                                     onClick={handleListShip}
-                                                    className="bg-blue-500/30 hover:bg-blue-500/50 border border-blue-400/30 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+                                                    className="bg-teal-800/40 hover:bg-teal-700/50 border border-teal-400/30 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
                                                 >
                                                     List for Sale
                                                 </button>
                                             </div>
-                                            <div className="text-xs text-blue-400">
+                                            <div className="text-xs text-slate-400">
                                                 {isMultiplayer
                                                     ? 'Ship removed immediately. 10s timer starts on first bid. All players see it live.'
                                                     : 'Highest bid at or above your asking price wins at end of round.'}
@@ -2020,7 +2020,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                     {!isMultiplayer && (gameState.auctionListings || []).length > 0 && (
                                         <div className="bg-indigo-500/10 border border-indigo-400/30 rounded-lg p-2.5 mb-2">
                                             <div className="text-xs font-bold text-indigo-300 mb-2">Active Listings</div>
-                                            <div className="grid grid-cols-5 gap-x-2 text-xs text-blue-400 font-medium pb-1 mb-1 border-b border-white/10">
+                                            <div className="grid grid-cols-5 gap-x-2 text-xs text-slate-400 font-medium pb-1 mb-1 border-b border-white/10">
                                                 <div>Seller</div>
                                                 <div className="text-center">Ships</div>
                                                 <div className="text-right">Asking</div>
@@ -2031,7 +2031,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                                 const myBid = listing.bids?.[activeSlot] ?? 0
                                                 return (
                                                     <div key={listing.id} className="grid grid-cols-5 gap-x-2 text-xs items-center py-1 border-b border-white/5 last:border-0">
-                                                        <div className="text-blue-100 truncate">{listing.sellerFarbe} {listing.sellerName}</div>
+                                                        <div className="text-slate-100 truncate">{listing.sellerFarbe} {listing.sellerName}</div>
                                                         <div className="text-center text-white">{listing.ships}</div>
                                                         <div className="text-right text-yellow-300">{listing.askingPrice.toLocaleString()}€</div>
                                                         <div className="text-right">
@@ -2046,7 +2046,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                                                     placeholder={`${listing.askingPrice}€`}
                                                                 />
                                                             ) : (
-                                                                <span className="text-blue-500 text-xs">Your listing</span>
+                                                                <span className="text-slate-500 text-xs">Your listing</span>
                                                             )}
                                                         </div>
                                                         <div className="text-right">
@@ -2065,7 +2065,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                                     </div>
                                                 )
                                             })}
-                                            <div className="text-xs text-blue-500 mt-1.5">Ships removed from fleet immediately. Bids ≥ asking price resolve at end of round.</div>
+                                            <div className="text-xs text-slate-500 mt-1.5">Ships removed from fleet immediately. Bids ≥ asking price resolve at end of round.</div>
                                         </div>
                                     )}
 
@@ -2075,11 +2075,11 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                             <div className="text-xs font-bold text-yellow-300 mb-2">Place Bid</div>
                                             {(gameState.pendingAuctionOffers || []).map(offer => (
                                                 <div key={offer.id} className="mb-2 last:mb-0">
-                                                    <div className="text-xs text-blue-200 mb-1.5">
+                                                    <div className="text-xs text-teal-200 mb-1.5">
                                                         {offer.sellerFarbe} {offer.sellerName} offered {offer.count} ship{offer.count !== 1 ? 's' : ''}
                                                     </div>
                                                     <div className="flex items-center gap-2">
-                                                        <span className="text-xs text-blue-400">Bid:</span>
+                                                        <span className="text-xs text-slate-400">Bid:</span>
                                                         <input
                                                             type="number"
                                                             min={0}
@@ -2089,7 +2089,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                                             className="w-24 bg-white/10 border border-white/20 rounded px-2 py-1 text-sm text-white"
                                                             placeholder={`${marketShipPrice}€`}
                                                         />
-                                                        <span className="text-xs text-blue-400">€</span>
+                                                        <span className="text-xs text-slate-400">€</span>
                                                         <button
                                                             onClick={() => setHumanBids(prev => ({ ...prev, [offer.id]: marketShipPrice }))}
                                                             className="text-xs bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-400/30 px-2 py-1 rounded transition-colors"
@@ -2097,7 +2097,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                                             Place Bid
                                                         </button>
                                                     </div>
-                                                    <div className="text-xs text-blue-500 mt-1">Highest bid wins. Leave blank or 0 to pass.</div>
+                                                    <div className="text-xs text-slate-500 mt-1">Highest bid wins. Leave blank or 0 to pass.</div>
                                                 </div>
                                             ))}
                                         </div>
@@ -2113,11 +2113,11 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                             return (
                                                 <div key={idxStr} className="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-2.5 mb-2">
                                                     <div className="text-xs font-bold text-yellow-300 mb-1">Bid on {seller.name}'s Ships</div>
-                                                    <div className="text-xs text-blue-200 mb-1.5">
+                                                    <div className="text-xs text-teal-200 mb-1.5">
                                                         {seller.farbe} {seller.name} offered {d.boatsOffered} ship{d.boatsOffered !== 1 ? 's' : ''} at auction
                                                     </div>
                                                     <div className="flex items-center gap-2">
-                                                        <span className="text-xs text-blue-400">Bid:</span>
+                                                        <span className="text-xs text-slate-400">Bid:</span>
                                                         <input
                                                             type="number"
                                                             min={0}
@@ -2127,15 +2127,15 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                                             className="w-24 bg-white/10 border border-white/20 rounded px-2 py-1 text-sm text-white"
                                                             placeholder={`${marketShipPrice}€`}
                                                         />
-                                                        <span className="text-xs text-blue-400">€</span>
+                                                        <span className="text-xs text-slate-400">€</span>
                                                     </div>
-                                                    <div className="text-xs text-blue-500 mt-1">Highest bid wins. Leave blank or 0 to pass.</div>
+                                                    <div className="text-xs text-slate-500 mt-1">Highest bid wins. Leave blank or 0 to pass.</div>
                                                 </div>
                                             )
                                         })
                                     }
 
-                                    <div className="text-xs text-blue-400 space-y-0.5">
+                                    <div className="text-xs text-slate-400 space-y-0.5">
                                         <div>Max order this round: <span className="text-white font-medium">{Math.ceil(activeTeam.fleet / 2)} ships</span> (½ of your fleet of {activeTeam.fleet})</div>
                                         {(activeTeam.shipsInDelivery || 0) > 0 && (
                                             <div className="text-green-400">{activeTeam.shipsInDelivery} ship{activeTeam.shipsInDelivery !== 1 ? 's' : ''} from your order arriving this round</div>
@@ -2148,7 +2148,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                         {/* Fleet overview — sorted by net worth */}
                         <div className="bg-white/10 rounded-xl p-3">
                             <h3 className="font-bold text-sm mb-2">Fleet Overview</h3>
-                            <div className="grid grid-cols-6 gap-x-2 text-xs text-blue-400 font-medium px-3 py-1 mb-1 border-b border-white/10">
+                            <div className="grid grid-cols-6 gap-x-2 text-xs text-slate-400 font-medium px-3 py-1 mb-1 border-b border-white/10">
                                 <div>Rank</div>
                                 <div>Team</div>
                                 <div className="text-center">Ships</div>
@@ -2166,11 +2166,11 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                             const isLeader = rankIdx === 0
                                             return (
                                                 <div key={team.name} className={`grid grid-cols-6 gap-x-2 text-xs rounded-lg px-3 py-1.5 items-center ${isLeader ? 'bg-yellow-500/15 border border-yellow-400/20' : 'bg-white/5'}`}>
-                                                    <div className={`font-bold ${isLeader ? 'text-yellow-300' : 'text-blue-500'}`}>{RANKS[rankIdx] ?? `${rankIdx + 1}th`}</div>
+                                                    <div className={`font-bold ${isLeader ? 'text-yellow-300' : 'text-slate-500'}`}>{RANKS[rankIdx] ?? `${rankIdx + 1}th`}</div>
                                                     <div className={`flex items-center gap-1.5 font-bold truncate ${isLeader ? 'text-yellow-100' : ''}`}><TeamDot farbe={team.farbe} />{team.name} {team.istKI ? 'AI' : ''}</div>
-                                                    <div className="text-center text-blue-200">{team.fleet}{(team.shipsInDelivery || 0) > 0 ? <span className="text-green-400"> +{team.shipsInDelivery}</span> : ''}</div>
+                                                    <div className="text-center text-teal-200">{team.fleet}{(team.shipsInDelivery || 0) > 0 ? <span className="text-green-400"> +{team.shipsInDelivery}</span> : ''}</div>
                                                     <div className="text-right text-yellow-300">{fleetValue.toLocaleString()}€</div>
-                                                    <div className="text-right text-blue-200">{team.bankBalance.toLocaleString()}€</div>
+                                                    <div className="text-right text-teal-200">{team.bankBalance.toLocaleString()}€</div>
                                                     <div className={`text-right font-bold ${isLeader ? 'text-yellow-200' : 'text-white'}`}>{team.netWorth.toLocaleString()}€</div>
                                                 </div>
                                             )
@@ -2184,12 +2184,12 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                         <div className="bg-white/10 rounded-xl p-3">
                             <h3 className="font-bold text-sm mb-2">Auction History</h3>
                             {(gameState.auctionHistory || []).length === 0 ? (
-                                <p className="text-xs text-blue-400">No auction sales yet.</p>
+                                <p className="text-xs text-slate-400">No auction sales yet.</p>
                             ) : (
                                 <div className="space-y-1">
                                     {[...(gameState.auctionHistory || [])].reverse().map((ev, i) => (
                                         <div key={i} className="flex justify-between text-xs bg-white/5 rounded px-2.5 py-1">
-                                            <span className="text-blue-300">Round {ev.runde}</span>
+                                            <span className="text-teal-300">Round {ev.runde}</span>
                                             <span className="text-white">
                                                 {ev.ships || 1} ship{(ev.ships || 1) !== 1 ? 's' : ''}
                                                 {ev.sellerName ? ` (${ev.sellerName})` : ''} → {ev.kaeufer}
