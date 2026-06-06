@@ -1100,7 +1100,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
     }
 
     return (
-        <div className="w-full h-screen bg-gradient-to-br from-blue-800 to-blue-950 text-white flex flex-col relative overflow-hidden">
+        <div className="w-full h-full bg-gradient-to-br from-blue-800 to-blue-950 text-white flex flex-col relative overflow-hidden">
             <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-cyan-400/[0.07] rounded-full blur-3xl pointer-events-none" />
             <div className="absolute bottom-1/3 right-1/4 w-80 h-80 bg-blue-300/[0.06] rounded-full blur-2xl pointer-events-none" />
 
@@ -1348,7 +1348,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
             </div>
 
             {/* Tab content */}
-            <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
 
                 {/* ── Tab 1: Dashboard ──────────────────────────────────────────── */}
                 {activeTab === 'dashboard' && (
