@@ -1633,7 +1633,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
 
                         {/* Left column: Annual Report */}
                         <div className="flex-1 flex flex-col gap-3 min-w-0">
-                            <h3 className="font-bold text-sm mb-1">Annual Report</h3>
+                            <h3 className="text-xs font-medium text-blue-400 uppercase tracking-wide mb-1">Annual Report</h3>
                                 {(showOtherCatches ? gameState.teams : gameState.teams.filter(t => !t.istKI)).map(team => {
                                     const rows = []
 
