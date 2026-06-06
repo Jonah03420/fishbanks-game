@@ -1467,7 +1467,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                 </div>
                             </div>
                         ) : activeTeam ? (
-                            <div className="flex-1 min-h-0 bg-white/10 border border-white/5 rounded-xl p-3 flex flex-col gap-2">
+                            <div className="flex-1 min-h-0 bg-white/10 border border-white/5 rounded-xl p-3 flex flex-col gap-2 overflow-y-auto">
 
                                 <h2 className="font-bold text-sm">{activeTeam.name} – Ship Allocation</h2>
 
@@ -1608,19 +1608,21 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                     </div>
                                 </div>
 
-                                {/* Confirm Round */}
-                                <button
-                                    onClick={handleSubmit}
-                                    disabled={!allAllocated}
-                                    className="w-full bg-green-500 hover:bg-green-400 disabled:opacity-50 disabled:cursor-not-allowed font-bold py-2.5 rounded-xl text-sm transition-colors"
-                                >
-                                    {allAllocated ? `Confirm Round ${gameState.runde}` : `Allocate all ${fleetSize} ships first`}
-                                </button>
                             </div>
                         ) : (
                             <div className="flex-1 min-h-0 bg-white/10 rounded-xl p-3 flex items-center justify-center">
                                 <p className="text-blue-300 text-center text-xs">All decisions submitted.<br />Processing round…</p>
                             </div>
+                        )}
+
+                        {!waitingForServer && activeTeam && (
+                            <button
+                                onClick={handleSubmit}
+                                disabled={!allAllocated}
+                                className="flex-none w-full bg-green-500 hover:bg-green-400 disabled:opacity-50 disabled:cursor-not-allowed font-bold py-2.5 rounded-xl text-sm transition-colors"
+                            >
+                                {allAllocated ? `Confirm Round ${gameState.runde}` : `Allocate all ${fleetSize} ships first`}
+                            </button>
                         )}
                     </div>
                 )}
