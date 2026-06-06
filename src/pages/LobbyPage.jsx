@@ -168,26 +168,31 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
   if (view === 'create') return (
     <div className="w-full h-full bg-blue-900 text-white flex overflow-hidden">
       <LeftPanel>
-        <h2 className="text-4xl font-bold mb-3">Create Room</h2>
-        <p className="text-blue-200 text-lg mb-8 max-w-sm leading-relaxed">
+        <h2 className="text-5xl font-bold mb-3">Create Room</h2>
+        <p className="text-blue-200 text-lg mb-8 max-w-lg leading-relaxed">
           Open a room as host, invite teams, and start the game when everyone is ready.
         </p>
-        <div className="space-y-3 max-w-md">
+        <div className="grid grid-cols-2 gap-3 max-w-xl">
           {[
             {
               icon: <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><rect x="4" y="4" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M4 7H2M4 9H2M12 7H14M12 9H14M7 4V2M9 4V2M7 12V14M9 12V14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/></svg>,
               title: 'AI fills empty slots',
-              desc: 'No need to wait for all players. Empty seats are taken by AI teams.',
+              desc: 'No need to wait for all players.',
             },
             {
               icon: <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.4"/><path d="M8 5v3.5l2.5 1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-              title: 'Configure before starting',
-              desc: 'Set rounds, AI difficulty, starting balance and fleet from the lobby.',
+              title: 'Configure first',
+              desc: 'Set rounds, AI difficulty and fleet.',
             },
             {
               icon: <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" strokeWidth="1.4"/><path d="M5 7h6M5 9.5h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>,
-              title: 'Share the 4-letter code',
-              desc: 'Players join from any device using the room code you share.',
+              title: 'Share the room code',
+              desc: 'Players join from any device.',
+            },
+            {
+              icon: <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M8 2l1.8 3.6L14 6.4l-3 2.9.7 4.1L8 11.4l-3.7 2 .7-4.1-3-2.9 4.2-.8z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/></svg>,
+              title: 'You control the start',
+              desc: 'Start the game once everyone is ready.',
             },
           ].map((item, i) => (
             <div key={i} className="flex gap-3 bg-white/[0.06] rounded-xl p-4 border border-white/[0.05]">
@@ -204,7 +209,7 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
       </LeftPanel>
 
       <RightPanel>
-        <div className="flex items-start justify-between mb-8">
+        <div className="flex items-center justify-between mb-10">
           <div>
             <h2 className="text-2xl font-bold">Create Game</h2>
             <p className="text-blue-400 text-sm mt-1">Open a room as host</p>
@@ -212,7 +217,7 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
           <ConnectionStatus connected={connected} />
         </div>
 
-        <div className="mb-6">
+        <div className="mb-8">
           <label className="block text-sm text-blue-200 mb-2">Your Name</label>
           <input
             type="text"
@@ -231,7 +236,7 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
           </div>
         )}
 
-        <div className="flex flex-col gap-3 mt-auto">
+        <div className="flex flex-col gap-3">
           <button
             onClick={doCreate}
             disabled={!connected}
@@ -252,21 +257,21 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
   if (view === 'join') return (
     <div className="w-full h-full bg-blue-900 text-white flex overflow-hidden">
       <LeftPanel>
-        <h2 className="text-4xl font-bold mb-3">Join Room</h2>
-        <p className="text-blue-200 text-lg mb-8 max-w-sm leading-relaxed">
+        <h2 className="text-5xl font-bold mb-3">Join Room</h2>
+        <p className="text-blue-200 text-lg mb-8 max-w-lg leading-relaxed">
           Enter the 4-letter code that the host shared with you to join the session.
         </p>
-        <div className="space-y-3 max-w-md">
+        <div className="grid grid-cols-2 gap-3 max-w-xl">
           {[
             {
               icon: <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M8 13 Q4 11.5 2 12.5 L2 3.5 Q4 2.5 8 4 Q12 2.5 14 3.5 L14 12.5 Q12 11.5 8 13Z" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinejoin="round"/><line x1="8" y1="4" x2="8" y2="13" stroke="currentColor" strokeWidth="1.4"/></svg>,
               title: 'Where is the code?',
-              desc: 'The host sees it right after creating the room — it is displayed prominently on their screen.',
+              desc: 'The host sees it right after creating the room.',
             },
             {
               icon: <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M1 11 Q4 8 8 11 Q12 14 15 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M1 7 Q4 4 8 7 Q12 10 15 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
               title: 'Any device works',
-              desc: 'Join from a laptop, tablet, or phone — as long as you have the code.',
+              desc: 'Laptop, tablet, or phone — just open the link.',
             },
           ].map((item, i) => (
             <div key={i} className="flex gap-3 bg-white/[0.06] rounded-xl p-4 border border-white/[0.05]">
@@ -283,7 +288,7 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
       </LeftPanel>
 
       <RightPanel>
-        <div className="flex items-start justify-between mb-8">
+        <div className="flex items-center justify-between mb-10">
           <div>
             <h2 className="text-2xl font-bold">Join Game</h2>
             <p className="text-blue-400 text-sm mt-1">Enter with a room code</p>
@@ -291,7 +296,7 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
           <ConnectionStatus connected={connected} />
         </div>
 
-        <div className="space-y-4 mb-6">
+        <div className="space-y-4 mb-8">
           <div>
             <label className="block text-sm text-blue-200 mb-2">Your Name</label>
             <input
