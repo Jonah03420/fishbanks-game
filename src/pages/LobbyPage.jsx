@@ -255,8 +255,8 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
               'blue'
             )}
             {featureCard(
-              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M1 11 Q4 8 8 11 Q12 14 15 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M1 7 Q4 4 8 7 Q12 10 15 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
-              'Any device works', 'Laptop, tablet, or phone.',
+              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.4"/><path d="M8 5v3.5l2.5 1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+              'Host controls the start', 'Once you join, wait for the host to begin the game.',
               'blue'
             )}
           </div>
