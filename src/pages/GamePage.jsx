@@ -1,5 +1,5 @@
 import FishGraph from '../components/FishGraph'
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { useState, useEffect, useRef } from 'react'
 import {
     GAME_CONFIG, berechneFischbestand, berechneNetWorth,
@@ -2180,7 +2180,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                         .filter(v => v.marketShipPrice != null)
                                         .map(v => ({ runde: v.runde, Price: v.marketShipPrice }))
                                     return (
-                                        <ResponsiveContainer width="100%" height={150}>
+                                        <ResponsiveContainer width="100%" height={190}>
                                             <LineChart data={priceData} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
                                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                                                 <XAxis dataKey="runde" tick={{ fill: '#93c5fd', fontSize: 10 }} />
@@ -2197,6 +2197,36 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                 })()}
                             </div>
                         )}
+
+                        {/* Fleet value by team — visual complement to the Fleet Overview table */}
+                        <div className="bg-white/10 rounded-xl p-3">
+                            <h3 className="font-bold text-sm mb-2">Fleet Value by Team</h3>
+                            {(() => {
+                                const fleetValueData = gameState.teams.map(team => ({
+                                    name: team.name,
+                                    farbe: team.farbe,
+                                    value: team.fleet * marketShipPrice,
+                                }))
+                                return (
+                                    <ResponsiveContainer width="100%" height={190}>
+                                        <BarChart data={fleetValueData} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                                            <XAxis dataKey="name" tick={{ fill: '#93c5fd', fontSize: 10 }} interval={0} angle={-20} textAnchor="end" height={40} />
+                                            <YAxis tick={{ fill: '#93c5fd', fontSize: 10 }} tickFormatter={v => `${v.toLocaleString()}€`} />
+                                            <Tooltip
+                                                contentStyle={{ backgroundColor: '#1e3a5f', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, fontSize: 11 }}
+                                                formatter={v => [`${v.toLocaleString()}€`, 'Fleet Value']}
+                                            />
+                                            <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                                                {fleetValueData.map((entry, i) => (
+                                                    <Cell key={i} fill={teamHex(entry.farbe)} />
+                                                ))}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                )
+                            })()}
+                        </div>
 
                         {/* Auction history */}
                         <div className="bg-white/10 rounded-xl p-3">
