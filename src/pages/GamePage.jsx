@@ -697,6 +697,10 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
     const maxShipOrder = activeTeam ? Math.ceil(activeTeam.fleet / 2) : 0
     const safeShipsOrdered = Math.min(currentShipsOrdered, maxShipOrder)
 
+    const marketPriceHistory = gameState.verlauf.filter(v => v.marketShipPrice != null)
+    const prevMarketPrice = marketPriceHistory.length >= 2
+        ? marketPriceHistory[marketPriceHistory.length - 2].marketShipPrice
+        : null
     const emergencyBuyPrice  = Math.round(marketShipPrice * 1.5 / 10) * 10
     const distressSalePrice  = Math.round(marketShipPrice * 0.5 / 10) * 10
     const buyCount  = activeTeam?.instantBuyCount  || 0
@@ -1873,34 +1877,8 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
 
                 {/* ── Tab 3: Market ─────────────────────────────────────────────── */}
                 {activeTab === 'market' && (
-                    <div className="p-3 flex flex-col gap-3">
-
-                        {/* Ship Market Price History */}
-                        {gameState.verlauf.some(v => v.marketShipPrice != null) && (
-                            <div className="bg-white/10 rounded-xl p-3">
-                                <h3 className="font-bold text-sm mb-2">Ship Market Price History</h3>
-                                {(() => {
-                                    const priceData = gameState.verlauf
-                                        .filter(v => v.marketShipPrice != null)
-                                        .map(v => ({ runde: v.runde, Price: v.marketShipPrice }))
-                                    return (
-                                        <ResponsiveContainer width="100%" height={150}>
-                                            <LineChart data={priceData} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
-                                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                                                <XAxis dataKey="runde" tick={{ fill: '#93c5fd', fontSize: 10 }} />
-                                                <YAxis tick={{ fill: '#93c5fd', fontSize: 10 }} domain={['auto', 'auto']} tickFormatter={v => `${v}€`} />
-                                                <Tooltip
-                                                    contentStyle={{ backgroundColor: '#1e3a5f', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, fontSize: 11 }}
-                                                    formatter={v => [`${v.toLocaleString()}€`, 'Market Price']}
-                                                    labelFormatter={label => `Round ${label}`}
-                                                />
-                                                <Line type="monotone" dataKey="Price" stroke="#f59e0b" strokeWidth={2} dot={false} />
-                                            </LineChart>
-                                        </ResponsiveContainer>
-                                    )
-                                })()}
-                            </div>
-                        )}
+                    <div className="p-3 flex gap-3">
+                    <div className="flex-1 flex flex-col gap-3 min-w-0">
 
                         {/* Ship market summary */}
                         <div className="bg-white/10 rounded-xl p-3">
@@ -1908,7 +1886,14 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                             <div className="grid grid-cols-2 gap-3 text-sm mb-3">
                                 <div className="bg-white/5 rounded-lg p-2.5">
                                     <div className="text-xs text-blue-300 mb-0.5">Current market price</div>
-                                    <div className="text-xl font-bold text-yellow-300">{marketShipPrice.toLocaleString()}€</div>
+                                    <div className="text-xl font-bold text-yellow-300 flex items-center gap-1.5">
+                                        {marketShipPrice.toLocaleString()}€
+                                        {prevMarketPrice != null && prevMarketPrice !== marketShipPrice && (
+                                            <span className={`text-xs font-bold ${marketShipPrice > prevMarketPrice ? 'text-green-400' : 'text-red-400'}`}>
+                                                {marketShipPrice > prevMarketPrice ? '↑' : '↓'} {Math.abs(marketShipPrice - prevMarketPrice).toLocaleString()}€
+                                            </span>
+                                        )}
+                                    </div>
                                     <div className="text-xs text-blue-400 mt-0.5">per ship · buy or sell instantly</div>
                                 </div>
                                 <div className="bg-white/5 rounded-lg p-2.5">
@@ -1919,34 +1904,37 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                             </div>
                             {activeTeam && (
                                 <>
-                                    <div className="grid grid-cols-2 gap-3 mb-2">
-                                        {/* Distress Sale */}
-                                        <div className="bg-white/5 border border-white/10 rounded-lg p-2.5">
-                                            <div className="text-xs font-bold text-orange-300 mb-1">Distress Sale <span className="text-blue-400 font-normal">({sellCount}/2 used)</span></div>
-                                            <button
-                                                onClick={handleBootVerkaufen}
-                                                disabled={activeTeam.fleet <= 1 || sellCount >= 2}
-                                                className="w-full bg-white/15 hover:bg-white/25 disabled:opacity-40 disabled:cursor-not-allowed font-medium py-1.5 px-2 rounded-lg transition-colors text-xs text-blue-100 border border-white/10 mb-1.5"
-                                            >
-                                                {sellCount >= 2 ? 'Used this round' : `Sell 1 Ship – receive ${distressSalePrice.toLocaleString()}€`}
-                                                {activeTeam.fleet <= 1 && sellCount < 2 && <span className="block text-xs text-blue-400 mt-0.5">(min. 1 ship)</span>}
-                                            </button>
-                                            <div className="text-xs text-orange-400/80">½ market price · max 2/round</div>
-                                        </div>
+                                    <div className="bg-orange-500/5 border border-orange-400/20 rounded-lg p-2 mb-2">
+                                        <div className="text-xs font-bold text-orange-300/90 uppercase tracking-wide mb-1.5">Instant Trading</div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {/* Distress Sale */}
+                                            <div className="bg-white/5 border border-white/10 rounded-lg p-2.5">
+                                                <div className="text-xs font-bold text-orange-300 mb-1">Distress Sale <span className="text-blue-400 font-normal">({sellCount}/2 used)</span></div>
+                                                <button
+                                                    onClick={handleBootVerkaufen}
+                                                    disabled={activeTeam.fleet <= 1 || sellCount >= 2}
+                                                    className="w-full bg-white/15 hover:bg-white/25 disabled:opacity-40 disabled:cursor-not-allowed font-medium py-1.5 px-2 rounded-lg transition-colors text-xs text-blue-100 border border-white/10 mb-1.5"
+                                                >
+                                                    {sellCount >= 2 ? 'Used this round' : `Sell 1 Ship – receive ${distressSalePrice.toLocaleString()}€`}
+                                                    {activeTeam.fleet <= 1 && sellCount < 2 && <span className="block text-xs text-blue-400 mt-0.5">(min. 1 ship)</span>}
+                                                </button>
+                                                <div className="text-xs text-orange-400/80">½ market price · max 2/round</div>
+                                            </div>
 
-                                        {/* Emergency Buy */}
-                                        <div className="bg-white/5 border border-white/10 rounded-lg p-2.5">
-                                            <div className="text-xs font-bold text-orange-300 mb-1">Emergency Buy <span className="text-blue-400 font-normal">({buyCount}/2 used)</span></div>
-                                            <button
-                                                onClick={handleBootKaufen}
-                                                disabled={activeTeam.bankBalance < emergencyBuyPrice || buyCount >= 2}
-                                                className="w-full bg-white/15 hover:bg-white/25 disabled:opacity-40 disabled:cursor-not-allowed font-medium py-1.5 px-2 rounded-lg transition-colors text-xs text-blue-100 border border-white/10 mb-1.5"
-                                            >
-                                                {buyCount >= 2 ? 'Used this round' : `Buy 1 Ship – pay ${emergencyBuyPrice.toLocaleString()}€`}
-                                                {activeTeam.bankBalance < emergencyBuyPrice && buyCount < 2 && <span className="block text-xs text-blue-400 mt-0.5">(insufficient funds)</span>}
-                                            </button>
-                                            {buyConfirm && <div className="text-xs text-green-300 mb-1">+1 ship purchased for {emergencyBuyPrice.toLocaleString()}€</div>}
-                                            <div className="text-xs text-orange-400/80">1.5× market price · max 2/round</div>
+                                            {/* Emergency Buy */}
+                                            <div className="bg-white/5 border border-white/10 rounded-lg p-2.5">
+                                                <div className="text-xs font-bold text-orange-300 mb-1">Emergency Buy <span className="text-blue-400 font-normal">({buyCount}/2 used)</span></div>
+                                                <button
+                                                    onClick={handleBootKaufen}
+                                                    disabled={activeTeam.bankBalance < emergencyBuyPrice || buyCount >= 2}
+                                                    className="w-full bg-white/15 hover:bg-white/25 disabled:opacity-40 disabled:cursor-not-allowed font-medium py-1.5 px-2 rounded-lg transition-colors text-xs text-blue-100 border border-white/10 mb-1.5"
+                                                >
+                                                    {buyCount >= 2 ? 'Used this round' : `Buy 1 Ship – pay ${emergencyBuyPrice.toLocaleString()}€`}
+                                                    {activeTeam.bankBalance < emergencyBuyPrice && buyCount < 2 && <span className="block text-xs text-blue-400 mt-0.5">(insufficient funds)</span>}
+                                                </button>
+                                                {buyConfirm && <div className="text-xs text-green-300 mb-1">+1 ship purchased for {emergencyBuyPrice.toLocaleString()}€</div>}
+                                                <div className="text-xs text-orange-400/80">1.5× market price · max 2/round</div>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -2156,10 +2144,16 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                         {ranked.map((team, rankIdx) => {
                                             const fleetValue = team.fleet * marketShipPrice
                                             const isLeader = rankIdx === 0
+                                            const isMe = activeTeam && team.name === activeTeam.name
                                             return (
-                                                <div key={team.name} className={`grid grid-cols-6 gap-x-2 text-xs rounded-lg px-3 py-1.5 items-center ${isLeader ? 'bg-yellow-500/15 border border-yellow-400/20' : 'bg-white/5'}`}>
+                                                <div key={team.name}
+                                                    className={`grid grid-cols-6 gap-x-2 text-xs rounded-lg px-3 py-1.5 items-center ${isLeader ? 'bg-yellow-500/15 border border-yellow-400/20' : 'bg-white/5'} ${isMe ? 'ring-2 ring-cyan-400/50' : ''}`}
+                                                    style={isMe ? { boxShadow: `inset 0 0 0 1px ${teamHex(team.farbe)}55` } : undefined}>
                                                     <div className={`font-bold ${isLeader ? 'text-yellow-300' : 'text-blue-500'}`}>{RANKS[rankIdx] ?? `${rankIdx + 1}th`}</div>
-                                                    <div className={`flex items-center gap-1.5 font-bold truncate ${isLeader ? 'text-yellow-100' : ''}`}><TeamDot farbe={team.farbe} />{team.name} {team.istKI ? 'AI' : ''}</div>
+                                                    <div className={`flex items-center gap-1.5 font-bold truncate ${isLeader ? 'text-yellow-100' : ''}`}>
+                                                        <TeamDot farbe={team.farbe} />{team.name} {team.istKI ? 'AI' : ''}
+                                                        {isMe && <span className="text-[10px] font-bold text-cyan-300 bg-cyan-500/15 border border-cyan-400/30 px-1 py-0.5 rounded">You</span>}
+                                                    </div>
                                                     <div className="text-center text-blue-200">{team.fleet}{(team.shipsInDelivery || 0) > 0 ? <span className="text-green-400"> +{team.shipsInDelivery}</span> : ''}</div>
                                                     <div className="text-right text-yellow-300">{fleetValue.toLocaleString()}€</div>
                                                     <div className="text-right text-blue-200">{team.bankBalance.toLocaleString()}€</div>
@@ -2171,6 +2165,38 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                 )
                             })()}
                         </div>
+
+                    </div>
+
+                    {/* Right column — price history & auction history */}
+                    <div className="w-[32%] flex-none flex flex-col gap-3">
+
+                        {/* Ship Market Price History */}
+                        {gameState.verlauf.some(v => v.marketShipPrice != null) && (
+                            <div className="bg-white/10 rounded-xl p-3">
+                                <h3 className="font-bold text-sm mb-2">Ship Market Price History</h3>
+                                {(() => {
+                                    const priceData = gameState.verlauf
+                                        .filter(v => v.marketShipPrice != null)
+                                        .map(v => ({ runde: v.runde, Price: v.marketShipPrice }))
+                                    return (
+                                        <ResponsiveContainer width="100%" height={150}>
+                                            <LineChart data={priceData} margin={{ top: 4, right: 8, left: -10, bottom: 0 }}>
+                                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                                                <XAxis dataKey="runde" tick={{ fill: '#93c5fd', fontSize: 10 }} />
+                                                <YAxis tick={{ fill: '#93c5fd', fontSize: 10 }} domain={['auto', 'auto']} tickFormatter={v => `${v}€`} />
+                                                <Tooltip
+                                                    contentStyle={{ backgroundColor: '#1e3a5f', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, fontSize: 11 }}
+                                                    formatter={v => [`${v.toLocaleString()}€`, 'Market Price']}
+                                                    labelFormatter={label => `Round ${label}`}
+                                                />
+                                                <Line type="monotone" dataKey="Price" stroke="#f59e0b" strokeWidth={2} dot={false} />
+                                            </LineChart>
+                                        </ResponsiveContainer>
+                                    )
+                                })()}
+                            </div>
+                        )}
 
                         {/* Auction history */}
                         <div className="bg-white/10 rounded-xl p-3">
@@ -2192,6 +2218,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                 </div>
                             )}
                         </div>
+                    </div>
                     </div>
                 )}
 
