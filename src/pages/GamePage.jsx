@@ -1771,30 +1771,6 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                         {/* Right column: Fish stock + Graph + Fishery Data */}
                         <div className="w-[32%] flex-none flex flex-col gap-3">
 
-                            {/* Fish stock bar */}
-                            <div className={`bg-white/10 rounded-xl px-3 py-2 ${fishDichte <= 0.30 ? 'pulse-critical' : ''}`}>
-                                <div className="flex justify-between items-center mb-1">
-                                    <span className="font-bold text-sm">Fish Stock</span>
-                                    {showFishStock
-                                        ? <span className="font-bold text-sm">{Math.max(0, gameState.fischbestand).toLocaleString()} / {maxFischUI.toLocaleString()}</span>
-                                        : <span className="font-bold text-sm text-blue-400">Hidden</span>
-                                    }
-                                </div>
-                                <div className="w-full rounded-full h-3 overflow-hidden mb-1 relative" style={{ background: 'rgba(255,255,255,0.12)' }}>
-                                    {showFishStock && (
-                                        <div className="absolute inset-0 rounded-full" style={{ background: 'linear-gradient(to right, #ef4444, #f59e0b 40%, #22c55e 80%)' }} />
-                                    )}
-                                    <div className="absolute top-0 right-0 h-full fish-bar-transition rounded-r-full"
-                                        style={{ width: showFishStock ? `${100 - fishPct}%` : '0%', background: 'rgba(10,20,40,0.8)' }} />
-                                    {!showFishStock && (
-                                        <div className="absolute inset-0 rounded-full" style={{ background: '#3b82f6' }} />
-                                    )}
-                                </div>
-                                <div className={`text-xs ${showFishStock ? (fishDichte > 0.60 ? 'text-green-300' : fishDichte > 0.30 ? 'text-yellow-300' : 'text-red-300') : 'text-blue-400'}`}>
-                                    {showFishStock ? (fishDichte > 0.60 ? 'Healthy' : fishDichte > 0.30 ? 'Endangered' : 'Critical!') : 'Observe catch rates to estimate stock'}
-                                </div>
-                            </div>
-
                             {/* FishGraph */}
                             <div className="bg-white/10 rounded-xl overflow-hidden" style={{ height: 300 }}>
                                 {gameState.verlauf.length === 0 ? (
