@@ -1498,7 +1498,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                             <span className="w-5 text-center font-bold text-sm">{val}</span>
                                             <button onClick={() => set(val + 1)} disabled={totalAllocated >= fleetSize}
                                                 className="bg-white/20 hover:bg-white/30 disabled:opacity-30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0">+</button>
-                                            <span className={`text-xs ${color} opacity-70`}>{hint}</span>
+                                            <span className="text-xs text-blue-300 opacity-70">{hint}</span>
                                         </div>
                                     ))}
                                 </div>
