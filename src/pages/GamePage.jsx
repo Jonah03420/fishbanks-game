@@ -1627,11 +1627,18 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
 
                 {/* ── Tab 2: Reports ────────────────────────────────────────────── */}
                 {activeTab === 'reports' && (
-                    <div className="p-3 flex gap-3">
+                    <div className="p-3 flex flex-col gap-2 h-full">
+
+                        {/* Section heading row — aligns both columns */}
+                        <div className="flex-none flex gap-3 items-end">
+                            <h3 className="flex-1 font-bold text-sm px-1">Annual Report</h3>
+                        </div>
+
+                        {/* Two-column content — each column scrolls independently */}
+                        <div className="flex-1 min-h-0 flex gap-3">
 
                         {/* Left column: Annual Report */}
-                        <div className="flex-1 flex flex-col gap-2 min-w-0">
-                            <h3 className="font-bold text-sm px-1">Annual Report</h3>
+                        <div className="flex-1 flex flex-col gap-2 min-w-0 overflow-y-auto pr-1">
                                 {(showOtherCatches ? gameState.teams : gameState.teams.filter(t => !t.istKI)).map(team => {
                                     const rows = []
 
@@ -1768,24 +1775,12 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                             )}
                         </div>
 
-                        {/* Right column: Fish stock + Graph + Fishery Data */}
-                        <div className="w-[32%] flex-none flex flex-col gap-3">
+                        {/* Right column: Graph + Fishery Data */}
+                        <div className="w-[32%] flex-none flex flex-col gap-3 overflow-y-auto">
 
-                            {/* FishGraph */}
-                            <div className="bg-white/10 rounded-xl overflow-hidden" style={{ height: 300 }}>
-                                {gameState.verlauf.length === 0 ? (
-                                    <div className="h-full flex flex-col items-center justify-center gap-2 text-center px-4">
-                                        <svg viewBox="0 0 48 48" className="w-10 h-10 opacity-20" fill="none">
-                                            <path d="M8 36 Q12 28 20 32 Q28 36 36 24 Q40 18 44 20" stroke="#7dd3fc" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-                                            <line x1="8" y1="40" x2="40" y2="40" stroke="#7dd3fc" strokeWidth="1.5" strokeLinecap="round" opacity="0.5"/>
-                                        </svg>
-                                        <p className="text-xs text-blue-400">Complete round 1 to see fish stock history</p>
-                                    </div>
-                                ) : (
-                                    <div className="p-2 h-full">
-                                        <FishGraph verlauf={gameState.verlauf} maxFisch={maxFischUI} />
-                                    </div>
-                                )}
+                            {/* FishGraph — component has its own bg-white/10 rounded-xl */}
+                            <div style={{ height: 300 }}>
+                                <FishGraph verlauf={gameState.verlauf} maxFisch={maxFischUI} />
                             </div>
 
                             {/* Fishery Data table */}
@@ -1869,6 +1864,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                 </div>
                             )}
                         </div>
+                        </div>{/* end two-column row */}
                     </div>
                 )}
 
