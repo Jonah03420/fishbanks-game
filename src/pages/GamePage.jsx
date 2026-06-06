@@ -1630,9 +1630,8 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                     <div className="p-3 flex gap-3">
 
                         {/* Left column: Annual Report */}
-                        <div className="flex-1 flex flex-col gap-3 min-w-0">
-                            <div className="bg-white/10 rounded-xl p-3">
-                                <h3 className="font-bold text-sm mb-3">Annual Report</h3>
+                        <div className="flex-1 flex flex-col gap-2 min-w-0">
+                            <h3 className="font-bold text-sm px-1">Annual Report</h3>
                                 {(showOtherCatches ? gameState.teams : gameState.teams.filter(t => !t.istKI)).map(team => {
                                     const rows = []
 
@@ -1660,10 +1659,16 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                     const totOrd   = dataRows.reduce((s, r) => s + (r.orderCost || 0), 0)
 
                                     return (
-                                        <div key={team.name} className="mb-4 last:mb-0">
-                                            <div className="flex items-center gap-2 mb-1.5">
-                                                <span className="font-bold text-xs">{team.farbe} {team.name}</span>
-                                                {team.istKI && <span className="text-xs text-blue-500">🤖 {team.aiDifficulty === 'hard' ? 'Hard' : 'Easy'}</span>}
+                                        <div key={team.name} className="bg-white/10 border border-white/5 rounded-xl p-3 border-l-4"
+                                            style={{ borderLeftColor: teamHex(team.farbe) }}>
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <TeamDot farbe={team.farbe} />
+                                                <span className="font-bold text-sm">{team.name}</span>
+                                                {team.istKI && (
+                                                    <span className="text-xs text-blue-300 bg-blue-500/15 px-1.5 py-0.5 rounded">
+                                                        AI · {team.aiDifficulty === 'hard' ? 'Hard' : 'Easy'}
+                                                    </span>
+                                                )}
                                             </div>
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-xs border-collapse">
@@ -1715,7 +1720,6 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                         </div>
                                     )
                                 })}
-                            </div>
 
                             {gameState.verlauf.length > 0 && (
                                 <div className="bg-white/10 rounded-xl p-3">
@@ -1765,7 +1769,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                         </div>
 
                         {/* Right column: Fish stock + Graph + Fishery Data */}
-                        <div className="w-[35%] flex-none flex flex-col gap-3">
+                        <div className="w-[32%] flex-none flex flex-col gap-3">
 
                             {/* Fish stock bar */}
                             <div className={`bg-white/10 rounded-xl px-3 py-2 ${fishDichte <= 0.30 ? 'pulse-critical' : ''}`}>
@@ -1776,16 +1780,15 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                         : <span className="font-bold text-sm text-blue-400">Hidden</span>
                                     }
                                 </div>
-                                <div className="w-full bg-white/20 rounded-full h-2.5 overflow-hidden mb-1">
-                                    <div
-                                        className="h-2.5 rounded-full fish-bar-transition"
-                                        style={{
-                                            width: showFishStock ? `${fishPct}%` : '100%',
-                                            backgroundColor: showFishStock
-                                                ? (fishDichte > 0.60 ? '#22c55e' : fishDichte > 0.30 ? '#f59e0b' : '#ef4444')
-                                                : '#3b82f6'
-                                        }}
-                                    />
+                                <div className="w-full rounded-full h-3 overflow-hidden mb-1 relative" style={{ background: 'rgba(255,255,255,0.12)' }}>
+                                    {showFishStock && (
+                                        <div className="absolute inset-0 rounded-full" style={{ background: 'linear-gradient(to right, #ef4444, #f59e0b 40%, #22c55e 80%)' }} />
+                                    )}
+                                    <div className="absolute top-0 right-0 h-full fish-bar-transition rounded-r-full"
+                                        style={{ width: showFishStock ? `${100 - fishPct}%` : '0%', background: 'rgba(10,20,40,0.8)' }} />
+                                    {!showFishStock && (
+                                        <div className="absolute inset-0 rounded-full" style={{ background: '#3b82f6' }} />
+                                    )}
                                 </div>
                                 <div className={`text-xs ${showFishStock ? (fishDichte > 0.60 ? 'text-green-300' : fishDichte > 0.30 ? 'text-yellow-300' : 'text-red-300') : 'text-blue-400'}`}>
                                     {showFishStock ? (fishDichte > 0.60 ? 'Healthy' : fishDichte > 0.30 ? 'Endangered' : 'Critical!') : 'Observe catch rates to estimate stock'}
@@ -1793,8 +1796,20 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                             </div>
 
                             {/* FishGraph */}
-                            <div className="bg-white/10 rounded-xl p-2" style={{ height: 300 }}>
-                                <FishGraph verlauf={gameState.verlauf} maxFisch={maxFischUI} />
+                            <div className="bg-white/10 rounded-xl overflow-hidden" style={{ height: 300 }}>
+                                {gameState.verlauf.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center gap-2 text-center px-4">
+                                        <svg viewBox="0 0 48 48" className="w-10 h-10 opacity-20" fill="none">
+                                            <path d="M8 36 Q12 28 20 32 Q28 36 36 24 Q40 18 44 20" stroke="#7dd3fc" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+                                            <line x1="8" y1="40" x2="40" y2="40" stroke="#7dd3fc" strokeWidth="1.5" strokeLinecap="round" opacity="0.5"/>
+                                        </svg>
+                                        <p className="text-xs text-blue-400">Complete round 1 to see fish stock history</p>
+                                    </div>
+                                ) : (
+                                    <div className="p-2 h-full">
+                                        <FishGraph verlauf={gameState.verlauf} maxFisch={maxFischUI} />
+                                    </div>
+                                )}
                             </div>
 
                             {/* Fishery Data table */}
