@@ -8,8 +8,8 @@ const COLOR_EMOJI = {
 function ConnectionStatus({ connected }) {
   return (
     <div className={`flex items-center gap-1.5 text-xs ${connected ? 'text-green-400' : 'text-red-400'}`}>
-      <span>{connected ? '🟢' : '🔴'}</span>
-      {connected ? 'Connected to server' : 'Connecting...'}
+      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${connected ? 'bg-green-400 server-online' : 'bg-red-400'}`}/>
+      {connected ? 'Connected' : 'Connecting…'}
     </div>
   )
 }
@@ -44,15 +44,25 @@ function SlotList({ slots, mySlotIndex }) {
   )
 }
 
-function Layout({ leftContent, rightContent }) {
+function LeftPanel({ children }) {
   return (
-    <div className="w-full h-full bg-blue-900 text-white flex overflow-hidden">
-      <div className="flex-1 flex flex-col justify-center px-16 py-12 bg-gradient-to-br from-blue-800 to-blue-950">
-        {leftContent}
+    <div className="relative flex-1 flex flex-col justify-center px-16 py-12 bg-gradient-to-br from-blue-800 to-blue-950 overflow-hidden">
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-400/[0.08] rounded-full blur-3xl pointer-events-none"/>
+      <div className="absolute bottom-1/3 right-1/4 w-64 h-64 bg-blue-300/[0.06] rounded-full blur-2xl pointer-events-none"/>
+      <div className="absolute bottom-0 left-0 right-0 h-20 overflow-hidden pointer-events-none">
+        <svg viewBox="0 0 2400 80" preserveAspectRatio="none" className="w-[200%] h-full wave-shift" style={{opacity:0.18}}>
+          <path d="M0,40 C200,70 400,10 600,40 C800,70 1000,10 1200,40 C1400,70 1600,10 1800,40 C2000,70 2200,10 2400,40 L2400,80 L0,80 Z" fill="#7dd3fc"/>
+        </svg>
       </div>
-      <div className="w-[420px] flex flex-col justify-center px-10 py-12 bg-blue-950/60 border-l border-white/10">
-        {rightContent}
-      </div>
+      <div className="relative z-10">{children}</div>
+    </div>
+  )
+}
+
+function RightPanel({ children }) {
+  return (
+    <div className="w-[420px] flex flex-col justify-center px-10 py-12 bg-blue-950/60 border-l border-white/10">
+      {children}
     </div>
   )
 }
@@ -151,141 +161,197 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
   function doStartGame() {
     if (!socket || !connected) { setError('Not connected to server.'); return }
     if (!room?.code) { setError('Room not found.'); return }
-    const roomCode = room.code
-    console.log('emitting start-game', roomCode)
-    socket.emit('start-game', { roomCode })
+    socket.emit('start-game', { roomCode: room.code })
   }
 
   // ── create ──────────────────────────────────────────────────────────────────
   if (view === 'create') return (
-    <Layout
-      leftContent={
-        <>
-          <h2 className="text-3xl font-bold mb-4">Create Room</h2>
-          <p className="text-blue-200 mb-8 max-w-md">
-            You will be the host of the game. After creating, you'll receive a 4-letter room code to share with participants.
-          </p>
-          <div className="space-y-4 max-w-md">
-            <div className="bg-white/10 rounded-xl p-5">
-              <div className="font-bold mb-2">As host you can:</div>
-              <ul className="text-blue-300 text-sm space-y-1.5 list-disc list-inside">
-                <li>Configure rounds, starting balance &amp; starting fleet</li>
-                <li>Choose AI difficulty for empty slots</li>
-                <li>Start the game once everyone is ready</li>
-              </ul>
-            </div>
-            <div className="bg-white/5 rounded-xl p-5 border border-white/10">
-              <div className="text-sm text-blue-300">
-                Empty slots are automatically filled by AI teams – you don't need to wait for all players.
+    <div className="w-full h-full bg-blue-900 text-white flex overflow-hidden">
+      <LeftPanel>
+        <div className="w-14 h-14 rounded-2xl bg-cyan-500/20 border border-cyan-400/20 flex items-center justify-center mb-6 text-cyan-400">
+          <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="5" r="2" stroke="currentColor" strokeWidth="1.5"/>
+            <line x1="12" y1="7" x2="12" y2="19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            <path d="M8 19 Q12 21 16 19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+            <path d="M6 12 L12 7 L18 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+          </svg>
+        </div>
+        <h2 className="text-4xl font-bold mb-3">Create Room</h2>
+        <p className="text-blue-200 text-lg mb-8 max-w-sm leading-relaxed">
+          Open a room as host, invite teams, and start the game when everyone is ready.
+        </p>
+        <div className="space-y-3 max-w-md">
+          {[
+            {
+              icon: <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><rect x="4" y="4" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M4 7H2M4 9H2M12 7H14M12 9H14M7 4V2M9 4V2M7 12V14M9 12V14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/></svg>,
+              title: 'AI fills empty slots',
+              desc: 'No need to wait for all players. Empty seats are taken by AI teams.',
+            },
+            {
+              icon: <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.4"/><path d="M8 5v3.5l2.5 1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+              title: 'Configure before starting',
+              desc: 'Set rounds, AI difficulty, starting balance and fleet from the lobby.',
+            },
+            {
+              icon: <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" strokeWidth="1.4"/><path d="M5 7h6M5 9.5h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>,
+              title: 'Share the 4-letter code',
+              desc: 'Players join from any device using the room code you share.',
+            },
+          ].map((item, i) => (
+            <div key={i} className="flex gap-3 bg-white/[0.06] rounded-xl p-4 border border-white/[0.05]">
+              <div className="w-7 h-7 rounded-lg bg-cyan-500/20 flex items-center justify-center flex-shrink-0 text-cyan-400 mt-0.5">
+                {item.icon}
+              </div>
+              <div>
+                <div className="font-semibold text-sm text-white mb-0.5">{item.title}</div>
+                <div className="text-blue-300 text-xs leading-relaxed">{item.desc}</div>
               </div>
             </div>
+          ))}
+        </div>
+      </LeftPanel>
+
+      <RightPanel>
+        <div className="flex items-start justify-between mb-8">
+          <div>
+            <h2 className="text-2xl font-bold">Create Game</h2>
+            <p className="text-blue-400 text-sm mt-1">Open a room as host</p>
           </div>
-        </>
-      }
-      rightContent={
-        <>
-          <div className="flex justify-end mb-6">
-            <ConnectionStatus connected={connected} />
+          <ConnectionStatus connected={connected} />
+        </div>
+
+        <div className="mb-6">
+          <label className="block text-sm text-blue-200 mb-2">Your Name</label>
+          <input
+            type="text"
+            value={playerName}
+            onChange={e => setPlayerName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && doCreate()}
+            placeholder="Player 1"
+            maxLength={20}
+            className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-blue-400 focus:outline-none focus:border-blue-400 transition-colors"
+          />
+        </div>
+
+        {error && (
+          <div className="bg-red-500/20 border border-red-400/30 rounded-xl p-3 text-red-200 text-sm text-center mb-4">
+            {error}
           </div>
-          <h2 className="text-2xl font-bold mb-2">Create Game</h2>
-          <p className="text-blue-300 text-sm mb-8">Enter your name and create a room.</p>
-          <div className="mb-6">
+        )}
+
+        <div className="flex flex-col gap-3 mt-auto">
+          <button
+            onClick={doCreate}
+            disabled={!connected}
+            className="w-full bg-gradient-to-br from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 px-6 rounded-xl text-base transition-all hover:-translate-y-0.5 shadow-lg group flex items-center justify-between"
+          >
+            <span>Create Room</span>
+            <svg className="w-5 h-5 text-green-200 group-hover:translate-x-0.5 transition-transform" viewBox="0 0 20 20" fill="none"><path d="M4 10h12M11 5l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+          <button onClick={onBack} className="w-full text-blue-400 hover:text-white text-sm transition-colors py-2">
+            ← Back
+          </button>
+        </div>
+      </RightPanel>
+    </div>
+  )
+
+  // ── join ────────────────────────────────────────────────────────────────────
+  if (view === 'join') return (
+    <div className="w-full h-full bg-blue-900 text-white flex overflow-hidden">
+      <LeftPanel>
+        <div className="w-14 h-14 rounded-2xl bg-blue-500/20 border border-blue-400/20 flex items-center justify-center mb-6 text-blue-300">
+          <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none">
+            <rect x="2" y="4" width="14" height="16" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M16 9l4 3-4 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <line x1="16" y1="12" x2="9" y2="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+        </div>
+        <h2 className="text-4xl font-bold mb-3">Join Room</h2>
+        <p className="text-blue-200 text-lg mb-8 max-w-sm leading-relaxed">
+          Enter the 4-letter code that the host shared with you to join the session.
+        </p>
+        <div className="space-y-3 max-w-md">
+          {[
+            {
+              icon: <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M8 13 Q4 11.5 2 12.5 L2 3.5 Q4 2.5 8 4 Q12 2.5 14 3.5 L14 12.5 Q12 11.5 8 13Z" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinejoin="round"/><line x1="8" y1="4" x2="8" y2="13" stroke="currentColor" strokeWidth="1.4"/></svg>,
+              title: 'Where is the code?',
+              desc: 'The host sees it right after creating the room — it is displayed prominently on their screen.',
+            },
+            {
+              icon: <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none"><path d="M1 11 Q4 8 8 11 Q12 14 15 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M1 7 Q4 4 8 7 Q12 10 15 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
+              title: 'Any device works',
+              desc: 'Join from a laptop, tablet, or phone — as long as you have the code.',
+            },
+          ].map((item, i) => (
+            <div key={i} className="flex gap-3 bg-white/[0.06] rounded-xl p-4 border border-white/[0.05]">
+              <div className="w-7 h-7 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0 text-blue-300 mt-0.5">
+                {item.icon}
+              </div>
+              <div>
+                <div className="font-semibold text-sm text-white mb-0.5">{item.title}</div>
+                <div className="text-blue-300 text-xs leading-relaxed">{item.desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </LeftPanel>
+
+      <RightPanel>
+        <div className="flex items-start justify-between mb-8">
+          <div>
+            <h2 className="text-2xl font-bold">Join Game</h2>
+            <p className="text-blue-400 text-sm mt-1">Enter with a room code</p>
+          </div>
+          <ConnectionStatus connected={connected} />
+        </div>
+
+        <div className="space-y-4 mb-6">
+          <div>
             <label className="block text-sm text-blue-200 mb-2">Your Name</label>
             <input
               type="text"
               value={playerName}
               onChange={e => setPlayerName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && doCreate()}
-              placeholder="Player 1"
+              placeholder="Player 2"
               maxLength={20}
-              className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-blue-300 focus:outline-none focus:border-blue-400 transition-colors"
+              className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-blue-400 focus:outline-none focus:border-blue-400 transition-colors"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-blue-200 mb-2">Room Code</label>
+            <input
+              type="text"
+              value={joinCode}
+              onChange={e => setJoinCode(e.target.value.toUpperCase().slice(0, 4))}
+              onKeyDown={e => e.key === 'Enter' && doJoin()}
+              placeholder="ABCD"
+              maxLength={4}
+              className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-4 text-white placeholder-blue-400/60 text-center text-3xl font-bold tracking-widest focus:outline-none focus:border-blue-400 transition-colors uppercase"
             />
           </div>
           {error && (
-            <div className="bg-red-500/20 border border-red-400/30 rounded-xl p-3 text-red-200 text-sm text-center mb-4">
+            <div className="bg-red-500/20 border border-red-400/30 rounded-xl p-3 text-red-200 text-sm text-center">
               {error}
             </div>
           )}
-          <div className="flex flex-col gap-3 mt-auto">
-            <button onClick={doCreate} disabled={!connected}
-              className="w-full bg-green-500 hover:bg-green-400 disabled:opacity-50 disabled:cursor-not-allowed font-bold py-4 rounded-xl text-lg transition-colors">
-              Create Room
-            </button>
-            <button onClick={onBack} className="w-full text-blue-300 hover:text-white text-sm transition-colors py-2">
-              ← Back
-            </button>
-          </div>
-        </>
-      }
-    />
-  )
+        </div>
 
-  // ── join ────────────────────────────────────────────────────────────────────
-  if (view === 'join') return (
-    <Layout
-      leftContent={
-        <>
-          <h2 className="text-3xl font-bold mb-4">Join Room</h2>
-          <p className="text-blue-200 mb-8 max-w-md">
-            Enter the 4-letter code that the host of the game shared with you.
-          </p>
-          <div className="bg-white/10 rounded-xl p-6 max-w-md">
-            <div className="font-bold mb-3">Where is the code?</div>
-            <p className="text-blue-300 text-sm">
-              The host sees the room code right after creating the room – it is displayed prominently on their screen.
-            </p>
-          </div>
-        </>
-      }
-      rightContent={
-        <>
-          <div className="flex justify-end mb-6">
-            <ConnectionStatus connected={connected} />
-          </div>
-          <h2 className="text-2xl font-bold mb-2">Join Game</h2>
-          <p className="text-blue-300 text-sm mb-8">Enter your name and type in the code.</p>
-          <div className="space-y-4 mb-6">
-            <div>
-              <label className="block text-sm text-blue-200 mb-2">Your Name</label>
-              <input
-                type="text"
-                value={playerName}
-                onChange={e => setPlayerName(e.target.value)}
-                placeholder="Player 2"
-                maxLength={20}
-                className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-blue-300 focus:outline-none focus:border-blue-400 transition-colors"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-blue-200 mb-2">Room Code</label>
-              <input
-                type="text"
-                value={joinCode}
-                onChange={e => setJoinCode(e.target.value.toUpperCase().slice(0, 4))}
-                onKeyDown={e => e.key === 'Enter' && doJoin()}
-                placeholder="ABCD"
-                maxLength={4}
-                className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-4 text-white placeholder-blue-300 text-center text-3xl font-bold tracking-widest focus:outline-none focus:border-blue-400 transition-colors uppercase"
-              />
-            </div>
-            {error && (
-              <div className="bg-red-500/20 border border-red-400/30 rounded-xl p-3 text-red-200 text-sm text-center">
-                {error}
-              </div>
-            )}
-          </div>
-          <div className="flex flex-col gap-3">
-            <button onClick={doJoin} disabled={!connected}
-              className="w-full bg-blue-500 hover:bg-blue-400 disabled:opacity-50 disabled:cursor-not-allowed font-bold py-4 rounded-xl text-lg transition-colors">
-              Join
-            </button>
-            <button onClick={onBack} className="w-full text-blue-300 hover:text-white text-sm transition-colors py-2">
-              ← Back
-            </button>
-          </div>
-        </>
-      }
-    />
+        <div className="flex flex-col gap-3">
+          <button
+            onClick={doJoin}
+            disabled={!connected}
+            className="w-full bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 px-6 rounded-xl text-base transition-all hover:-translate-y-0.5 shadow-lg group flex items-center justify-between"
+          >
+            <span>Join Room</span>
+            <svg className="w-5 h-5 text-blue-200 group-hover:translate-x-0.5 transition-transform" viewBox="0 0 20 20" fill="none"><path d="M4 10h12M11 5l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+          <button onClick={onBack} className="w-full text-blue-400 hover:text-white text-sm transition-colors py-2">
+            ← Back
+          </button>
+        </div>
+      </RightPanel>
+    </div>
   )
 
   // ── waiting ──────────────────────────────────────────────────────────────────
@@ -296,38 +362,37 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
 
     return (
       <div className="w-full h-full bg-blue-900 text-white flex overflow-hidden">
-
-        <div className="flex-1 flex flex-col justify-center px-16 py-12 bg-gradient-to-br from-blue-800 to-blue-950 gap-6">
+        <LeftPanel>
           <div>
-            <p className="text-blue-200 text-sm mb-3">
-              {isHost ? 'Room code – share with participants' : 'You joined – Room code'}
+            <p className="text-blue-300 text-sm font-medium mb-3 uppercase tracking-wider">
+              {isHost ? 'Room code — share with participants' : 'You joined — Room code'}
             </p>
-            <div className="bg-white/15 border-2 border-white/30 rounded-2xl px-10 py-5 inline-block mb-2">
+            <div className="bg-white/10 border border-white/20 rounded-2xl px-10 py-5 inline-block mb-3">
               <div className="text-6xl font-bold tracking-widest font-mono">{room.code}</div>
             </div>
-            <p className="text-blue-400 text-xs">Share this code with other players</p>
+            <p className="text-blue-400 text-xs mb-8">Share this code with other players</p>
           </div>
 
           <div>
-            <p className="text-sm text-blue-200 mb-3">
+            <p className="text-sm text-blue-300 font-medium mb-3">
               Players ({humanCount} human · {aiCount} AI)
             </p>
             <div className="max-w-md">
               <SlotList slots={room.slots} mySlotIndex={mySlotIndex} />
             </div>
           </div>
-        </div>
+        </LeftPanel>
 
         <div className="w-[420px] flex flex-col px-10 py-8 bg-blue-950/60 border-l border-white/10 gap-4 justify-center">
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start justify-between gap-2 mb-2">
             <div>
-              <h2 className="text-2xl font-bold mb-1">
-                {isHost ? 'Settings' : 'Waiting for Host'}
+              <h2 className="text-2xl font-bold">
+                {isHost ? 'Game Settings' : 'Waiting for Host'}
               </h2>
-              <p className="text-blue-300 text-sm">
+              <p className="text-blue-400 text-sm mt-1">
                 {isHost
-                  ? 'You are host – configure the game.'
-                  : 'You have successfully joined. The host will start the game.'}
+                  ? 'Configure before starting the game.'
+                  : 'The host will start the game soon.'}
               </p>
             </div>
             <ConnectionStatus connected={connected} />
@@ -336,7 +401,7 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
           {isHost ? (
             <>
               <div>
-                <label className="block text-sm text-blue-200 mb-2">Rounds</label>
+                <label className="block text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">Rounds</label>
                 <div className="grid grid-cols-3 gap-2">
                   {[10, 15, 20].map(r => (
                     <button key={r}
@@ -349,12 +414,16 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
               </div>
 
               <div>
-                <label className="block text-sm text-blue-200 mb-2">AI Difficulty</label>
+                <label className="block text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">AI Difficulty</label>
                 <div className="grid grid-cols-2 gap-2">
                   {[['easy', 'Easy'], ['hard', 'Hard']].map(([val, lbl]) => (
                     <button key={val}
                       onClick={() => changeSetting('aiDifficulty', val)}
-                      className={`py-3 rounded-xl font-bold text-sm transition-colors ${s.aiDifficulty === val ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-blue-200'}`}>
+                      className={`py-3 rounded-xl font-bold text-sm transition-colors ${
+                        s.aiDifficulty === val
+                          ? val === 'easy' ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'
+                          : 'bg-white/10 hover:bg-white/20 text-blue-200'
+                      }`}>
                       {lbl}
                     </button>
                   ))}
@@ -362,7 +431,7 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
               </div>
 
               <div>
-                <label className="block text-sm text-blue-200 mb-2">Starting Balance</label>
+                <label className="block text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">Starting Balance</label>
                 <div className="grid grid-cols-3 gap-2">
                   {[3000, 5000, 8000].map(n => (
                     <button key={n}
@@ -375,7 +444,7 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
               </div>
 
               <div>
-                <label className="block text-sm text-blue-200 mb-2">Starting Fleet</label>
+                <label className="block text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">Starting Fleet</label>
                 <div className="grid grid-cols-3 gap-2">
                   {[2, 3, 5].map(n => (
                     <button key={n}
@@ -388,39 +457,45 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
               </div>
 
               {onOpenAdmin && (
-                <button onClick={onOpenAdmin} className="text-blue-500 hover:text-blue-300 text-xs transition-colors text-left">
-                  ⚙ Instructor Settings
+                <button onClick={onOpenAdmin} className="text-blue-500 hover:text-blue-300 text-xs transition-colors text-left flex items-center gap-1.5">
+                  <span className="w-3 h-3 flex items-center justify-center text-[10px] leading-none">⚙</span>
+                  Instructor Settings
                 </button>
               )}
 
-              <div className="flex flex-col gap-3 mt-auto">
+              <div className="flex flex-col gap-3 mt-2">
                 <button
                   onClick={doStartGame}
                   disabled={!connected}
-                  className="w-full bg-green-500 hover:bg-green-400 disabled:opacity-50 disabled:cursor-not-allowed font-bold py-4 rounded-xl text-lg transition-colors">
-                  Start Game
+                  className="w-full bg-gradient-to-br from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 disabled:opacity-50 disabled:cursor-not-allowed font-bold py-4 px-6 rounded-xl text-base transition-all hover:-translate-y-0.5 shadow-lg group flex items-center justify-between">
+                  <span>Start Game</span>
+                  <svg className="w-5 h-5 text-green-200 group-hover:translate-x-0.5 transition-transform" viewBox="0 0 20 20" fill="none"><path d="M4 10h12M11 5l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 </button>
-                <button onClick={doLeave} className="w-full text-blue-300 hover:text-white text-sm transition-colors py-2">
+                <button onClick={doLeave} className="w-full text-blue-400 hover:text-white text-sm transition-colors py-2">
                   ← Leave Room
                 </button>
               </div>
             </>
           ) : (
             <>
-              <div className="bg-white/5 rounded-xl p-6 text-center border border-white/10">
-                <p className="text-blue-300 text-sm">Waiting for host to start the game…</p>
-                <p className="text-blue-400 text-xs mt-2">This page updates automatically.</p>
+              <div className="bg-white/5 rounded-xl p-5 text-center border border-white/10">
+                <div className="w-8 h-8 rounded-full border-2 border-blue-400/40 border-t-blue-400 animate-spin mx-auto mb-3"/>
+                <p className="text-blue-200 text-sm font-medium">Waiting for host to start…</p>
+                <p className="text-blue-400 text-xs mt-1">This page updates automatically.</p>
               </div>
 
-              <div className="bg-white/10 rounded-xl p-4 text-sm text-blue-300">
-                <div className="font-bold text-white mb-2">Game Settings</div>
-                <div>{s.maxRounds} rounds</div>
-                <div>{s.aiDifficulty === 'easy' ? 'Easy' : 'Hard'} AI</div>
-                <div>Balance: {s.startingBalance.toLocaleString()}€ · Fleet: {s.startingFleet} ships</div>
+              <div className="bg-white/[0.06] rounded-xl p-4 border border-white/[0.05]">
+                <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-3">Game Settings</div>
+                <div className="space-y-1.5 text-sm text-blue-200">
+                  <div className="flex justify-between"><span className="text-blue-400">Rounds</span><span>{s.maxRounds}</span></div>
+                  <div className="flex justify-between"><span className="text-blue-400">AI difficulty</span><span>{s.aiDifficulty === 'easy' ? 'Easy' : 'Hard'}</span></div>
+                  <div className="flex justify-between"><span className="text-blue-400">Starting balance</span><span>{s.startingBalance.toLocaleString()}€</span></div>
+                  <div className="flex justify-between"><span className="text-blue-400">Starting fleet</span><span>{s.startingFleet} ships</span></div>
+                </div>
               </div>
 
               <div className="mt-auto">
-                <button onClick={doLeave} className="w-full text-blue-300 hover:text-white text-sm transition-colors py-2">
+                <button onClick={doLeave} className="w-full text-blue-400 hover:text-white text-sm transition-colors py-2">
                   ← Leave Room
                 </button>
               </div>
