@@ -585,6 +585,45 @@ function AuctionListingCard({ listing, mySlotIndex, socket, roomCode }) {
     )
 }
 
+// ─── Team color helpers ───────────────────────────────────────────────────────
+
+const TEAM_COLOR_MAP = { '🔴': '#ef4444', '🟡': '#eab308', '🟢': '#22c55e', '🔵': '#3b82f6' }
+function teamHex(farbe) { return TEAM_COLOR_MAP[farbe] ?? '#6b7280' }
+function TeamDot({ farbe }) {
+    return <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: teamHex(farbe) }} />
+}
+
+// ─── Zone SVG icons ───────────────────────────────────────────────────────────
+
+function IconHarbor() {
+    return (
+        <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            <circle cx="8" cy="3.5" r="1.5" />
+            <line x1="8" y1="5" x2="8" y2="13" />
+            <path d="M5 10l3 3 3-3" />
+            <path d="M5 8h6" />
+        </svg>
+    )
+}
+function IconCoastal() {
+    return (
+        <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            <path d="M1 6c1.5-2 3-2 4.5 0s3 2 4.5 0 3-2 4.5 0" />
+            <path d="M1 10c1.5-2 3-2 4.5 0s3 2 4.5 0 3-2 4.5 0" />
+        </svg>
+    )
+}
+function IconDeepSea() {
+    return (
+        <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            <path d="M8 2v10" />
+            <path d="M5 9l3 3 3-3" />
+            <path d="M3 5h2M11 5h2" />
+            <circle cx="8" cy="2" r="1" fill="currentColor" stroke="none" />
+        </svg>
+    )
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
@@ -1061,7 +1100,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
     }
 
     return (
-        <div className="w-full h-screen bg-blue-900 text-white flex flex-col">
+        <div className="w-full h-screen bg-gradient-to-b from-slate-950 via-blue-950 to-blue-900 text-white flex flex-col">
 
             {/* DEV shortcut toast */}
             {devToast && (
@@ -1265,12 +1304,14 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                 <div className="flex items-center gap-2">
                     <h1 className="text-base font-bold">Fish Banks Game</h1>
                     {isMultiplayer && activeTeam && (
-                        <span className="text-xs px-2 py-0.5 rounded font-medium bg-blue-500/30 text-blue-200">
-                            {activeTeam.farbe} {activeTeam.name} (You)
+                        <span className="flex items-center gap-1.5 text-xs px-2 py-0.5 rounded font-medium bg-white/10 text-blue-200">
+                            <TeamDot farbe={activeTeam.farbe} />
+                            {activeTeam.name} (You)
                         </span>
                     )}
                     {!isMultiplayer && humanTeams.length > 1 && activeTeam && (
-                        <span className="text-xs px-2 py-0.5 rounded font-medium bg-blue-500/30 text-blue-200">
+                        <span className="flex items-center gap-1.5 text-xs px-2 py-0.5 rounded font-medium bg-white/10 text-blue-200">
+                            <TeamDot farbe={activeTeam.farbe} />
                             {activeTeam.name} ({hotSeatEntryIdx + 1}/{humanTeams.length})
                         </span>
                     )}
@@ -1322,16 +1363,23 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                 return (
                                     <div
                                         key={team.name}
-                                        className={`flex-1 rounded-xl px-3 py-2.5 transition-all ${
-                                            isActive ? 'bg-green-600/80 ring-2 ring-green-400' :
-                                            hasSubmitted ? 'bg-green-900/50 ring-1 ring-green-600/50' :
-                                            'bg-white/10'
+                                        className={`flex-1 rounded-xl px-3 py-2.5 overflow-hidden transition-all border-l-4 ${
+                                            isActive ? 'bg-white/15' :
+                                            hasSubmitted ? 'bg-green-900/20' :
+                                            'bg-white/8'
                                         }`}
+                                        style={{
+                                            borderLeftColor: teamHex(team.farbe),
+                                            boxShadow: isActive ? `0 0 20px ${teamHex(team.farbe)}33, inset 0 0 0 1px ${teamHex(team.farbe)}22` : 'none'
+                                        }}
                                     >
                                         <div className="flex justify-between items-center mb-0.5">
-                                            <span className="font-bold text-sm truncate">{team.farbe} {team.name}</span>
+                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                <TeamDot farbe={team.farbe} />
+                                                <span className="font-bold text-sm truncate">{team.name}</span>
+                                            </div>
                                             <span className="text-xs opacity-70 shrink-0 ml-1">
-                                                {team.istKI ? (team.disconnectedHuman ? '🔌' : '🤖') : hasSubmitted ? '✓' : isActive ? '◉' : '…'}
+                                                {team.istKI ? (team.disconnectedHuman ? '🔌' : 'AI') : hasSubmitted ? '✓' : isActive ? '◉' : '…'}
                                             </span>
                                         </div>
                                         {team.istKI && (
@@ -1382,16 +1430,20 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                     : <span className="font-bold text-sm text-blue-400">Hidden by instructor</span>
                                 }
                             </div>
-                            <div className="w-full bg-white/20 rounded-full h-2 overflow-hidden mb-1">
+                            <div className="w-full rounded-full h-3 overflow-hidden mb-1 relative" style={{ background: 'rgba(255,255,255,0.12)' }}>
+                                {showFishStock && (
+                                    <div className="absolute inset-0 rounded-full" style={{ background: 'linear-gradient(to right, #ef4444, #f59e0b 40%, #22c55e 80%)' }} />
+                                )}
                                 <div
-                                    className="h-2 rounded-full fish-bar-transition"
+                                    className="absolute top-0 right-0 h-full fish-bar-transition rounded-r-full"
                                     style={{
-                                        width: showFishStock ? `${fishPct}%` : '100%',
-                                        backgroundColor: showFishStock
-                                            ? (fishDichte > 0.60 ? '#22c55e' : fishDichte > 0.30 ? '#f59e0b' : '#ef4444')
-                                            : '#3b82f6'
+                                        width: showFishStock ? `${100 - fishPct}%` : '0%',
+                                        background: 'rgba(10,20,40,0.8)'
                                     }}
                                 />
+                                {!showFishStock && (
+                                    <div className="absolute inset-0 rounded-full fish-bar-transition" style={{ background: '#3b82f6' }} />
+                                )}
                             </div>
                             <div className={`text-xs ${showFishStock ? (fishDichte > 0.60 ? 'text-green-300' : fishDichte > 0.30 ? 'text-yellow-300' : 'text-red-300') : 'text-blue-400'}`}>
                                 {showFishStock ? (fishDichte > 0.60 ? 'Healthy' : fishDichte > 0.30 ? 'Endangered' : 'Critical!') : 'Observe catch rates to estimate stock'}
@@ -1432,12 +1484,15 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                         </span>
                                     </div>
                                     {[
-                                        { label: 'Harbor',   color: 'text-blue-200',   hint: '50€/ship · no catch',    val: currentHarbor,  set: setCurrentHarbor },
-                                        { label: 'Coastal',  color: 'text-blue-200',   hint: '150€/ship · max 15/ship', val: currentCoastal, set: setCurrentCoastal },
-                                        { label: 'Deep Sea', color: 'text-blue-200',   hint: '250€/ship · max 25/ship', val: currentDeepSea, set: setCurrentDeepSea },
-                                    ].map(({ label, color, hint, val, set }) => (
+                                        { label: 'Harbor',   icon: <IconHarbor />,   hint: '50€/ship · no catch',    val: currentHarbor,  set: setCurrentHarbor },
+                                        { label: 'Coastal',  icon: <IconCoastal />,  hint: '150€/ship · max 15/ship', val: currentCoastal, set: setCurrentCoastal },
+                                        { label: 'Deep Sea', icon: <IconDeepSea />,  hint: '250€/ship · max 25/ship', val: currentDeepSea, set: setCurrentDeepSea },
+                                    ].map(({ label, icon, hint, val, set }) => (
                                         <div key={label} className="flex items-center gap-1.5 mb-1 last:mb-0">
-                                            <span className={`text-xs w-16 ${color}`}>{label}</span>
+                                            <div className="flex items-center gap-1 w-[72px] text-blue-300">
+                                                {icon}
+                                                <span className="text-xs">{label}</span>
+                                            </div>
                                             <button onClick={() => set(Math.max(0, val - 1))} disabled={val === 0}
                                                 className="bg-white/20 hover:bg-white/30 disabled:opacity-30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0">−</button>
                                             <span className="w-5 text-center font-bold text-sm">{val}</span>
@@ -1511,12 +1566,17 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                     const expNet = expRev - expOp
                                     return (
                                         <div className="bg-white/5 rounded-lg p-2.5">
-                                            <div className="text-xs font-bold text-blue-200 mb-1">Expected This Round</div>
-                                            <div className="grid grid-cols-2 gap-x-3 text-xs leading-relaxed">
-                                                <div className="text-blue-300">Catch: <span className="text-white font-bold">~{expCatch} fish</span></div>
+                                            <div className="text-xs font-bold text-blue-200 mb-1.5">Expected This Round</div>
+                                            <div className="grid grid-cols-3 gap-x-3 text-xs leading-relaxed mb-2">
+                                                <div className="text-blue-300">Catch: <span className="text-white font-bold">~{expCatch}</span></div>
                                                 <div className="text-blue-300">Revenue: <span className="text-green-300">+{expRev.toLocaleString()}€</span></div>
                                                 <div className="text-blue-300">Op costs: <span className="text-red-300">−{expOp.toLocaleString()}€</span></div>
-                                                <div className="text-blue-300">Net income: <span className={expNet >= 0 ? 'text-green-300' : 'text-red-300'}>{expNet >= 0 ? '+' : ''}{expNet.toLocaleString()}€</span></div>
+                                            </div>
+                                            <div className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 ${expNet >= 0 ? 'bg-green-500/15 border border-green-400/20' : 'bg-red-500/15 border border-red-400/20'}`}>
+                                                <span className="text-xs font-bold text-blue-200">Net income</span>
+                                                <span className={`font-bold text-base ${expNet >= 0 ? 'text-green-300' : 'text-red-300'}`}>
+                                                    {expNet >= 0 ? '+' : ''}{expNet.toLocaleString()}€
+                                                </span>
                                             </div>
                                         </div>
                                     )
@@ -2107,7 +2167,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                             return (
                                                 <div key={team.name} className={`grid grid-cols-6 gap-x-2 text-xs rounded-lg px-3 py-1.5 items-center ${isLeader ? 'bg-yellow-500/15 border border-yellow-400/20' : 'bg-white/5'}`}>
                                                     <div className={`font-bold ${isLeader ? 'text-yellow-300' : 'text-blue-500'}`}>{RANKS[rankIdx] ?? `${rankIdx + 1}th`}</div>
-                                                    <div className={`font-bold truncate ${isLeader ? 'text-yellow-100' : ''}`}>{team.farbe} {team.name} {team.istKI ? '🤖' : ''}</div>
+                                                    <div className={`flex items-center gap-1.5 font-bold truncate ${isLeader ? 'text-yellow-100' : ''}`}><TeamDot farbe={team.farbe} />{team.name} {team.istKI ? 'AI' : ''}</div>
                                                     <div className="text-center text-blue-200">{team.fleet}{(team.shipsInDelivery || 0) > 0 ? <span className="text-green-400"> +{team.shipsInDelivery}</span> : ''}</div>
                                                     <div className="text-right text-yellow-300">{fleetValue.toLocaleString()}€</div>
                                                     <div className="text-right text-blue-200">{team.bankBalance.toLocaleString()}€</div>
