@@ -1141,48 +1141,45 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
             {/* Round result modal */}
             {rundenErgebnis && (
                 <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-                    <div className="bg-blue-900 border border-blue-700 rounded-xl p-5 max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+                    <div className="bg-blue-900 border border-blue-700 rounded-xl p-5 max-w-4xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
                         <h2 className="text-xl font-bold mb-0.5 text-center">Round {rundenErgebnis.runde} Complete</h2>
-                        <p className="text-blue-400 text-xs text-center mb-4">End of year {rundenErgebnis.runde}</p>
+                        <p className="text-blue-400 text-xs text-center mb-3">End of year {rundenErgebnis.runde}</p>
 
-                        {rundenErgebnis.roundDeliveries.length > 0 && (
-                            <div className="bg-green-500/15 border border-green-400/30 rounded-lg p-2.5 mb-4">
-                                <div className="font-bold text-xs text-green-300 mb-1">Ships delivered at start of round</div>
-                                {rundenErgebnis.roundDeliveries.map((d, i) => (
-                                    <div key={i} className="text-xs text-green-200">
-                                        {d.farbe} {d.name}: +{d.count} ship{d.count !== 1 ? 's' : ''} delivered
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                        {/* At-a-glance summary strip */}
+                        {(() => {
+                            const totalDelivered = rundenErgebnis.roundDeliveries.reduce((s, d) => s + d.count, 0)
+                            const tradedShips = (rundenErgebnis.auctionEvents || []).filter(e => e.erfolg).length
+                                + (rundenErgebnis.listingEvents || []).reduce((s, e) => s + (e.erfolg ? e.ships : 0), 0)
+                            const stats = [
+                                { icon: '🎣', label: 'Total catch', value: `${(rundenErgebnis.gesamtFang || 0).toLocaleString()} fish` },
+                                { icon: '🐟', label: 'Fish stock', value: Math.max(0, rundenErgebnis.neuerFischbestand).toLocaleString(), delta: rundenErgebnis.fischDelta },
+                                { icon: '🚢', label: 'Ships delivered', value: totalDelivered > 0 ? `+${totalDelivered}` : '—' },
+                                { icon: '🔨', label: 'Ships traded', value: tradedShips > 0 ? tradedShips : '—' },
+                            ]
+                            return (
+                                <div className="grid grid-cols-4 gap-2 mb-4">
+                                    {stats.map((s, i) => (
+                                        <div key={i} className="bg-white/10 rounded-lg p-2 text-center">
+                                            <div className="text-lg leading-none mb-1">{s.icon}</div>
+                                            <div className="text-[11px] text-blue-300">{s.label}</div>
+                                            <div className="text-sm font-bold text-white">
+                                                {s.value}
+                                                {s.delta != null && s.delta !== 0 && (
+                                                    <span className={`ml-1 text-xs font-bold ${s.delta >= 0 ? 'text-green-300' : 'text-red-300'}`}>
+                                                        {s.delta >= 0 ? '+' : ''}{s.delta.toLocaleString()}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )
+                        })()}
 
-                        {/* AI ship purchases this round */}
-                        {(rundenErgebnis.aiShipPurchases || []).length > 0 && (
-                            <div className="bg-blue-500/15 border border-blue-400/30 rounded-lg p-2.5 mb-4">
-                                <div className="font-bold text-xs text-blue-300 mb-1">AI Ship Purchases</div>
-                                {rundenErgebnis.aiShipPurchases.map((p, i) => (
-                                    <div key={i} className="text-xs text-blue-200">
-                                        {p.farbe} {p.name} purchased {p.count} ship{p.count !== 1 ? 's' : ''} at auction ({p.price.toLocaleString()}€ each)
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {/* AI ships offered at auction — human can bid next round in Market tab */}
-                        {(rundenErgebnis.newPendingOffers || []).length > 0 && (
-                            <div className="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-2.5 mb-4">
-                                <div className="font-bold text-xs text-yellow-300 mb-1">Ships Offered at Auction</div>
-                                {rundenErgebnis.newPendingOffers.map((offer, i) => (
-                                    <div key={i} className="text-xs text-blue-200">
-                                        {offer.sellerFarbe} {offer.sellerName} offered {offer.count} ship{offer.count !== 1 ? 's' : ''} at auction — bid in the Market tab next round
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
+                        <div className="flex gap-3">
                         {/* YOUR RESULTS */}
-                        <div className="mb-4">
-                            <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">Your Results</div>
+                        <div className="flex-1 min-w-0">
+                            <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">🎣 Your Results</div>
                             {(showOtherCatches ? rundenErgebnis.teams : rundenErgebnis.teams.filter(t => !t.istKI)).map(team => {
                                 const s = team.roundSummary
                                 if (!s) return null
@@ -1239,12 +1236,15 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                             })}
                         </div>
 
+                        {/* Right column — fishery update & market activity */}
+                        <div className="w-[38%] flex-none flex flex-col gap-3">
+
                         {/* FISHERY UPDATE */}
                         {(() => {
                             const naturalGrowth = rundenErgebnis.neuerFischbestand - rundenErgebnis.alterFischbestand + (rundenErgebnis.gesamtFang || 0)
                             return (
-                                <div className="mb-4">
-                                    <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">Fishery Update</div>
+                                <div>
+                                    <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">🐟 Fishery Update</div>
                                     <div className={`rounded-lg p-3 ${rundenErgebnis.fischDelta < 0 ? 'bg-red-500/20 border border-red-400/30' : 'bg-green-500/15 border border-green-400/20'}`}>
                                         <div className="grid grid-cols-2 gap-x-3 text-xs leading-relaxed mb-2">
                                             <div className="text-blue-200">Total catch: <span className="text-white font-bold">{(rundenErgebnis.gesamtFang || 0).toLocaleString()} fish</span></div>
@@ -1260,41 +1260,61 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                             )
                         })()}
 
-                        {rundenErgebnis.auctionEvents.length > 0 && (
-                            <div className="bg-yellow-500/10 border border-yellow-400/20 rounded-lg p-2.5 mb-4">
-                                <div className="font-bold text-xs text-yellow-300 mb-1">Auction Result</div>
-                                {rundenErgebnis.auctionEvents.map((ev, i) => (
-                                    <div key={i} className="text-xs text-blue-200">
-                                        {ev.erfolg
-                                            ? `1 ship sold to ${ev.kaeufer} for ${ev.preis.toLocaleString()}€`
-                                            : 'No bid received – ship not sold'}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                        {/* Merged Market Activity feed — deliveries, AI purchases, pending offers, auction & listing results */}
+                        {(() => {
+                            const items = []
+                            rundenErgebnis.roundDeliveries.forEach((d, i) => items.push({
+                                key: `del-${i}`, icon: '🚢', color: 'text-green-200',
+                                text: `${d.farbe} ${d.name}: +${d.count} ship${d.count !== 1 ? 's' : ''} delivered`
+                            }))
+                            ;(rundenErgebnis.aiShipPurchases || []).forEach((p, i) => items.push({
+                                key: `aip-${i}`, icon: '🤖', color: 'text-blue-200',
+                                text: `${p.farbe} ${p.name} purchased ${p.count} ship${p.count !== 1 ? 's' : ''} at auction (${p.price.toLocaleString()}€ each)`
+                            }))
+                            ;(rundenErgebnis.newPendingOffers || []).forEach((o, i) => items.push({
+                                key: `pend-${i}`, icon: '⏳', color: 'text-yellow-200',
+                                text: `${o.sellerFarbe} ${o.sellerName} offered ${o.count} ship${o.count !== 1 ? 's' : ''} at auction — bid in the Market tab next round`
+                            }))
+                            rundenErgebnis.auctionEvents.forEach((ev, i) => items.push({
+                                key: `auc-${i}`, icon: '🔨', color: ev.erfolg ? 'text-yellow-200' : 'text-blue-400',
+                                text: ev.erfolg
+                                    ? `1 ship sold to ${ev.kaeufer} for ${ev.preis.toLocaleString()}€`
+                                    : 'No bid received – ship not sold'
+                            }))
+                            ;(rundenErgebnis.listingEvents || []).forEach((ev, i) => items.push({
+                                key: `list-${i}`, icon: '📋', color: ev.erfolg ? 'text-indigo-200' : 'text-blue-400',
+                                text: ev.erfolg
+                                    ? `${ev.ships} ship${ev.ships !== 1 ? 's' : ''} from ${ev.sellerName} sold to ${ev.kaeufer} for ${ev.preis.toLocaleString()}€`
+                                    : `${ev.ships} ship${ev.ships !== 1 ? 's' : ''} from ${ev.sellerName} – no qualifying bid, returned to seller`
+                            }))
 
-                        {(rundenErgebnis.listingEvents || []).length > 0 && (
-                            <div className="bg-indigo-500/10 border border-indigo-400/20 rounded-lg p-2.5 mb-4">
-                                <div className="font-bold text-xs text-indigo-300 mb-1">Open Market Results</div>
-                                {rundenErgebnis.listingEvents.map((ev, i) => (
-                                    <div key={i} className="text-xs text-blue-200">
-                                        {ev.erfolg
-                                            ? `${ev.ships} ship${ev.ships !== 1 ? 's' : ''} from ${ev.sellerName} sold to ${ev.kaeufer} for ${ev.preis.toLocaleString()}€`
-                                            : `${ev.ships} ship${ev.ships !== 1 ? 's' : ''} from ${ev.sellerName} – no qualifying bid, returned to seller`}
+                            if (items.length === 0) return null
+                            return (
+                                <div className="bg-white/5 border border-white/10 rounded-lg p-2.5">
+                                    <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-1.5">📰 Market Activity</div>
+                                    <div className="space-y-1">
+                                        {items.map(item => (
+                                            <div key={item.key} className={`text-xs flex items-start gap-1.5 ${item.color}`}>
+                                                <span className="shrink-0">{item.icon}</span>
+                                                <span>{item.text}</span>
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
-                            </div>
-                        )}
+                                </div>
+                            )
+                        })()}
 
                         {rundenErgebnis.neuerFischbestand < maxFischUI * 0.40 && (
-                            <div className="bg-orange-500/20 border border-orange-400/40 rounded-lg p-2.5 mb-4 text-xs text-orange-200 text-center">
+                            <div className="bg-orange-500/20 border border-orange-400/40 rounded-lg p-2.5 text-xs text-orange-200 text-center">
                                 <strong>Warning:</strong> Fish stock is below 40% — sustainable yields are at risk!
                             </div>
                         )}
+                        </div>
+                        </div>
 
                         <button
                             onClick={handleWeiter}
-                            className="w-full bg-green-500 hover:bg-green-400 font-bold py-3 rounded-xl transition-colors text-base"
+                            className="w-full bg-green-500 hover:bg-green-400 font-bold py-3 rounded-xl transition-colors text-base mt-4"
                         >
                             {rundenErgebnis.gameStateNachRunde?.phase === 'ende' || rundenErgebnis.gameStateNachRunde?.fischbestand <= 0
                                 ? 'View Final Results →'
