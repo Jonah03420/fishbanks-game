@@ -54,6 +54,7 @@ function EndPage({ gameState, onRestart }) {
 
     let niedrigsterBestand = { runde: 0, wert: Infinity }
     let groessterEinzelAbfall = { runde: 0, delta: 0 }
+    let groessterGewinnVerlust = { team: null, farbe: null, runde: 0, betrag: 0 }
     gameState.verlauf.forEach((v, i) => {
         const fisch = v.fischbestand ?? 0
         if (fisch < niedrigsterBestand.wert) {
@@ -65,6 +66,15 @@ function EndPage({ gameState, onRestart }) {
                 groessterEinzelAbfall = { runde: v.runde, delta }
             }
         }
+        gameState.teams.forEach(team => {
+            const rs = v[`${team.name}_rs`]
+            if (rs) {
+                const netIncome = rs.finalBalance - rs.startBalance
+                if (Math.abs(netIncome) > Math.abs(groessterGewinnVerlust.betrag)) {
+                    groessterGewinnVerlust = { team: team.name, farbe: team.farbe, runde: v.runde, betrag: netIncome }
+                }
+            }
+        })
     })
 
     const scoreColor = sustainabilityScore > 60 ? 'text-green-400' : sustainabilityScore > 40 ? 'text-yellow-400' : sustainabilityScore > 20 ? 'text-orange-400' : 'text-red-400'
@@ -182,6 +192,16 @@ function EndPage({ gameState, onRestart }) {
                                         </div>
                                     </div>
                                 )
+                            )}
+                            {groessterGewinnVerlust.team && (
+                                <div className={`flex items-start gap-2 ${groessterGewinnVerlust.betrag >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'} rounded-lg p-2.5`}>
+                                    <div>
+                                        <div className="font-bold text-xs">Biggest Single {groessterGewinnVerlust.betrag >= 0 ? 'Profit' : 'Loss'}</div>
+                                        <div className="text-blue-300 text-xs">
+                                            Round {groessterGewinnVerlust.runde}: {groessterGewinnVerlust.farbe} {groessterGewinnVerlust.team} {groessterGewinnVerlust.betrag >= 0 ? 'gained' : 'lost'} {Math.abs(groessterGewinnVerlust.betrag).toLocaleString()}€ in one round
+                                        </div>
+                                    </div>
+                                </div>
                             )}
                             {gameState.auctionHistory?.length > 0 && (
                                 <div className="flex items-start gap-2 bg-yellow-500/10 rounded-lg p-2.5">
