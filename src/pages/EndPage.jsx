@@ -108,8 +108,8 @@ function EndPage({ gameState, onRestart }) {
                 </div>
 
                 {/* Winner */}
-                <div className="bg-yellow-500/20 rounded-xl px-5 py-3 flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-yellow-400/20 flex items-center justify-center text-yellow-300 shrink-0">
+                <div className="bg-gradient-to-br from-yellow-500/30 to-amber-600/20 border border-yellow-400/30 rounded-xl px-5 py-3 flex items-center gap-4 shadow-lg shadow-yellow-900/20">
+                    <div className="w-10 h-10 rounded-full bg-yellow-400/25 border border-yellow-300/30 flex items-center justify-center text-yellow-300 shrink-0">
                         <IconTrophy className="w-5 h-5" />
                     </div>
                     <div>
