@@ -1279,13 +1279,13 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                         </div>
 
                         {/* Right column — fishery update & market activity */}
-                        <div className="w-[38%] flex-none flex flex-col gap-3">
+                        <div className="w-[38%] flex-none flex flex-col gap-3 self-stretch">
 
                         {/* FISHERY UPDATE */}
                         {(() => {
                             const naturalGrowth = rundenErgebnis.neuerFischbestand - rundenErgebnis.alterFischbestand + (rundenErgebnis.gesamtFang || 0)
                             return (
-                                <div>
+                                <div className="shrink-0">
                                     <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">🐟 Fishery Update</div>
                                     <div className={`rounded-lg p-3 ${rundenErgebnis.fischDelta < 0 ? 'bg-red-500/20 border border-red-400/30' : 'bg-green-500/15 border border-green-400/20'}`}>
                                         <div className="grid grid-cols-2 gap-x-3 text-xs leading-relaxed mb-2">
@@ -1330,18 +1330,23 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                     : `${ev.ships} ship${ev.ships !== 1 ? 's' : ''} from ${ev.sellerName} – no qualifying bid, returned to seller`
                             }))
 
-                            if (items.length === 0) return null
                             return (
-                                <div className="bg-white/5 border border-white/10 rounded-lg p-2.5">
+                                <div className="bg-white/5 border border-white/10 rounded-lg p-2.5 flex-1 flex flex-col min-h-[8rem]">
                                     <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-1.5">📰 Market Activity</div>
-                                    <div className="space-y-1">
-                                        {items.map(item => (
-                                            <div key={item.key} className={`text-xs flex items-start gap-1.5 ${item.color}`}>
-                                                <span className="shrink-0">{item.icon}</span>
-                                                <span>{item.text}</span>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    {items.length === 0 ? (
+                                        <div className="flex-1 flex items-center justify-center text-xs text-blue-400 italic text-center px-4">
+                                            No deliveries, trades or auction activity this round.
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-1.5 overflow-y-auto pr-1">
+                                            {items.map(item => (
+                                                <div key={item.key} className={`text-xs flex items-start gap-1.5 ${item.color}`}>
+                                                    <span className="shrink-0">{item.icon}</span>
+                                                    <span>{item.text}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             )
                         })()}
