@@ -1,5 +1,6 @@
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts'
 import { GAME_CONFIG, berechneFischbestand } from '../game/fishLogic'
+import { teamHex } from '../game/teamColors'
 
 function berechneOptimalesErgebnis(maxRunden, startFischbestand, params) {
     let fischbestand = startFischbestand
@@ -30,10 +31,9 @@ function EndPage({ gameState, onRestart }) {
     const maxRunden = gameState.maxRunden || GAME_CONFIG.maxRunden
     const marketShipPrice = gameState.marketShipPrice || GAME_CONFIG.auctionPreis
 
-    const teamColors = ['#ef4444', '#f59e0b', '#22d3ee', '#a78bfa']
-
     const netWorthDaten = gameState.teams.map(team => ({
         name: team.name,
+        farbe: team.farbe,
         'Net Worth': team.netWorth,
     }))
 
@@ -230,7 +230,7 @@ function EndPage({ gameState, onRestart }) {
                                             yAxisId="right"
                                             type="monotone"
                                             dataKey={d => d[team.name]}
-                                            stroke={teamColors[i]}
+                                            stroke={teamHex(team.farbe)}
                                             strokeWidth={1.5}
                                             strokeDasharray="5 3"
                                             name={`${team.name} NW`}
@@ -251,7 +251,11 @@ function EndPage({ gameState, onRestart }) {
                                     <XAxis dataKey="name" stroke="rgba(255,255,255,0.5)" tick={{ fontSize: 10 }} />
                                     <YAxis stroke="rgba(255,255,255,0.5)" tickFormatter={v => v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)} tick={{ fontSize: 10 }} width={35} domain={[0, niceMax]} ticks={niceBarTicks} />
                                     <Tooltip contentStyle={{ backgroundColor: '#1e3a8a', border: 'none', borderRadius: '8px', fontSize: 11 }} formatter={v => [`${v.toLocaleString()}€`, 'Net Worth']} />
-                                    <Bar dataKey="Net Worth" fill="#3b82f6" radius={[3, 3, 0, 0]} />
+                                    <Bar dataKey="Net Worth" radius={[3, 3, 0, 0]}>
+                                        {netWorthDaten.map((entry, i) => (
+                                            <Cell key={i} fill={teamHex(entry.farbe)} />
+                                        ))}
+                                    </Bar>
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>

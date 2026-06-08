@@ -6,6 +6,7 @@ import {
     kiDecisionEasy, kiDecisionHard,
     erzeugeMarktereignis,
 } from '../game/fishLogic'
+import { teamHex } from '../game/teamColors'
 
 // ─── MIT Order Verification Test (DEV only) ───────────────────────────────────
 // Scenario: fleet=3 ships (1 harbor, 1 coastal, 1 deep sea), startBalance=$5000
@@ -587,8 +588,6 @@ function AuctionListingCard({ listing, mySlotIndex, socket, roomCode }) {
 
 // ─── Team color helpers ───────────────────────────────────────────────────────
 
-const TEAM_COLOR_MAP = { '🔴': '#ef4444', '🟡': '#eab308', '🟢': '#22c55e', '🔵': '#3b82f6' }
-function teamHex(farbe) { return TEAM_COLOR_MAP[farbe] ?? '#6b7280' }
 function TeamDot({ farbe }) {
     return <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: teamHex(farbe) }} />
 }
