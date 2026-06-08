@@ -1,5 +1,5 @@
 import { GAME_CONFIG } from '../game/fishLogic'
-import { IconGear } from '../components/icons'
+import { IconGear, IconArrowRight } from '../components/icons'
 
 function FishLogo({ className }) {
   return (
@@ -163,7 +163,7 @@ function StartPage({ connected, onCreateGame, onJoinGame, onOpenAdmin }) {
                 <div className="font-bold">Create Game</div>
                 <div className="text-green-100 text-sm font-normal">Open a room as host</div>
               </div>
-              <svg className="w-5 h-5 text-green-200 flex-shrink-0 group-hover:translate-x-0.5 transition-transform" viewBox="0 0 20 20" fill="none"><path d="M4 10h12M11 5l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              <IconArrowRight className="w-5 h-5 text-green-200 flex-shrink-0" />
             </div>
           </button>
 
@@ -176,7 +176,7 @@ function StartPage({ connected, onCreateGame, onJoinGame, onOpenAdmin }) {
                 <div className="font-bold">Join Game</div>
                 <div className="text-blue-100 text-sm font-normal">Enter with 4-letter room code</div>
               </div>
-              <svg className="w-5 h-5 text-blue-200 flex-shrink-0 group-hover:translate-x-0.5 transition-transform" viewBox="0 0 20 20" fill="none"><path d="M4 10h12M11 5l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              <IconArrowRight className="w-5 h-5 text-blue-200 flex-shrink-0" />
             </div>
           </button>
 

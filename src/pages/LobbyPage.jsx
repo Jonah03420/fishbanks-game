@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { IconGear } from '../components/icons'
+import { IconGear, IconArrowRight } from '../components/icons'
 
 const COLOR_HEX = {
   red: '#ef4444', yellow: '#eab308', green: '#22c55e',
@@ -232,7 +232,7 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
             <button onClick={doCreate} disabled={!connected}
               className="w-full bg-gradient-to-br from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 px-6 rounded-xl text-base transition-all hover:-translate-y-0.5 shadow-lg group flex items-center justify-between">
               <span>Create Room</span>
-              <svg className="w-5 h-5 text-green-200 group-hover:translate-x-0.5 transition-transform" viewBox="0 0 20 20" fill="none"><path d="M4 10h12M11 5l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              <IconArrowRight className="w-5 h-5 text-green-200" />
             </button>
             <button onClick={onBack} className="w-full text-blue-400 hover:text-white text-sm transition-colors py-2">
               ← Back
@@ -308,7 +308,7 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
             <button onClick={doJoin} disabled={!connected}
               className="w-full bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 px-6 rounded-xl text-base transition-all hover:-translate-y-0.5 shadow-lg group flex items-center justify-between">
               <span>Join Room</span>
-              <svg className="w-5 h-5 text-blue-200 group-hover:translate-x-0.5 transition-transform" viewBox="0 0 20 20" fill="none"><path d="M4 10h12M11 5l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              <IconArrowRight className="w-5 h-5 text-blue-200" />
             </button>
             <button onClick={onBack} className="w-full text-blue-400 hover:text-white text-sm transition-colors py-2">
               ← Back
@@ -421,7 +421,7 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
                   <button onClick={doStartGame} disabled={!connected}
                     className="w-full bg-gradient-to-br from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 disabled:opacity-50 disabled:cursor-not-allowed font-bold py-4 px-6 rounded-xl text-base transition-all hover:-translate-y-0.5 shadow-lg group flex items-center justify-between">
                     <span>Start Game</span>
-                    <svg className="w-5 h-5 text-green-200 group-hover:translate-x-0.5 transition-transform" viewBox="0 0 20 20" fill="none"><path d="M4 10h12M11 5l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    <IconArrowRight className="w-5 h-5 text-green-200" />
                   </button>
                   <button onClick={doLeave} className="w-full text-blue-400 hover:text-white text-sm transition-colors py-2">
                     ← Leave Room

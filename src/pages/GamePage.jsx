@@ -1180,7 +1180,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                 <div className="grid grid-cols-4 gap-2 mb-4">
                                     {stats.map((s, i) => (
                                         <div key={i} className="bg-white/10 rounded-lg p-2 text-center">
-                                            <div className="flex items-center justify-center mb-1 text-blue-300"><s.Icon className="w-4 h-4" /></div>
+                                            <div className="w-7 h-7 mx-auto rounded-lg bg-cyan-500/20 flex items-center justify-center mb-1 text-cyan-300"><s.Icon className="w-4 h-4" /></div>
                                             <div className="text-[11px] text-blue-300">{s.label}</div>
                                             <div className="text-sm font-bold text-white">
                                                 {s.value}
@@ -1422,7 +1422,17 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                                 <span className="font-bold text-sm truncate">{team.name}</span>
                                             </div>
                                             <span className="text-xs opacity-70 shrink-0 ml-1 inline-flex items-center">
-                                                {team.istKI ? (team.disconnectedHuman ? <IconPlug className="w-3 h-3" /> : 'AI') : hasSubmitted ? '✓' : isActive ? '◉' : '…'}
+                                                {team.istKI ? (
+                                                    team.disconnectedHuman
+                                                        ? <IconPlug className="w-3 h-3 text-orange-400" />
+                                                        : <IconRobot className="w-3 h-3" />
+                                                ) : hasSubmitted ? (
+                                                    <IconCheck className="w-3 h-3 text-green-400" />
+                                                ) : isActive ? (
+                                                    <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                                                ) : (
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-white/40" />
+                                                )}
                                             </span>
                                         </div>
                                         {team.istKI && (
@@ -1537,9 +1547,11 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                                 <span className="text-xs">{label}</span>
                                             </div>
                                             <button onClick={() => set(Math.max(0, val - 1))} disabled={val === 0}
+                                                aria-label={`Fewer ships to ${label}`}
                                                 className="bg-white/20 hover:bg-white/30 disabled:opacity-30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0">−</button>
                                             <span className="w-5 text-center font-bold text-sm">{val}</span>
                                             <button onClick={() => set(val + 1)} disabled={totalAllocated >= fleetSize}
+                                                aria-label={`More ships to ${label}`}
                                                 className="bg-white/20 hover:bg-white/30 disabled:opacity-30 w-6 h-6 rounded-full font-bold text-sm flex items-center justify-center shrink-0">+</button>
                                             <span className="text-xs text-blue-300 opacity-70">{hint}</span>
                                         </div>

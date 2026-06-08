@@ -10,6 +10,14 @@ const base = {
     strokeLinejoin: 'round',
 }
 
+export function IconArrowRight({ className = 'w-5 h-5' }) {
+    return (
+        <svg className={`${className} shrink-0 group-hover:translate-x-0.5 transition-transform`} viewBox="0 0 20 20" fill="none">
+            <path d="M4 10h12M11 5l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+    )
+}
+
 export function IconGear({ className = 'w-3.5 h-3.5' }) {
     return (
         <svg {...base} className={`${className} shrink-0`}>

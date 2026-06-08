@@ -1,7 +1,7 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts'
 import { GAME_CONFIG, berechneFischbestand } from '../game/fishLogic'
 import { teamHex } from '../game/teamColors'
-import { IconMedal, IconRobot } from '../components/icons'
+import { IconMedal, IconRobot, IconTrophy } from '../components/icons'
 
 function TeamDot({ farbe }) {
     return <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: teamHex(farbe) }} />
@@ -109,6 +109,9 @@ function EndPage({ gameState, onRestart }) {
 
                 {/* Winner */}
                 <div className="bg-yellow-500/20 rounded-xl px-5 py-3 flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-yellow-400/20 flex items-center justify-center text-yellow-300 shrink-0">
+                        <IconTrophy className="w-5 h-5" />
+                    </div>
                     <div>
                         <div className="text-xs text-yellow-200 mb-0.5">Winner</div>
                         <div className="text-xl font-bold flex items-center gap-2"><TeamDot farbe={winner.farbe} />{winner.name}</div>
