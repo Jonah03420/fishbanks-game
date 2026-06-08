@@ -1183,7 +1183,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
             {/* Round result modal */}
             {rundenErgebnis && (
                 <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-                    <div className="bg-blue-900 border border-blue-700 rounded-xl p-5 max-w-4xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+                    <div className="bg-blue-900 border border-blue-700 rounded-xl p-5 max-w-3xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
                         <h2 className="text-xl font-bold mb-0.5 text-center">Round {rundenErgebnis.runde} Complete</h2>
                         <p className="text-blue-400 text-xs text-center mb-3">End of year {rundenErgebnis.runde}</p>
 
@@ -1249,12 +1249,8 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                                 <span>Fish caught: {s.fang} fish × {fishP}€/fish</span>
                                                 <span className="text-green-300">+{s.fishRevenue.toLocaleString()}€</span>
                                             </div>
-                                            <div className="flex justify-between text-blue-400 italic">
-                                                <span>Min balance (basis for interest)</span>
-                                                <span>{s.minBalance.toLocaleString()}€</span>
-                                            </div>
                                             <div className="flex justify-between text-blue-200">
-                                                <span>Interest ({(intRate * 100).toFixed(0)}% on min balance)</span>
+                                                <span>Interest ({(intRate * 100).toFixed(0)}% on {s.minBalance.toLocaleString()}€ min balance)</span>
                                                 <span className={s.zinsen >= 0 ? 'text-green-300' : 'text-red-300'}>{s.zinsen >= 0 ? '+' : ''}{s.zinsen.toLocaleString()}€</span>
                                             </div>
                                             {s.actualOrder > 0 && (
@@ -1267,11 +1263,6 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                                 <span>Final balance</span>
                                                 <span>{s.finalBalance.toLocaleString()}€</span>
                                             </div>
-                                        </div>
-                                        <div className="mt-2 pt-1.5 border-t border-white/10 grid grid-cols-3 gap-x-2 text-xs text-blue-400">
-                                            <div>Harbor ({s.harborShips}): no catch</div>
-                                            <div>Coastal ({s.coastalShips}): {s.coastalFang} fish</div>
-                                            <div>Deep Sea ({s.deepSeaShips}): {s.deepSeaFang} fish</div>
                                         </div>
                                     </div>
                                 )
