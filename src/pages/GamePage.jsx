@@ -705,7 +705,8 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
     const totalAllocated = currentHarbor + currentCoastal + currentDeepSea
     const allAllocated = totalAllocated === fleetSize
     const maxShipOrder = activeTeam ? Math.ceil(activeTeam.fleet / 2) : 0
-    const safeShipsOrdered = Math.min(currentShipsOrdered, maxShipOrder)
+    const affordableShipOrder = activeTeam ? Math.max(0, Math.floor(activeTeam.bankBalance / newShipPriceUI)) : 0
+    const safeShipsOrdered = Math.min(currentShipsOrdered, maxShipOrder, affordableShipOrder)
 
     const marketPriceHistory = gameState.verlauf.filter(v => v.marketShipPrice != null)
     const prevMarketPrice = marketPriceHistory.length >= 2
@@ -1645,15 +1646,22 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                             <span className="font-normal text-blue-400"> · {newShipPriceUI.toLocaleString()}€ · next round · max {maxShipOrder}</span>
                                         </div>
                                         <div className="flex items-center gap-1 flex-wrap">
-                                            {Array.from({ length: maxShipOrder + 1 }, (_, i) => (
-                                                <button
-                                                    key={i}
-                                                    onClick={() => setCurrentShipsOrdered(i)}
-                                                    className={`min-w-[1.75rem] h-7 rounded px-1 font-bold text-sm transition-colors ${
-                                                        safeShipsOrdered === i ? 'bg-cyan-500 text-white' : 'bg-white/20 hover:bg-white/30 text-white'
-                                                    }`}
-                                                >{i}</button>
-                                            ))}
+                                            {Array.from({ length: maxShipOrder + 1 }, (_, i) => {
+                                                const affordable = i <= affordableShipOrder
+                                                return (
+                                                    <button
+                                                        key={i}
+                                                        onClick={() => affordable && setCurrentShipsOrdered(i)}
+                                                        disabled={!affordable}
+                                                        title={!affordable ? 'Nicht genug Kapital' : undefined}
+                                                        className={`min-w-[1.75rem] h-7 rounded px-1 font-bold text-sm transition-colors ${
+                                                            !affordable
+                                                                ? 'bg-white/5 text-red-400 cursor-not-allowed'
+                                                                : safeShipsOrdered === i ? 'bg-cyan-500 text-white' : 'bg-white/20 hover:bg-white/30 text-white'
+                                                        }`}
+                                                    >{i}</button>
+                                                )
+                                            })}
                                             {safeShipsOrdered > 0 && (
                                                 <span className="text-xs text-blue-300 ml-0.5">−{(safeShipsOrdered * newShipPriceUI).toLocaleString()}€</span>
                                             )}

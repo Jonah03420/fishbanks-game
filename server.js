@@ -406,7 +406,8 @@ function processRound(room) {
 
     // Step 7: New ship orders — payment immediate, delivery next round
     const maxOrder     = Math.ceil(team.fleet / 2)
-    const actualOrders = Math.min(Math.max(0, dec.newShipOrders ?? 0), maxOrder)
+    const affordableOrders = balance >= params.newShipPrice ? Math.floor(balance / params.newShipPrice) : 0
+    const actualOrders = Math.min(Math.max(0, dec.newShipOrders ?? 0), maxOrder, affordableOrders)
     const orderCost    = actualOrders * params.newShipPrice
     balance           -= orderCost
     team.shipsInDelivery = actualOrders
