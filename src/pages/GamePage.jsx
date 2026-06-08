@@ -1230,7 +1230,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                 return (
                                     <div key={team.name} className="bg-white/10 rounded-lg p-3 mb-2 last:mb-0">
                                         <div className="flex items-center gap-2 mb-2">
-                                            <span className="font-bold text-sm">{team.farbe} {team.name}</span>
+                                            <span className="font-bold text-sm flex items-center gap-1.5"><TeamDot farbe={team.farbe} />{team.name}</span>
                                             {team.istKI && <span className="text-xs text-blue-400">🤖 AI</span>}
                                             {team.shipsInDelivery > 0 && (
                                                 <span className="text-xs text-green-400 ml-auto">+{team.shipsInDelivery} ship{team.shipsInDelivery !== 1 ? 's' : ''} arriving next round</span>
@@ -1297,16 +1297,16 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                         {(() => {
                             const items = []
                             rundenErgebnis.roundDeliveries.forEach((d, i) => items.push({
-                                key: `del-${i}`, icon: '🚢', color: 'text-green-200',
-                                text: `${d.farbe} ${d.name}: +${d.count} ship${d.count !== 1 ? 's' : ''} delivered`
+                                key: `del-${i}`, icon: '🚢', color: 'text-green-200', farbe: d.farbe,
+                                text: `${d.name}: +${d.count} ship${d.count !== 1 ? 's' : ''} delivered`
                             }))
                             ;(rundenErgebnis.aiShipPurchases || []).forEach((p, i) => items.push({
-                                key: `aip-${i}`, icon: '🤖', color: 'text-blue-200',
-                                text: `${p.farbe} ${p.name} purchased ${p.count} ship${p.count !== 1 ? 's' : ''} at auction (${p.price.toLocaleString()}€ each)`
+                                key: `aip-${i}`, icon: '🤖', color: 'text-blue-200', farbe: p.farbe,
+                                text: `${p.name} purchased ${p.count} ship${p.count !== 1 ? 's' : ''} at auction (${p.price.toLocaleString()}€ each)`
                             }))
                             ;(rundenErgebnis.newPendingOffers || []).forEach((o, i) => items.push({
-                                key: `pend-${i}`, icon: '⏳', color: 'text-yellow-200',
-                                text: `${o.sellerFarbe} ${o.sellerName} offered ${o.count} ship${o.count !== 1 ? 's' : ''} at auction — bid in the Market tab next round`
+                                key: `pend-${i}`, icon: '⏳', color: 'text-yellow-200', farbe: o.sellerFarbe,
+                                text: `${o.sellerName} offered ${o.count} ship${o.count !== 1 ? 's' : ''} at auction — bid in the Market tab next round`
                             }))
                             rundenErgebnis.auctionEvents.forEach((ev, i) => items.push({
                                 key: `auc-${i}`, icon: '🔨', color: ev.erfolg ? 'text-yellow-200' : 'text-blue-400',
@@ -1333,6 +1333,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                             {items.map(item => (
                                                 <div key={item.key} className={`text-xs flex items-start gap-1.5 ${item.color}`}>
                                                     <span className="shrink-0">{item.icon}</span>
+                                                    {item.farbe && <span className="mt-0.5"><TeamDot farbe={item.farbe} /></span>}
                                                     <span>{item.text}</span>
                                                 </div>
                                             ))}
@@ -2151,8 +2152,8 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                             return (
                                                 <div key={idxStr} className="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-2.5 mb-2">
                                                     <div className="text-xs font-bold text-yellow-300 mb-1">Bid on {seller.name}'s Ships</div>
-                                                    <div className="text-xs text-blue-200 mb-1.5">
-                                                        {seller.farbe} {seller.name} offered {d.boatsOffered} ship{d.boatsOffered !== 1 ? 's' : ''} at auction
+                                                    <div className="text-xs text-blue-200 mb-1.5 flex items-center gap-1.5">
+                                                        <TeamDot farbe={seller.farbe} />{seller.name} offered {d.boatsOffered} ship{d.boatsOffered !== 1 ? 's' : ''} at auction
                                                     </div>
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-xs text-blue-400">Bid:</span>

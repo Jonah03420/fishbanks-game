@@ -2,6 +2,10 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { GAME_CONFIG, berechneFischbestand } from '../game/fishLogic'
 import { teamHex } from '../game/teamColors'
 
+function TeamDot({ farbe }) {
+    return <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: teamHex(farbe) }} />
+}
+
 function berechneOptimalesErgebnis(maxRunden, startFischbestand, params) {
     let fischbestand = startFischbestand
     const startingCapital = params?.startingCapital ?? GAME_CONFIG.startGuthaben
@@ -106,7 +110,7 @@ function EndPage({ gameState, onRestart }) {
                 <div className="bg-yellow-500/20 rounded-xl px-5 py-3 flex items-center gap-4">
                     <div>
                         <div className="text-xs text-yellow-200 mb-0.5">Winner</div>
-                        <div className="text-xl font-bold">{winner.farbe} {winner.name}</div>
+                        <div className="text-xl font-bold flex items-center gap-2"><TeamDot farbe={winner.farbe} />{winner.name}</div>
                         <div className="text-yellow-200 text-sm font-bold">{winner.netWorth.toLocaleString()}€ Net Worth</div>
                         <div className="text-yellow-300 text-xs">{winner.bankBalance.toLocaleString()}€ + {(winner.fleet * marketShipPrice).toLocaleString()}€ ({winner.fleet} ships)</div>
                     </div>
@@ -154,7 +158,7 @@ function EndPage({ gameState, onRestart }) {
                                 <div key={team.name} className="flex justify-between items-center bg-white/10 rounded-lg px-3 py-2 text-sm">
                                     <div className="flex items-center gap-2">
                                         <span>{index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '4.'}</span>
-                                        <span>{team.farbe} {team.name}</span>
+                                        <span className="flex items-center gap-1.5"><TeamDot farbe={team.farbe} />{team.name}</span>
                                         <span className="text-xs text-blue-400">{team.istKI ? '🤖' : ''}</span>
                                     </div>
                                     <div className="text-right">
@@ -197,8 +201,10 @@ function EndPage({ gameState, onRestart }) {
                                 <div className={`flex items-start gap-2 ${groessterGewinnVerlust.betrag >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'} rounded-lg p-2.5`}>
                                     <div>
                                         <div className="font-bold text-xs">Biggest Single {groessterGewinnVerlust.betrag >= 0 ? 'Profit' : 'Loss'}</div>
-                                        <div className="text-blue-300 text-xs">
-                                            Round {groessterGewinnVerlust.runde}: {groessterGewinnVerlust.farbe} {groessterGewinnVerlust.team} {groessterGewinnVerlust.betrag >= 0 ? 'gained' : 'lost'} {Math.abs(groessterGewinnVerlust.betrag).toLocaleString()}€ in one round
+                                        <div className="text-blue-300 text-xs flex items-center gap-1.5 flex-wrap">
+                                            <span>Round {groessterGewinnVerlust.runde}:</span>
+                                            <TeamDot farbe={groessterGewinnVerlust.farbe} />
+                                            <span>{groessterGewinnVerlust.team} {groessterGewinnVerlust.betrag >= 0 ? 'gained' : 'lost'} {Math.abs(groessterGewinnVerlust.betrag).toLocaleString()}€ in one round</span>
                                         </div>
                                     </div>
                                 </div>
