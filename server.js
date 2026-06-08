@@ -354,7 +354,8 @@ function processRound(room) {
     const distressSalePrice  = Math.round(gs.marketShipPrice * 0.5 / 10) * 10
     if (!team.instantBuyCount)  team.instantBuyCount  = 0
     if (!team.instantSellCount) team.instantSellCount = 0
-    const toBuy  = Math.min(Math.max(0, dec.shipsToBuy  ?? 0), Math.max(0, 2 - team.instantBuyCount))
+    const affordableBuys = emergencyBuyPrice > 0 ? Math.floor(Math.max(0, team.bankBalance) / emergencyBuyPrice) : 0
+    const toBuy  = Math.min(Math.max(0, dec.shipsToBuy  ?? 0), Math.max(0, 2 - team.instantBuyCount), affordableBuys)
     const toSell = Math.min(Math.min(Math.max(0, dec.shipsToSell ?? 0), team.fleet), Math.max(0, 2 - team.instantSellCount))
     team.fleet  += toBuy - toSell
     team.auctionPurchases = toBuy
