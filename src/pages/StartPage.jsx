@@ -1,4 +1,5 @@
 import { GAME_CONFIG } from '../game/fishLogic'
+import { IconGear } from '../components/icons'
 
 function FishLogo({ className }) {
   return (
@@ -196,7 +197,7 @@ function StartPage({ connected, onCreateGame, onJoinGame, onOpenAdmin }) {
             onClick={onOpenAdmin}
             className="text-blue-600 hover:text-blue-400 text-xs flex items-center gap-1.5 transition-colors"
           >
-            <span className="w-3 h-3 text-[10px] flex items-center justify-center flex-shrink-0 leading-none">⚙</span>
+            <IconGear />
             Instructor Settings
           </button>
           <div className={`flex items-center gap-1.5 text-xs ${connected ? 'text-green-500' : 'text-red-400'}`}>

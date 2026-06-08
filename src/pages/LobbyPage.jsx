@@ -1,8 +1,13 @@
 import { useState, useEffect } from 'react'
+import { IconGear } from '../components/icons'
 
-const COLOR_EMOJI = {
-  red: '🔴', yellow: '🟡', green: '🟢',
-  blue: '🔵', purple: '🟣', orange: '🟠'
+const COLOR_HEX = {
+  red: '#ef4444', yellow: '#eab308', green: '#22c55e',
+  blue: '#3b82f6', purple: '#a855f7', orange: '#f97316'
+}
+
+function ColorDot({ color, className = 'w-4 h-4' }) {
+  return <span className={`inline-block ${className} rounded-full shrink-0`} style={{ backgroundColor: COLOR_HEX[color] || '#6b7280' }} />
 }
 
 function ConnectionStatus({ connected }) {
@@ -24,7 +29,7 @@ function SlotList({ slots, mySlotIndex }) {
               ? 'bg-white/5 border border-dashed border-white/20 text-blue-400'
               : 'bg-white/10'
           }`}>
-          <span className="text-xl">{COLOR_EMOJI[slot.color] || '⚪'}</span>
+          <ColorDot color={slot.color} />
           <span className="flex-1 font-medium">
             {slot.name}
             {slot.slotIndex === 0 && !slot.isAI && (
@@ -408,7 +413,7 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
                 </div>
                 {onOpenAdmin && (
                   <button onClick={onOpenAdmin} className="text-blue-500 hover:text-blue-300 text-xs transition-colors text-left flex items-center gap-1.5">
-                    <span className="w-3 h-3 flex items-center justify-center text-[10px] leading-none">⚙</span>
+                    <IconGear />
                     Instructor Settings
                   </button>
                 )}

@@ -7,6 +7,11 @@ import {
     erzeugeMarktereignis,
 } from '../game/fishLogic'
 import { teamHex } from '../game/teamColors'
+import {
+    IconAlertTriangle, IconCheck, IconClipboard, IconFish, IconFishingRod,
+    IconGavel, IconHourglass, IconNewspaper, IconPlug, IconRobot, IconShip,
+    IconTag, IconTrophy,
+} from '../components/icons'
 
 // ─── MIT Order Verification Test (DEV only) ───────────────────────────────────
 // Scenario: fleet=3 ships (1 harbor, 1 coastal, 1 deep sea), startBalance=$5000
@@ -484,11 +489,11 @@ function AuctionListingCard({ listing, mySlotIndex, socket, roomCode }) {
     if (listing.status === 'sold') {
         return (
             <div className="bg-green-900/30 border border-green-400/30 rounded-lg p-3">
-                <div className="text-xs text-blue-300 mb-1">
-                    {listing.sellerFarbe} {listing.sellerName} — {listing.ships} ship{listing.ships !== 1 ? 's' : ''} @ {listing.askingPrice.toLocaleString()}€
+                <div className="text-xs text-blue-300 mb-1 flex items-center gap-1.5">
+                    <TeamDot farbe={listing.sellerFarbe} />{listing.sellerName} — {listing.ships} ship{listing.ships !== 1 ? 's' : ''} @ {listing.askingPrice.toLocaleString()}€
                 </div>
-                <div className="text-sm font-bold text-green-300">
-                    ✅ Sold to {listing.resolution?.buyerName} for {listing.resolution?.price.toLocaleString()}€
+                <div className="text-sm font-bold text-green-300 flex items-center gap-1.5">
+                    <IconCheck className="w-3.5 h-3.5" /> Sold to {listing.resolution?.buyerName} for {listing.resolution?.price.toLocaleString()}€
                 </div>
             </div>
         )
@@ -524,8 +529,8 @@ function AuctionListingCard({ listing, mySlotIndex, socket, roomCode }) {
                         </button>
                     )}
                     {isSeller && hasBid && <span className="text-xs text-blue-400 bg-white/10 px-2 py-0.5 rounded">Your listing</span>}
-                    {!isSeller && isWinning && <span className="text-xs text-green-300 bg-green-900/40 px-2 py-0.5 rounded">🏆 Winning</span>}
-                    {!isSeller && hasBid && !isWinning && <span className="text-xs text-red-300 bg-red-900/30 px-2 py-0.5 rounded">⚠️ Outbid</span>}
+                    {!isSeller && isWinning && <span className="text-xs text-green-300 bg-green-900/40 px-2 py-0.5 rounded flex items-center gap-1"><IconTrophy className="w-3 h-3" />Winning</span>}
+                    {!isSeller && hasBid && !isWinning && <span className="text-xs text-red-300 bg-red-900/30 px-2 py-0.5 rounded flex items-center gap-1"><IconAlertTriangle className="w-3 h-3" />Outbid</span>}
                     {!isSeller && !hasBid && !isPassed && <span className="text-xs text-blue-500">No bids yet</span>}
                     {!isSeller && isPassed && !hasBid && <span className="text-xs text-blue-500">Passed</span>}
                 </div>
@@ -624,33 +629,6 @@ function IconDeepSea() {
 }
 
 // ─── Toast notification icons ─────────────────────────────────────────────────
-
-function IconAlert() {
-    return (
-        <svg viewBox="0 0 16 16" className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M8 2.5l6 10.5H2z" />
-            <line x1="8" y1="6.5" x2="8" y2="9.5" />
-            <circle cx="8" cy="11.5" r="0.6" fill="currentColor" stroke="none" />
-        </svg>
-    )
-}
-function IconGavel() {
-    return (
-        <svg viewBox="0 0 16 16" className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="2.5" y="3" width="3" height="6" rx="0.8" transform="rotate(-45 4 6)" />
-            <line x1="6.5" y1="8" x2="3" y2="11.5" />
-            <line x1="2" y1="13" x2="6" y2="13" />
-        </svg>
-    )
-}
-function IconTag() {
-    return (
-        <svg viewBox="0 0 16 16" className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M2 2h5l7 7-5 5-7-7z" />
-            <circle cx="5" cy="5" r="1" fill="currentColor" stroke="none" />
-        </svg>
-    )
-}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -1149,7 +1127,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
             {auctionToasts.length > 0 && (
                 <div className="fixed top-4 right-4 z-[60] flex flex-col gap-2 items-end pointer-events-none">
                     {auctionToasts.map(toast => {
-                        const ToastIcon = toast.type === 'outbid' ? IconAlert : toast.type === 'bid' ? IconGavel : IconTag
+                        const ToastIcon = toast.type === 'outbid' ? IconAlertTriangle : toast.type === 'bid' ? IconGavel : IconTag
                         return (
                             <div
                                 key={toast.id}
@@ -1193,16 +1171,16 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                             const tradedShips = (rundenErgebnis.auctionEvents || []).filter(e => e.erfolg).length
                                 + (rundenErgebnis.listingEvents || []).reduce((s, e) => s + (e.erfolg ? e.ships : 0), 0)
                             const stats = [
-                                { icon: '🎣', label: 'Total catch', value: `${(rundenErgebnis.gesamtFang || 0).toLocaleString()} fish` },
-                                { icon: '🐟', label: 'Fish stock', value: Math.max(0, rundenErgebnis.neuerFischbestand).toLocaleString(), delta: rundenErgebnis.fischDelta },
-                                { icon: '🚢', label: 'Ships delivered', value: totalDelivered > 0 ? `+${totalDelivered}` : '—' },
-                                { icon: '🔨', label: 'Ships traded', value: tradedShips > 0 ? tradedShips : '—' },
+                                { Icon: IconFishingRod, label: 'Total catch', value: `${(rundenErgebnis.gesamtFang || 0).toLocaleString()} fish` },
+                                { Icon: IconFish, label: 'Fish stock', value: Math.max(0, rundenErgebnis.neuerFischbestand).toLocaleString(), delta: rundenErgebnis.fischDelta },
+                                { Icon: IconShip, label: 'Ships delivered', value: totalDelivered > 0 ? `+${totalDelivered}` : '—' },
+                                { Icon: IconGavel, label: 'Ships traded', value: tradedShips > 0 ? tradedShips : '—' },
                             ]
                             return (
                                 <div className="grid grid-cols-4 gap-2 mb-4">
                                     {stats.map((s, i) => (
                                         <div key={i} className="bg-white/10 rounded-lg p-2 text-center">
-                                            <div className="text-lg leading-none mb-1">{s.icon}</div>
+                                            <div className="flex items-center justify-center mb-1 text-blue-300"><s.Icon className="w-4 h-4" /></div>
                                             <div className="text-[11px] text-blue-300">{s.label}</div>
                                             <div className="text-sm font-bold text-white">
                                                 {s.value}
@@ -1221,7 +1199,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                         <div className="flex gap-3">
                         {/* YOUR RESULTS */}
                         <div className="flex-1 min-w-0">
-                            <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">🎣 Your Results</div>
+                            <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2 flex items-center gap-1.5"><IconFishingRod className="w-3.5 h-3.5" />Your Results</div>
                             {(showOtherCatches ? rundenErgebnis.teams : rundenErgebnis.teams.filter(t => !t.istKI)).map(team => {
                                 const s = team.roundSummary
                                 if (!s) return null
@@ -1231,7 +1209,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                     <div key={team.name} className="bg-white/10 rounded-lg p-3 mb-2 last:mb-0">
                                         <div className="flex items-center gap-2 mb-2">
                                             <span className="font-bold text-sm flex items-center gap-1.5"><TeamDot farbe={team.farbe} />{team.name}</span>
-                                            {team.istKI && <span className="text-xs text-blue-400">🤖 AI</span>}
+                                            {team.istKI && <span className="text-xs text-blue-400 flex items-center gap-1"><IconRobot className="w-3 h-3" />AI</span>}
                                             {team.shipsInDelivery > 0 && (
                                                 <span className="text-xs text-green-400 ml-auto">+{team.shipsInDelivery} ship{team.shipsInDelivery !== 1 ? 's' : ''} arriving next round</span>
                                             )}
@@ -1277,7 +1255,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                             const naturalGrowth = rundenErgebnis.neuerFischbestand - rundenErgebnis.alterFischbestand + (rundenErgebnis.gesamtFang || 0)
                             return (
                                 <div className="shrink-0">
-                                    <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">🐟 Fishery Update</div>
+                                    <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2 flex items-center gap-1.5"><IconFish className="w-3.5 h-3.5" />Fishery Update</div>
                                     <div className={`rounded-lg p-3 ${rundenErgebnis.fischDelta < 0 ? 'bg-red-500/20 border border-red-400/30' : 'bg-green-500/15 border border-green-400/20'}`}>
                                         <div className="grid grid-cols-2 gap-x-3 text-xs leading-relaxed mb-2">
                                             <div className="text-blue-200">Total catch: <span className="text-white font-bold">{(rundenErgebnis.gesamtFang || 0).toLocaleString()} fish</span></div>
@@ -1297,25 +1275,25 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                         {(() => {
                             const items = []
                             rundenErgebnis.roundDeliveries.forEach((d, i) => items.push({
-                                key: `del-${i}`, icon: '🚢', color: 'text-green-200', farbe: d.farbe,
+                                key: `del-${i}`, Icon: IconShip, color: 'text-green-200', farbe: d.farbe,
                                 text: `${d.name}: +${d.count} ship${d.count !== 1 ? 's' : ''} delivered`
                             }))
                             ;(rundenErgebnis.aiShipPurchases || []).forEach((p, i) => items.push({
-                                key: `aip-${i}`, icon: '🤖', color: 'text-blue-200', farbe: p.farbe,
+                                key: `aip-${i}`, Icon: IconRobot, color: 'text-blue-200', farbe: p.farbe,
                                 text: `${p.name} purchased ${p.count} ship${p.count !== 1 ? 's' : ''} at auction (${p.price.toLocaleString()}€ each)`
                             }))
                             ;(rundenErgebnis.newPendingOffers || []).forEach((o, i) => items.push({
-                                key: `pend-${i}`, icon: '⏳', color: 'text-yellow-200', farbe: o.sellerFarbe,
+                                key: `pend-${i}`, Icon: IconHourglass, color: 'text-yellow-200', farbe: o.sellerFarbe,
                                 text: `${o.sellerName} offered ${o.count} ship${o.count !== 1 ? 's' : ''} at auction — bid in the Market tab next round`
                             }))
                             rundenErgebnis.auctionEvents.forEach((ev, i) => items.push({
-                                key: `auc-${i}`, icon: '🔨', color: ev.erfolg ? 'text-yellow-200' : 'text-blue-400',
+                                key: `auc-${i}`, Icon: IconGavel, color: ev.erfolg ? 'text-yellow-200' : 'text-blue-400',
                                 text: ev.erfolg
                                     ? `1 ship sold to ${ev.kaeufer} for ${ev.preis.toLocaleString()}€`
                                     : 'No bid received – ship not sold'
                             }))
                             ;(rundenErgebnis.listingEvents || []).forEach((ev, i) => items.push({
-                                key: `list-${i}`, icon: '📋', color: ev.erfolg ? 'text-indigo-200' : 'text-blue-400',
+                                key: `list-${i}`, Icon: IconClipboard, color: ev.erfolg ? 'text-indigo-200' : 'text-blue-400',
                                 text: ev.erfolg
                                     ? `${ev.ships} ship${ev.ships !== 1 ? 's' : ''} from ${ev.sellerName} sold to ${ev.kaeufer} for ${ev.preis.toLocaleString()}€`
                                     : `${ev.ships} ship${ev.ships !== 1 ? 's' : ''} from ${ev.sellerName} – no qualifying bid, returned to seller`
@@ -1323,7 +1301,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
 
                             return (
                                 <div className="bg-white/5 border border-white/10 rounded-lg p-2.5 flex-1 flex flex-col min-h-[8rem]">
-                                    <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-1.5">📰 Market Activity</div>
+                                    <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5"><IconNewspaper className="w-3.5 h-3.5" />Market Activity</div>
                                     {items.length === 0 ? (
                                         <div className="flex-1 flex items-center justify-center text-xs text-blue-400 italic text-center px-4">
                                             No deliveries, trades or auction activity this round.
@@ -1332,7 +1310,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                         <div className="space-y-1.5 overflow-y-auto pr-1">
                                             {items.map(item => (
                                                 <div key={item.key} className={`text-xs flex items-start gap-1.5 ${item.color}`}>
-                                                    <span className="shrink-0">{item.icon}</span>
+                                                    <item.Icon className="w-3.5 h-3.5 mt-0.5" />
                                                     {item.farbe && <span className="mt-0.5"><TeamDot farbe={item.farbe} /></span>}
                                                     <span>{item.text}</span>
                                                 </div>
@@ -1443,8 +1421,8 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                                 <TeamDot farbe={team.farbe} />
                                                 <span className="font-bold text-sm truncate">{team.name}</span>
                                             </div>
-                                            <span className="text-xs opacity-70 shrink-0 ml-1">
-                                                {team.istKI ? (team.disconnectedHuman ? '🔌' : 'AI') : hasSubmitted ? '✓' : isActive ? '◉' : '…'}
+                                            <span className="text-xs opacity-70 shrink-0 ml-1 inline-flex items-center">
+                                                {team.istKI ? (team.disconnectedHuman ? <IconPlug className="w-3 h-3" /> : 'AI') : hasSubmitted ? '✓' : isActive ? '◉' : '…'}
                                             </span>
                                         </div>
                                         {team.istKI && (

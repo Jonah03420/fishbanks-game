@@ -1,6 +1,7 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts'
 import { GAME_CONFIG, berechneFischbestand } from '../game/fishLogic'
 import { teamHex } from '../game/teamColors'
+import { IconMedal, IconRobot } from '../components/icons'
 
 function TeamDot({ farbe }) {
     return <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: teamHex(farbe) }} />
@@ -157,9 +158,9 @@ function EndPage({ gameState, onRestart }) {
                             {sortedTeams.map((team, index) => (
                                 <div key={team.name} className="flex justify-between items-center bg-white/10 rounded-lg px-3 py-2 text-sm">
                                     <div className="flex items-center gap-2">
-                                        <span>{index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '4.'}</span>
+                                        {index < 3 ? <IconMedal tier={index + 1} className="w-4 h-4" /> : <span className="text-xs text-blue-400 w-4 text-center">4.</span>}
                                         <span className="flex items-center gap-1.5"><TeamDot farbe={team.farbe} />{team.name}</span>
-                                        <span className="text-xs text-blue-400">{team.istKI ? '🤖' : ''}</span>
+                                        {team.istKI && <span className="text-xs text-blue-400 flex items-center"><IconRobot className="w-3 h-3" /></span>}
                                     </div>
                                     <div className="text-right">
                                         <div className="font-bold text-xs">{team.netWorth.toLocaleString()}€</div>
@@ -250,7 +251,7 @@ function EndPage({ gameState, onRestart }) {
                                     />
                                     <Legend wrapperStyle={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }} />
                                     <Line yAxisId="left" type="monotone" dataKey="fischbestand" stroke="#22c55e" strokeWidth={2} name="Fish Stock" dot={false} />
-                                    {gameState.teams.map((team, i) => (
+                                    {gameState.teams.map((team) => (
                                         <Line
                                             key={team.name}
                                             yAxisId="right"

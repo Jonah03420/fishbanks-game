@@ -1,7 +1,13 @@
 import { useState } from 'react'
 import { getAdminSettings, saveAdminSettings, resetAdminSettings, ADMIN_DEFAULTS } from '../game/adminSettings'
+import { IconGear } from '../components/icons'
+import { teamHex } from '../game/teamColors'
 
-const TEAM_COLORS = ['🔴', '🟡', '🟢', '🔵']
+const TEAM_FARBEN = ['🔴', '🟡', '🟢', '🔵']
+
+function ColorDot({ farbe }) {
+  return <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: teamHex(farbe) }} />
+}
 const PERSONALITIES = ['gierig', 'kooperativ', 'rational']
 const PERSONALITY_LABEL = { gierig: 'Greedy', kooperativ: 'Cooperative', rational: 'Rational' }
 
@@ -101,7 +107,7 @@ export default function AdminPage({ onBack }) {
       {/* Header */}
       <div className="flex-none flex items-center justify-between px-6 py-3.5 border-b border-white/10 bg-blue-950/40">
         <div className="flex items-center gap-3">
-          <span className="text-base">⚙</span>
+          <IconGear className="w-4 h-4" />
           <div>
             <h1 className="font-bold text-sm leading-tight">Instructor Settings</h1>
             <p className="text-blue-400 text-xs">Configures defaults for all game sessions on this device</p>
@@ -219,7 +225,7 @@ export default function AdminPage({ onBack }) {
               {[1, 2, 3].map(slot => (
                 <Row
                   key={slot}
-                  label={`${TEAM_COLORS[slot]} Slot ${slot + 1} personality`}
+                  label={<span className="flex items-center gap-1.5"><ColorDot farbe={TEAM_FARBEN[slot]} />Slot {slot + 1} personality</span>}
                   hint="Only active if this slot has no human player"
                 >
                   <BtnGroup
