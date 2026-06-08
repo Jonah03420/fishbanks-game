@@ -460,9 +460,10 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
 
 // ─── AuctionListingCard ───────────────────────────────────────────────────────
 
-function AuctionListingCard({ listing, mySlotIndex, socket, roomCode }) {
+function AuctionListingCard({ listing, mySlotIndex, myBalance, socket, roomCode }) {
     const [timeLeft, setTimeLeft] = useState(null)
     const [bidInput, setBidInput] = useState('')
+    const maxBid = Math.max(0, myBalance)
 
     useEffect(() => {
         if (!listing.timerEndsAt || listing.status !== 'open') { setTimeLeft(null); return }
@@ -481,7 +482,7 @@ function AuctionListingCard({ listing, mySlotIndex, socket, roomCode }) {
 
     function placeBid() {
         const amount = parseInt(bidInput) || 0
-        if (amount < listing.askingPrice || amount <= (listing.topBid ?? 0)) return
+        if (amount < listing.askingPrice || amount <= (listing.topBid ?? 0) || amount > maxBid) return
         socket.emit('place-bid', { roomCode, listingId: listing.id, amount })
         setBidInput('')
     }
@@ -563,16 +564,20 @@ function AuctionListingCard({ listing, mySlotIndex, socket, roomCode }) {
                     <input
                         type="number"
                         min={minNext}
+                        max={maxBid}
                         step={10}
                         value={bidInput}
                         onChange={e => setBidInput(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && placeBid()}
                         placeholder={`≥ ${minNext.toLocaleString()}€`}
-                        className="flex-1 bg-white/10 border border-white/20 rounded px-2 py-1 text-xs text-white min-w-0"
+                        className={`flex-1 bg-white/10 border rounded px-2 py-1 text-xs min-w-0 ${
+                            (parseInt(bidInput) || 0) > maxBid ? 'border-red-400/50 text-red-300' : 'border-white/20 text-white'
+                        }`}
                     />
                     <button
                         onClick={placeBid}
-                        className="bg-blue-500/30 hover:bg-blue-500/50 border border-blue-400/30 text-xs font-medium px-3 py-1 rounded transition-colors whitespace-nowrap"
+                        disabled={(parseInt(bidInput) || 0) > maxBid}
+                        className="bg-blue-500/30 hover:bg-blue-500/50 disabled:opacity-40 disabled:cursor-not-allowed border border-blue-400/30 text-xs font-medium px-3 py-1 rounded transition-colors whitespace-nowrap"
                     >
                         Bid
                     </button>
@@ -668,6 +673,10 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
     }
     const prevListingsRef = useRef([])
     const myTeamNameRef = useRef(null)
+    // Always-current snapshot of this round's not-yet-submitted emergency buy/sell —
+    // re-applied on top of server team data so 'listings-updated' broadcasts (which
+    // carry the server's pre-decision balances) don't wipe the optimistic preview.
+    const pendingAdjustRef = useRef({ slotIndex: null, buys: 0, sells: 0, buyPrice: 0, sellPrice: 0, marketShipPrice: 0 })
 
     const isMultiplayer = !!(socket && roomCode)
 
@@ -714,6 +723,10 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
         : null
     const emergencyBuyPrice  = Math.round(marketShipPrice * 1.5 / 10) * 10
     const distressSalePrice  = Math.round(marketShipPrice * 0.5 / 10) * 10
+    pendingAdjustRef.current = {
+        slotIndex: mySlotIndex, buys: pendingBuys, sells: pendingSells,
+        buyPrice: emergencyBuyPrice, sellPrice: distressSalePrice, marketShipPrice,
+    }
     const buyCount  = activeTeam?.instantBuyCount  || 0
     const sellCount = activeTeam?.instantSellCount || 0
 
@@ -1079,7 +1092,16 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                 prevListingsRef.current = listings
             }
 
-            setGameState(prev => ({ ...prev, auctionListings: listings, teams }))
+            const adj = pendingAdjustRef.current
+            const mergedTeams = (adj.slotIndex != null && (adj.buys > 0 || adj.sells > 0))
+                ? teams.map((t, i) => {
+                    if (i !== adj.slotIndex) return t
+                    const bankBalance = t.bankBalance - adj.buys * adj.buyPrice + adj.sells * adj.sellPrice
+                    const fleet = t.fleet + adj.buys - adj.sells
+                    return { ...t, bankBalance, fleet, netWorth: berechneNetWorth(bankBalance, fleet, adj.marketShipPrice) }
+                })
+                : teams
+            setGameState(prev => ({ ...prev, auctionListings: listings, teams: mergedTeams }))
         }
 
         socket.on('decision-received', onDecisionReceived)
@@ -2046,6 +2068,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                                     key={listing.id}
                                                     listing={listing}
                                                     mySlotIndex={mySlotIndex}
+                                                    myBalance={activeTeam?.bankBalance ?? 0}
                                                     socket={socket}
                                                     roomCode={roomCode}
                                                 />
@@ -2120,15 +2143,16 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                                         <input
                                                             type="number"
                                                             min={0}
+                                                            max={activeTeam.bankBalance}
                                                             step={10}
                                                             value={humanBids[offer.id] ?? ''}
-                                                            onChange={e => setHumanBids(prev => ({ ...prev, [offer.id]: Math.max(0, parseInt(e.target.value) || 0) }))}
+                                                            onChange={e => setHumanBids(prev => ({ ...prev, [offer.id]: Math.min(Math.max(0, parseInt(e.target.value) || 0), Math.max(0, activeTeam.bankBalance)) }))}
                                                             className="w-24 bg-white/10 border border-white/20 rounded px-2 py-1 text-sm text-white"
                                                             placeholder={`${marketShipPrice}€`}
                                                         />
                                                         <span className="text-xs text-blue-400">€</span>
                                                         <button
-                                                            onClick={() => setHumanBids(prev => ({ ...prev, [offer.id]: marketShipPrice }))}
+                                                            onClick={() => setHumanBids(prev => ({ ...prev, [offer.id]: Math.min(marketShipPrice, Math.max(0, activeTeam.bankBalance)) }))}
                                                             className="text-xs bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-400/30 px-2 py-1 rounded transition-colors"
                                                         >
                                                             Place Bid
@@ -2158,9 +2182,10 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                                                         <input
                                                             type="number"
                                                             min={0}
+                                                            max={activeTeam.bankBalance}
                                                             step={10}
                                                             value={humanBids[offerKey] ?? ''}
-                                                            onChange={e => setHumanBids(prev => ({ ...prev, [offerKey]: Math.max(0, parseInt(e.target.value) || 0) }))}
+                                                            onChange={e => setHumanBids(prev => ({ ...prev, [offerKey]: Math.min(Math.max(0, parseInt(e.target.value) || 0), Math.max(0, activeTeam.bankBalance)) }))}
                                                             className="w-24 bg-white/10 border border-white/20 rounded px-2 py-1 text-sm text-white"
                                                             placeholder={`${marketShipPrice}€`}
                                                         />

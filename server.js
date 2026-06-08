@@ -298,18 +298,41 @@ function processRound(room) {
   const { params } = gs
   if (!room.pendingDecisions) room.pendingDecisions = {}
 
-  // Close any listings still open when round fires (return ships to sellers)
+  // Settle any listings still open when round fires — honor qualifying bids
+  // (don't just return ships to the seller and silently drop the trade)
   if (!gs.listingEvents) gs.listingEvents = []
   for (const listing of (gs.auctionListings || [])) {
     if (listing.status === 'open') {
       clearListingTimer(room.code, listing.id)
+      listing.timerEndsAt = null
+
       const seller = gs.teams[listing.sellerSlot]
-      if (seller) {
-        seller.fleet += listing.ships
+      const buyer  = listing.topBidderSlot != null ? gs.teams[listing.topBidderSlot] : null
+      const qualifying = buyer != null
+        && listing.topBid != null
+        && listing.topBid >= listing.askingPrice
+        && buyer.bankBalance >= listing.topBid
+
+      if (qualifying) {
+        seller.bankBalance += listing.topBid
+        buyer.fleet += listing.ships
+        buyer.bankBalance -= listing.topBid
         seller.netWorth = berechneNetWorth(seller.bankBalance, seller.fleet, gs.marketShipPrice)
+        buyer.netWorth  = berechneNetWorth(buyer.bankBalance,  buyer.fleet,  gs.marketShipPrice)
+        listing.status = 'sold'
+        listing.resolution = { buyerName: buyer.name, price: listing.topBid }
+        gs.listingEvents.push({ erfolg: true, sellerName: seller?.name || '?', kaeufer: buyer.name, preis: listing.topBid, ships: listing.ships })
+        if (!gs.auctionHistory) gs.auctionHistory = []
+        gs.auctionHistory.push({ runde: gs.runde, sellerName: seller?.name || '?', kaeufer: buyer.name, preis: listing.topBid, ships: listing.ships })
+      } else {
+        if (seller) {
+          seller.fleet += listing.ships
+          seller.netWorth = berechneNetWorth(seller.bankBalance, seller.fleet, gs.marketShipPrice)
+        }
+        listing.status = 'returned'
+        listing.resolution = null
+        gs.listingEvents.push({ erfolg: false, sellerName: seller?.name || '?', ships: listing.ships })
       }
-      listing.status = 'returned'
-      gs.listingEvents.push({ erfolg: false, sellerName: seller?.name || '?', ships: listing.ships })
     }
   }
   gs.auctionListings = [] // fresh slate for the next round
