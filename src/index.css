@@ -45,6 +45,26 @@ html, body, #root {
   animation: slideInRight 0.25s ease forwards;
 }
 
+/* Slide-out for auction toasts on dismiss */
+@keyframes slideOutRight {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(20px); }
+}
+
+.animate-fade-out {
+  animation: slideOutRight 0.2s ease forwards;
+}
+
+/* Shrinking countdown bar for auction toasts */
+@keyframes toastProgress {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
+.toast-progress-bar {
+  animation: toastProgress 5s linear forwards;
+}
+
 /* Hook bob — same rhythm as fish but slightly phase-shifted so fish appears to chase */
 @keyframes hookBob {
   0%   { transform: translateY(0px); }

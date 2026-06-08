@@ -623,6 +623,35 @@ function IconDeepSea() {
     )
 }
 
+// ─── Toast notification icons ─────────────────────────────────────────────────
+
+function IconAlert() {
+    return (
+        <svg viewBox="0 0 16 16" className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M8 2.5l6 10.5H2z" />
+            <line x1="8" y1="6.5" x2="8" y2="9.5" />
+            <circle cx="8" cy="11.5" r="0.6" fill="currentColor" stroke="none" />
+        </svg>
+    )
+}
+function IconGavel() {
+    return (
+        <svg viewBox="0 0 16 16" className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2.5" y="3" width="3" height="6" rx="0.8" transform="rotate(-45 4 6)" />
+            <line x1="6.5" y1="8" x2="3" y2="11.5" />
+            <line x1="2" y1="13" x2="6" y2="13" />
+        </svg>
+    )
+}
+function IconTag() {
+    return (
+        <svg viewBox="0 0 16 16" className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M2 2h5l7 7-5 5-7-7z" />
+            <circle cx="5" cy="5" r="1" fill="currentColor" stroke="none" />
+        </svg>
+    )
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
@@ -655,6 +684,10 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
     )
     const [newListingCount, setNewListingCount] = useState(1)
     const [auctionToasts, setAuctionToasts] = useState([])
+    function dismissToast(id) {
+        setAuctionToasts(t => t.map(x => x.id === id ? { ...x, exiting: true } : x))
+        setTimeout(() => setAuctionToasts(t => t.filter(x => x.id !== id)), 200)
+    }
     const prevListingsRef = useRef([])
     const myTeamNameRef = useRef(null)
 
@@ -1058,9 +1091,7 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
                 if (toasts.length > 0) {
                     setAuctionToasts(t => [...t, ...toasts])
                     toasts.forEach(toast => {
-                        setTimeout(() => {
-                            setAuctionToasts(t => t.filter(x => x.id !== toast.id))
-                        }, 5000)
+                        setTimeout(() => dismissToast(toast.id), 5000)
                     })
                 }
             } catch (e) {
@@ -1117,23 +1148,35 @@ function GamePage({ gameState, setGameState, socket, mySlotIndex, roomCode }) {
             {/* Auction notification toasts */}
             {auctionToasts.length > 0 && (
                 <div className="fixed top-4 right-4 z-[60] flex flex-col gap-2 items-end pointer-events-none">
-                    {auctionToasts.map(toast => (
-                        <div
-                            key={toast.id}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-xl shadow-xl border text-sm font-medium max-w-xs animate-fade-in
-                                ${toast.type === 'outbid'
-                                    ? 'bg-red-900/90 border-red-500/50 text-red-100'
-                                    : toast.type === 'bid'
-                                    ? 'bg-blue-800/90 border-blue-400/50 text-blue-100'
-                                    : 'bg-green-900/90 border-green-500/50 text-green-100'
-                                }`}
-                        >
-                            <span>
-                                {toast.type === 'outbid' ? '⚠' : toast.type === 'bid' ? '🔨' : '🏷'}
-                            </span>
-                            <span>{toast.msg}</span>
-                        </div>
-                    ))}
+                    {auctionToasts.map(toast => {
+                        const ToastIcon = toast.type === 'outbid' ? IconAlert : toast.type === 'bid' ? IconGavel : IconTag
+                        return (
+                            <div
+                                key={toast.id}
+                                className={`relative overflow-hidden flex items-center gap-2 pl-3 pr-2 py-2 rounded-xl shadow-xl border text-sm font-medium max-w-xs pointer-events-auto
+                                    ${toast.exiting ? 'animate-fade-out' : 'animate-fade-in'}
+                                    ${toast.type === 'outbid'
+                                        ? 'bg-red-900/90 border-red-500/50 text-red-100'
+                                        : toast.type === 'bid'
+                                        ? 'bg-blue-800/90 border-blue-400/50 text-blue-100'
+                                        : 'bg-green-900/90 border-green-500/50 text-green-100'
+                                    }`}
+                            >
+                                <ToastIcon />
+                                <span className="flex-1">{toast.msg}</span>
+                                <button
+                                    onClick={() => dismissToast(toast.id)}
+                                    aria-label="Dismiss notification"
+                                    className="shrink-0 text-current/50 hover:text-current transition-colors px-1 leading-none text-base"
+                                >
+                                    ×
+                                </button>
+                                {!toast.exiting && (
+                                    <div className="absolute bottom-0 left-0 h-0.5 bg-current/40 toast-progress-bar" />
+                                )}
+                            </div>
+                        )
+                    })}
                 </div>
             )}
 
