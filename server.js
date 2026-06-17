@@ -59,7 +59,6 @@ function resolveListing(roomCode, listingId) {
   const qualifying = buyer != null
     && listing.topBid != null
     && listing.topBid >= listing.askingPrice
-    && buyer.bankBalance >= listing.topBid
 
   if (!gs.listingEvents) gs.listingEvents = []
 
@@ -298,8 +297,10 @@ function processRound(room) {
   const { params } = gs
   if (!room.pendingDecisions) room.pendingDecisions = {}
 
+  // Record pre-auction balances so per-team auction income/expense can be tracked
+  const preAuctionBalances = gs.teams.map(t => t.bankBalance)
+
   // Settle any listings still open when round fires — honor qualifying bids
-  // (don't just return ships to the seller and silently drop the trade)
   if (!gs.listingEvents) gs.listingEvents = []
   for (const listing of (gs.auctionListings || [])) {
     if (listing.status === 'open') {
@@ -311,7 +312,6 @@ function processRound(room) {
       const qualifying = buyer != null
         && listing.topBid != null
         && listing.topBid >= listing.askingPrice
-        && buyer.bankBalance >= listing.topBid
 
       if (qualifying) {
         seller.bankBalance += listing.topBid
@@ -336,6 +336,10 @@ function processRound(room) {
     }
   }
   gs.auctionListings = [] // fresh slate for the next round
+
+  // Per-team auction deltas (positive = income from selling, stored by index)
+  const teamAuctionIncome = gs.teams.map((t, i) => Math.max(0,  t.bankBalance - preAuctionBalances[i]))
+  const teamAuctionSpent  = gs.teams.map((t, i) => Math.max(0, preAuctionBalances[i] - t.bankBalance))
 
   const wetterfaktor = erzeugeMarktereignis()
   let totalCatch = 0
@@ -377,13 +381,14 @@ function processRound(room) {
     const distressSalePrice  = Math.round(gs.marketShipPrice * 0.5 / 10) * 10
     if (!team.instantBuyCount)  team.instantBuyCount  = 0
     if (!team.instantSellCount) team.instantSellCount = 0
-    const affordableBuys = emergencyBuyPrice > 0 ? Math.floor(Math.max(0, team.bankBalance) / emergencyBuyPrice) : 0
-    const toBuy  = Math.min(Math.max(0, dec.shipsToBuy  ?? 0), Math.max(0, 2 - team.instantBuyCount), affordableBuys)
+    const toBuy  = Math.min(Math.max(0, dec.shipsToBuy  ?? 0), Math.max(0, 2 - team.instantBuyCount))
     const toSell = Math.min(Math.min(Math.max(0, dec.shipsToSell ?? 0), team.fleet), Math.max(0, 2 - team.instantSellCount))
+    const quickBuyCost    = toBuy  * emergencyBuyPrice
+    const quickSellIncome = toSell * distressSalePrice
     team.fleet  += toBuy - toSell
     team.auctionPurchases = toBuy
-    team.bankBalance -= toBuy  * emergencyBuyPrice
-    team.bankBalance += toSell * distressSalePrice
+    team.bankBalance -= quickBuyCost
+    team.bankBalance += quickSellIncome
     team.instantBuyCount  += toBuy
     team.instantSellCount += toSell
 
@@ -422,15 +427,15 @@ function processRound(room) {
     team.deepSeaShips     = deep
     team.ausgesandteBoote = coastal + deep
 
-    // Step 6: Interest on minimum balance reached this round (MIT §6)
-    const zinsen    = Math.round(minBalance * params.interestRate)
+    // Step 6: Interest on minimum balance — +2% reward if positive, −5% penalty if negative
+    const effectiveRate = minBalance >= 0 ? params.interestRate : 0.05
+    const zinsen    = Math.round(minBalance * effectiveRate)
     balance        += zinsen
     team.letzteZinsen = zinsen
 
     // Step 7: New ship orders — payment immediate, delivery next round
-    const maxOrder     = Math.ceil(team.fleet / 2)
-    const affordableOrders = balance >= params.newShipPrice ? Math.floor(balance / params.newShipPrice) : 0
-    const actualOrders = Math.min(Math.max(0, dec.newShipOrders ?? 0), maxOrder, affordableOrders)
+    const maxOrder     = gs.runde >= gs.maxRunden ? 0 : Math.ceil(team.fleet / 2)
+    const actualOrders = Math.min(Math.max(0, dec.newShipOrders ?? 0), maxOrder)
     const orderCost    = actualOrders * params.newShipPrice
     balance           -= orderCost
     team.shipsInDelivery = actualOrders
@@ -439,6 +444,10 @@ function processRound(room) {
     // Attach roundSummary for the round result modal
     team.roundSummary = {
       startBalance,
+      auctionSaleIncome: teamAuctionIncome[i] ?? 0,
+      auctionBuyCost:    teamAuctionSpent[i]  ?? 0,
+      quickBuyCost,
+      quickSellIncome,
       opCosts,
       deployedShips: team.fleet,
       harborShips: harbor,

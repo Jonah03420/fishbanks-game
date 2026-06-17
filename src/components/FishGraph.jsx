@@ -34,7 +34,7 @@ function FishGraph({ verlauf, maxFisch }) {
             <Line
               type="monotone"
               dataKey="fischbestand"
-              stroke="#22c55e"
+              stroke="#14b8a6"
               strokeWidth={2}
               dot={false}
               name="Fish Stock"

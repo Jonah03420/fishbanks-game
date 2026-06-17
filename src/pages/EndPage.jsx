@@ -108,8 +108,8 @@ function EndPage({ gameState, onRestart }) {
                 </div>
 
                 {/* Winner */}
-                <div className="bg-gradient-to-br from-yellow-500/30 to-amber-600/20 border border-yellow-400/30 rounded-xl px-5 py-3 flex items-center gap-4 shadow-lg shadow-yellow-900/20">
-                    <div className="w-10 h-10 rounded-full bg-yellow-400/25 border border-yellow-300/30 flex items-center justify-center text-yellow-300 shrink-0">
+                <div className="bg-gradient-to-br from-yellow-400/60 to-amber-600/40 border border-yellow-400/60 rounded-xl px-5 py-3 flex items-center gap-4 shadow-lg shadow-yellow-900/40">
+                    <div className="w-10 h-10 rounded-full bg-yellow-400/50 border border-yellow-300/60 flex items-center justify-center text-yellow-200 shrink-0">
                         <IconTrophy className="w-5 h-5" />
                     </div>
                     <div>
@@ -242,18 +242,25 @@ function EndPage({ gameState, onRestart }) {
                         <h2 className="flex-none font-bold text-sm mb-1">Fish Stock &amp; Net Worth</h2>
                         <p className="flex-none text-blue-300 text-xs mb-2">History over all rounds</p>
                         <div className="flex-1 min-h-0">
+                            {(() => {
+                                const finalFisch = Math.max(0, gameState.fischbestand)
+                                const last = gameState.verlauf[gameState.verlauf.length - 1]
+                                const chartData = (last && last.fischbestand !== finalFisch)
+                                    ? [...gameState.verlauf, { ...last, runde: last.runde + 1, fischbestand: finalFisch }]
+                                    : gameState.verlauf
+                                return (
                             <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={gameState.verlauf} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                                <LineChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                                     <XAxis dataKey="runde" stroke="rgba(255,255,255,0.5)" tick={{ fontSize: 10 }} />
-                                    <YAxis yAxisId="left" domain={[0, maxFisch]} stroke="#22c55e" tickFormatter={v => v >= 1000 ? `${Math.round(v / 1000)}k` : v} tick={{ fontSize: 10 }} width={35} />
+                                    <YAxis yAxisId="left" domain={[0, maxFisch]} stroke="#14b8a6" tickFormatter={v => v >= 1000 ? `${Math.round(v / 1000)}k` : v} tick={{ fontSize: 10 }} width={35} />
                                     <YAxis yAxisId="right" orientation="right" stroke="rgba(255,255,255,0.3)" tickFormatter={v => `${Math.round(v / 1000)}k`} tick={{ fontSize: 10 }} width={38} />
                                     <Tooltip
                                         contentStyle={{ backgroundColor: '#1e3a8a', border: 'none', borderRadius: '8px', fontSize: 11 }}
                                         formatter={(value, name) => name === 'Fish Stock' ? [`${value.toLocaleString()} fish`, name] : [`${value.toLocaleString()}€`, name]}
                                     />
                                     <Legend wrapperStyle={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }} />
-                                    <Line yAxisId="left" type="monotone" dataKey="fischbestand" stroke="#22c55e" strokeWidth={2} name="Fish Stock" dot={false} />
+                                    <Line yAxisId="left" type="monotone" dataKey="fischbestand" stroke="#14b8a6" strokeWidth={2} name="Fish Stock" dot={false} />
                                     {gameState.teams.map((team) => (
                                         <Line
                                             key={team.name}
@@ -269,6 +276,8 @@ function EndPage({ gameState, onRestart }) {
                                     ))}
                                 </LineChart>
                             </ResponsiveContainer>
+                                )
+                            })()}
                         </div>
                     </div>
 
