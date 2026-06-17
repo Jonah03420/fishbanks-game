@@ -552,8 +552,8 @@ function AuctionListingCard({ listing, mySlotIndex, myBalance, socket, roomCode 
                     </div>
                     <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
                         <div
-                            className={`h-1.5 rounded-full transition-none ${secLeft <= 3 ? 'bg-red-400' : secLeft <= 6 ? 'bg-yellow-400' : 'bg-green-400'}`}
-                            style={{ width: `${Math.min(100, (secLeft / 10) * 100)}%` }}
+                            className={`h-1.5 rounded-full transition-none ${secLeft <= 6 ? 'bg-red-400' : secLeft <= 12 ? 'bg-yellow-400' : 'bg-green-400'}`}
+                            style={{ width: `${Math.min(100, (secLeft / 20) * 100)}%` }}
                         />
                     </div>
                 </div>

@@ -828,7 +828,7 @@ io.on('connection', socket => {
     listing.topBidderSlot = slot.slotIndex
     listing.topBidderName = bidder.name
 
-    const TIMER_MS = 10000
+    const TIMER_MS = 20000
     clearListingTimer(code, listingId)
     listing.timerEndsAt = Date.now() + TIMER_MS
     const timerId = setTimeout(() => resolveListing(code, listingId), TIMER_MS)
