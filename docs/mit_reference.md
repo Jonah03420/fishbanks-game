@@ -35,9 +35,14 @@ Profit ($/year) = Income – Expenses
 | Operating Costs | Annual costs for ships in Harbor, Coast & Deep Sea | set by Instructor |
 | Ship Purchases | Ships Bought × Ship Price | Ship Price = Auction |
 | New Ship Orders | Ships Ordered × New Ship Price | New Ship Price = $300/ship |
-| Interest Charges | Minimum Bank Balance × Interest Rate | Interest Rate = 2%/year |
+| Interest Charges | Minimum Bank Balance × Penalty Rate | Penalty Rate = 5%/year |
 
 > Interest is only charged if Minimum Bank Balance is negative.
+>
+> **Deviation from MIT slides (intentional):** this implementation uses an
+> asymmetric rate — 2% credit on a positive minimum balance, but a steeper
+> 5% penalty charge on a negative one — instead of the original slides'
+> symmetric 2%/2%. This is a deliberate game-balance choice, not a bug.
 
 ---
 
@@ -114,15 +119,20 @@ effectiveness falls, catch decreases - Tragedy of the Commons.
 
 ## 6. Interest - Complete Logic
 
+As implemented in this project (`server.js`, `GamePage.jsx`): the rate
+differs by sign, rather than reusing the same `interestRate` for both
+directions.
+
 function applyInterest(bankBalance, minBalanceDuringYear, interestRate) {
-  // interestRate = 0.02 (default)
-  // Same formula for credit and charge - sign results automatically
-  bankBalance += minBalanceDuringYear * interestRate;
+  // interestRate = 0.02 (default, used only when minBalance >= 0)
+  // Negative minimum balance is charged a flat 5% penalty rate instead
+  const effectiveRate = minBalanceDuringYear >= 0 ? interestRate : 0.05;
+  bankBalance += minBalanceDuringYear * effectiveRate;
   return bankBalance;
 }
 
-- minBalanceDuringYear > 0 → positive amount → credit
-- minBalanceDuringYear < 0 → negative amount → charge
+- minBalanceDuringYear > 0 → credited at 2% (default `interestRate`)
+- minBalanceDuringYear < 0 → charged at a flat 5% penalty rate
 
 ---
 
@@ -151,8 +161,9 @@ function processYear(team, decisions, gameParams) {
   const catch_ = decisions.shipsDeployed * effectiveness * weatherFactor();
   team.bankBalance = track(team.bankBalance + catch_ * fishPrice);
 
-  // Step 5: Interest on Minimum Balance
-  team.bankBalance += minBalance * interestRate;
+  // Step 5: Interest on Minimum Balance (asymmetric — see Section 6)
+  const effectiveRate = minBalance >= 0 ? interestRate : 0.05;
+  team.bankBalance += minBalance * effectiveRate;
 
   // Step 6: New ships - pay & schedule for next year
   const maxOrder = Math.ceil(team.fleet / 2);
@@ -225,7 +236,8 @@ const gameState = {
 | Initial Fleet | Ships per team at start (default: 3) |
 | Operating Costs | Cost per ship per year |
 | Fish Price | Price per fish (default: $20) |
-| Interest Rate | Interest on Minimum Balance (default: 2%) |
+| Interest Rate | Interest credited on a positive Minimum Balance (default: 2%) |
+| Penalty Rate | Interest charged on a negative Minimum Balance (fixed: 5%, not Instructor-configurable) |
 | New Ship Price | New build price (default: $300) |
 | Max Fish Population | Maximum ocean capacity |
 | Fish Reproduction | How fast fish regenerate |
