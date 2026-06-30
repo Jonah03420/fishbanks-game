@@ -266,7 +266,7 @@ function EndPage({ gameState, onRestart }) {
                                             key={team.name}
                                             yAxisId="right"
                                             type="monotone"
-                                            dataKey={d => d[team.name]}
+                                            dataKey={team.name}
                                             stroke={teamHex(team.farbe)}
                                             strokeWidth={1.5}
                                             strokeDasharray="5 3"
