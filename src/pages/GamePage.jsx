@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
     GAME_CONFIG, berechneFischbestand, berechneNetWorth,
     kiDecisionEasy, kiDecisionHard,
+    kiAuctionBidDecision, kiListingDecision,
     erzeugeMarktereignis,
 } from '../game/fishLogic'
 import { teamHex } from '../game/teamColors'
@@ -205,17 +206,38 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
     const listingAuctionEvents = []
     const preListingBalances = teamsAfterPending.map(t => t.bankBalance)
     let teamsAfterListings = teamsAfterPending.map(t => ({ ...t }))
-    const fishDensityForBids = maxFisch > 0 ? state.fischbestand / maxFisch : 0
 
     for (const listing of (state.auctionListings || [])) {
         const allBids = { ...(listing.bids || {}) }
-        teamsAfterListings.forEach((team, idx) => {
+
+        // AI teams react to the listing (and to each other) up to a small cap,
+        // so the marketplace stays competitive but humans always get the final word.
+        let currentTopBid = null
+        let currentTopBidderIdx = null
+        Object.entries(allBids).forEach(([idxStr, bid]) => {
+            const idx = parseInt(idxStr)
             if (idx === listing.sellerSlot) return
-            if (team.istKI && team.aiDifficulty === 'hard' && fishDensityForBids > 0.60) {
-                const aiBid = Math.round(Math.min(marketShipPrice * 1.15, team.bankBalance))
-                if (aiBid > 0 && (allBids[idx] == null || allBids[idx] < aiBid)) allBids[idx] = aiBid
+            if (bid >= listing.askingPrice && (currentTopBid == null || bid > currentTopBid)) {
+                currentTopBid = bid
+                currentTopBidderIdx = idx
             }
         })
+        const AI_BID_CAP = 3
+        for (let i = 0; i < AI_BID_CAP; i++) {
+            let bestIdx = -1
+            let bestBid = -1
+            teamsAfterListings.forEach((team, idx) => {
+                if (idx === listing.sellerSlot || idx === currentTopBidderIdx || !team.istKI) return
+                const syntheticListing = { ...listing, topBid: currentTopBid, status: 'open' }
+                const bid = kiAuctionBidDecision(team, syntheticListing, { fischbestand: state.fischbestand, runde: state.runde, maxRunden, marketShipPrice }, params)
+                if (bid != null && bid > bestBid) { bestBid = bid; bestIdx = idx }
+            })
+            if (bestIdx === -1) break
+            allBids[bestIdx] = bestBid
+            currentTopBid = bestBid
+            currentTopBidderIdx = bestIdx
+        }
+
         let bestBid = listing.askingPrice - 1
         let bestBidderIdx = -1
         Object.entries(allBids).forEach(([idxStr, bid]) => {
@@ -288,21 +310,15 @@ function simuliereRunde(state, humanDecisions, schwierigkeit) {
 
     // ── AI market listings (ships removed from fleet immediately, resolved next round) ──
     const aiNewListings = []
-    const fishDensityForAI = maxFisch > 0 ? state.fischbestand / maxFisch : 0
     let teamsWithAIListings = teamsNachEntscheidung.map(t => ({ ...t }))
     teamsNachEntscheidung.forEach((team, idx) => {
         if (!team.istKI || teamsWithAIListings[idx].fleet <= 2) return
-        if (aiNewListings.some(l => l.sellerSlot === idx)) return
-        let askingPrice = null
-        if (team.aiDifficulty === 'easy' && fishDensityForAI < 0.35) {
-            askingPrice = Math.round(marketShipPrice * 0.9)
-        } else if (team.aiDifficulty === 'hard' && fishDensityForAI < 0.40) {
-            askingPrice = Math.round(marketShipPrice * 0.85)
-        }
-        if (askingPrice !== null) {
-            aiNewListings.push({ id: `al-${idx}-${state.runde}`, sellerSlot: idx, sellerName: team.name, sellerFarbe: team.farbe, ships: 1, askingPrice, bids: {} })
-            teamsWithAIListings[idx] = { ...teamsWithAIListings[idx], fleet: teamsWithAIListings[idx].fleet - 1 }
-        }
+        const decision = kiListingDecision(team, { fischbestand: state.fischbestand, marketShipPrice }, params)
+        if (!decision) return
+        const count = Math.min(decision.ships, teamsWithAIListings[idx].fleet - 1)
+        if (count <= 0) return
+        aiNewListings.push({ id: `al-${idx}-${state.runde}`, sellerSlot: idx, sellerName: team.name, sellerFarbe: team.farbe, ships: count, askingPrice: decision.askingPrice, bids: {} })
+        teamsWithAIListings[idx] = { ...teamsWithAIListings[idx], fleet: teamsWithAIListings[idx].fleet - count }
     })
 
     // ── Step 2 continued: Auction — resolve human ship offers (H→H and H→AI) ──

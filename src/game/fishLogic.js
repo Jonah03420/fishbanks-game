@@ -231,3 +231,65 @@ export function kiDecisionHard(team, gameState, params) {
 
   return { harborShips, coastalShips, deepSeaShips, shipsToBuy, shipsToSell, newShipOrders }
 }
+
+// ─── AI Marketplace Participation ──────────────────────────────────────────
+//
+// Beyond the instant emergency buy/sell handled above (capped at 2/round,
+// premium/discount pricing), AI teams also react to the player-driven ship
+// marketplace: they bid on listings other teams put up for sale, and list
+// their own surplus ships when conditions call for offloading more than the
+// emergency cap allows — at a much better price than a distress sale.
+// Shared by both single-player simulation and the multiplayer server so AI
+// behaves identically in both modes.
+
+// Decides whether an AI team bids on an open listing, and for how much.
+// Returns a bid amount (>= listing.askingPrice, > listing.topBid) or null to pass.
+export function kiAuctionBidDecision(team, listing, gameState, params) {
+  if (!listing || listing.status !== 'open') return null
+
+  const { fischbestand, runde, maxRunden, marketShipPrice } = gameState
+  const maxFisch = params?.maxFishPopulation ?? GAME_CONFIG.maxFischbestand
+  const density = maxFisch > 0 ? Math.max(0, fischbestand) / maxFisch : 0
+  const maxRoundsVal = maxRunden ?? GAME_CONFIG.maxRunden
+  const gameProgress = runde / maxRoundsVal
+  const refPrice = marketShipPrice ?? GAME_CONFIG.auctionPreis
+  const isHard = team.aiDifficulty === 'hard'
+
+  if (density < 0.30) return null                              // fishery too thin to expand into
+  if (gameProgress > (isHard ? 0.60 : 0.55)) return null        // too late to bother
+  if ((team.fleet ?? 0) >= 10) return null                      // avoid runaway hoarding
+  if (team.bankBalance < listing.askingPrice) return null
+
+  // Easy AI is reactive and imperfect — sometimes just doesn't bother
+  if (!isHard && Math.random() < 0.45) return null
+
+  const ceilingMultiplier = isHard ? 1.15 : 1.0
+  const densityBonus = (isHard ? 0.10 : 0.05) * density
+  const maxWillingToPay = Math.round(refPrice * (ceilingMultiplier + densityBonus))
+
+  const currentTop = listing.topBid ?? (listing.askingPrice - 1)
+  const step = Math.max(10, Math.round(refPrice * 0.02))
+  const nextBid = Math.max(listing.askingPrice, currentTop + step)
+
+  if (nextBid > maxWillingToPay) return null
+  if (nextBid > team.bankBalance) return null
+  return nextBid
+}
+
+// Decides whether an AI team should list surplus ships on the marketplace.
+// Returns { ships, askingPrice } or null.
+export function kiListingDecision(team, gameState, params) {
+  const { fischbestand, marketShipPrice } = gameState
+  const maxFisch = params?.maxFishPopulation ?? GAME_CONFIG.maxFischbestand
+  const density = maxFisch > 0 ? Math.max(0, fischbestand) / maxFisch : 0
+  const refPrice = marketShipPrice ?? GAME_CONFIG.auctionPreis
+  const isHard = team.aiDifficulty === 'hard'
+
+  if ((team.fleet ?? 0) <= 2) return null
+
+  const densityThreshold = isHard ? 0.40 : 0.35
+  if (density >= densityThreshold) return null
+
+  const askingPrice = Math.round(refPrice * (isHard ? 0.85 : 0.90) / 10) * 10
+  return { ships: 1, askingPrice }
+}

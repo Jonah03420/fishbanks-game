@@ -13,6 +13,8 @@ import {
   berechneNetWorth,
   kiDecisionEasy,
   kiDecisionHard,
+  kiAuctionBidDecision,
+  kiListingDecision,
 } from './src/game/fishLogic.js'
 
 const PORT = process.env.PORT || 3002
@@ -37,11 +39,116 @@ const rooms = new Map()
 // ─── Listing Timers ───────────────────────────────────────────────────────────
 
 const listingTimers = new Map() // key: `${roomCode}:${listingId}` → timeoutId
+const aiEvalTimers = new Map()  // key: `${roomCode}:${listingId}` → timeoutId (debounced AI bid reaction)
 
 function clearListingTimer(roomCode, listingId) {
   const key = `${roomCode}:${listingId}`
   const id = listingTimers.get(key)
   if (id != null) { clearTimeout(id); listingTimers.delete(key) }
+}
+
+function clearAIEvalTimer(roomCode, listingId) {
+  const key = `${roomCode}:${listingId}`
+  const id = aiEvalTimers.get(key)
+  if (id != null) { clearTimeout(id); aiEvalTimers.delete(key) }
+}
+
+// Applies a validated bid to a listing (used by both human place-bid and AI reactions).
+function applyBid(room, roomCode, listing, slotIndex, bid) {
+  const bidder = room.gameState.teams[slotIndex]
+  if (!bidder) return
+
+  listing.bids[slotIndex] = bid
+  listing.topBid = bid
+  listing.topBidderSlot = slotIndex
+  listing.topBidderName = bidder.name
+
+  const TIMER_MS = 20000
+  clearListingTimer(roomCode, listing.id)
+  listing.timerEndsAt = Date.now() + TIMER_MS
+  const timerId = setTimeout(() => resolveListing(roomCode, listing.id), TIMER_MS)
+  listingTimers.set(`${roomCode}:${listing.id}`, timerId)
+
+  room.lastActivity = Date.now()
+  io.to(roomCode).emit('listings-updated', { listings: room.gameState.auctionListings, teams: room.gameState.teams })
+}
+
+// AI teams react to listing activity (new listings / human or AI bids) after a short,
+// human-like delay. Debounced per listing so rapid-fire bids don't stack timers, and
+// capped so AI can't keep an auction open forever — humans always get the final word.
+const AI_BID_CAP_PER_LISTING = 3
+
+function scheduleAIBidEvaluation(room, roomCode, listingId) {
+  const key = `${roomCode}:${listingId}`
+  clearAIEvalTimer(roomCode, listingId)
+  const delay = 1800 + Math.random() * 3200 // 1.8–5s, feels like a real player reacting
+  const timerId = setTimeout(() => {
+    aiEvalTimers.delete(key)
+    evaluateAIBids(room, roomCode, listingId)
+  }, delay)
+  aiEvalTimers.set(key, timerId)
+}
+
+function evaluateAIBids(room, roomCode, listingId) {
+  if (room.phase !== 'game' || !room.gameState) return
+  const gs = room.gameState
+  const listing = (gs.auctionListings || []).find(l => l.id === listingId)
+  if (!listing || listing.status !== 'open') return
+  if ((listing.aiBidCount || 0) >= AI_BID_CAP_PER_LISTING) return
+
+  let bestSlot = -1
+  let bestBid = -1
+  gs.teams.forEach((team, idx) => {
+    if (idx === listing.sellerSlot || idx === listing.topBidderSlot || !team.istKI) return
+    const bid = kiAuctionBidDecision(team, listing, gs, gs.params)
+    if (bid != null && bid > bestBid) { bestBid = bid; bestSlot = idx }
+  })
+
+  if (bestSlot === -1) return
+  listing.aiBidCount = (listing.aiBidCount || 0) + 1
+  applyBid(room, roomCode, listing, bestSlot, bestBid)
+  console.log(`AI bid on ${listingId} in room ${roomCode}: ${bestBid}€ by slot ${bestSlot}`)
+
+  // Give other AI (or a human) a chance to react to this bid
+  scheduleAIBidEvaluation(room, roomCode, listingId)
+}
+
+// AI teams list surplus ships on the marketplace when fish stock is thin —
+// a slower, better-priced alternative to the instant distress sale.
+function createAIListings(room) {
+  const gs = room.gameState
+  const newListings = []
+  gs.teams.forEach((team, idx) => {
+    if (!team.istKI) return
+    const decision = kiListingDecision(team, gs, gs.params)
+    if (!decision) return
+    const count = Math.min(decision.ships, Math.max(0, team.fleet - 1))
+    if (count <= 0) return
+
+    team.fleet -= count
+    team.netWorth = berechneNetWorth(team.bankBalance, team.fleet, gs.marketShipPrice)
+
+    const listing = {
+      id: `${room.code}-ai-${idx}-${gs.runde}-${Date.now()}`,
+      sellerSlot: idx,
+      sellerName: team.name,
+      sellerFarbe: team.farbe,
+      ships: count,
+      askingPrice: decision.askingPrice,
+      bids: {},
+      topBid: null,
+      topBidderSlot: null,
+      topBidderName: null,
+      status: 'open',
+      timerEndsAt: null,
+      passedBy: [],
+      resolution: null,
+      aiBidCount: 0,
+    }
+    gs.auctionListings.push(listing)
+    newListings.push(listing)
+  })
+  return newListings
 }
 
 function resolveListing(roomCode, listingId) {
@@ -52,6 +159,7 @@ function resolveListing(roomCode, listingId) {
   if (!listing || listing.status !== 'open') return
 
   clearListingTimer(roomCode, listingId)
+  clearAIEvalTimer(roomCode, listingId)
   listing.timerEndsAt = null
 
   const seller = gs.teams[listing.sellerSlot]
@@ -305,6 +413,7 @@ function processRound(room) {
   for (const listing of (gs.auctionListings || [])) {
     if (listing.status === 'open') {
       clearListingTimer(room.code, listing.id)
+      clearAIEvalTimer(room.code, listing.id)
       listing.timerEndsAt = null
 
       const seller = gs.teams[listing.sellerSlot]
@@ -518,6 +627,15 @@ function processRound(room) {
 
   // Step 12: Game end — max rounds reached or fish stock collapsed
   const isOver = gs.runde >= gs.maxRunden || gs.fischbestand <= 0
+
+  // AI teams put surplus ships up on the marketplace for the upcoming decision phase
+  // (skip when the game just ended — there's no further phase to bid in)
+  if (!isOver) {
+    const newAIListings = createAIListings(room)
+    for (const listing of newAIListings) {
+      scheduleAIBidEvaluation(room, room.code, listing.id)
+    }
+  }
 
   room.pendingDecisions = {}
   room.lastActivity = Date.now()
@@ -805,6 +923,7 @@ io.on('connection', socket => {
       timerEndsAt: null,
       passedBy: [],
       resolution: null,
+      aiBidCount: 0,
     }
     if (!room.gameState.auctionListings) room.gameState.auctionListings = []
     room.gameState.auctionListings.push(listing)
@@ -812,6 +931,7 @@ io.on('connection', socket => {
 
     io.to(code).emit('listings-updated', { listings: room.gameState.auctionListings, teams: room.gameState.teams })
     console.log(`Listing ${listing.id} created in room ${code}`)
+    scheduleAIBidEvaluation(room, code, listing.id)
   })
 
   // ── place-bid ───────────────────────────────────────────────────────────────
@@ -832,20 +952,9 @@ io.on('connection', socket => {
     const bidder = room.gameState.teams[slot.slotIndex]
     if (!bidder || bidder.bankBalance < bid) return
 
-    listing.bids[slot.slotIndex] = bid
-    listing.topBid = bid
-    listing.topBidderSlot = slot.slotIndex
-    listing.topBidderName = bidder.name
-
-    const TIMER_MS = 20000
-    clearListingTimer(code, listingId)
-    listing.timerEndsAt = Date.now() + TIMER_MS
-    const timerId = setTimeout(() => resolveListing(code, listingId), TIMER_MS)
-    listingTimers.set(`${code}:${listingId}`, timerId)
-
-    room.lastActivity = Date.now()
-    io.to(code).emit('listings-updated', { listings: room.gameState.auctionListings, teams: room.gameState.teams })
+    applyBid(room, code, listing, slot.slotIndex, bid)
     console.log(`Bid on ${listingId} in room ${code}: ${bid}€ by slot ${slot.slotIndex}`)
+    scheduleAIBidEvaluation(room, code, listingId)
   })
 
   // ── cancel-listing ───────────────────────────────────────────────────────────
@@ -862,6 +971,7 @@ io.on('connection', socket => {
     if (listing.topBid != null) return // bids placed — cannot cancel
 
     clearListingTimer(code, listingId)
+    clearAIEvalTimer(code, listingId)
     const seller = room.gameState.teams[slot.slotIndex]
     if (seller) {
       seller.fleet += listing.ships
