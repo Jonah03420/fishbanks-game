@@ -7,10 +7,10 @@ Lehrstuhl für Wirtschaftsinformatik und Business Analytics, Julius-Maximilians-
 Universität Würzburg.
 
 Die Anwendung ist ein webbasierter, echtzeitfähiger Mehrspieler-Prototyp des
-Planspiels *Fish Banks* (Meadows, MIT): Mehrere Teams (Menschen und/oder KI)
-teilen sich einen gemeinsamen Fischbestand, entscheiden rundenweise über den
-Einsatz ihrer Flotte auf drei Fanggebiete und handeln Schiffe über einen
-Echtzeit-Auktionsmarkt.
+Planspiels *Fish Banks* von Dennis Meadows. Mehrere menschliche und
+KI-gesteuerte Teams teilen sich einen gemeinsamen Fischbestand, entscheiden
+rundenweise über den Einsatz ihrer Flotte auf drei Fanggebiete und handeln
+Schiffe über einen Echtzeit-Auktionsmarkt.
 
 ---
 
@@ -39,7 +39,7 @@ cd fishbanks-game
 npm install
 ```
 
-### 2.2 Entwicklungsmodus (empfohlen für die Abnahme)
+### 2.2 Entwicklungsmodus (empfohlen)
 
 Die Anwendung besteht aus zwei Prozessen — dem Express/Socket.io-Backend und
 dem Vite-Dev-Server für das React-Frontend. Beide müssen laufen.
@@ -79,7 +79,7 @@ NODE_ENV=production node server.js
 
 Im Produktionsmodus liefert der Node-Server selbst die gebauten
 Frontend-Dateien aus `dist/` aus (siehe `server.js`, Abschnitt „Static
-Frontend") — es ist dann nur noch **ein** Prozess und **ein** Port nötig.
+Frontend") — es läuft dann nur noch ein Prozess auf einem Port.
 Standardport ist `3002`, überschreibbar per Umgebungsvariable `PORT` (das
 Deployment auf Render, siehe `render.yaml`, setzt z. B. `PORT=10000`).
 
@@ -166,7 +166,7 @@ fishbanks-game/
 4. Sobald ein (menschliches oder KI-)Team ein Gebot abgibt, startet ein
    20-Sekunden-Timer; weitere Teams können in Echtzeit nachbieten oder
    passen. KI-Teams reagieren mit einer kurzen, zufälligen Verzögerung
-   (ca. 1,8–5 s), um menschliches Bietverhalten zu simulieren.
+   von ca. 1,8–5 s.
 5. Für den Screenshot/die Abbildung genügt es, mit zwei Browser-Fenstern
    (oder einem zweiten Gerät) demselben Raum als zwei unterschiedliche Teams
    beizutreten und gegeneinander zu bieten — so sind beide Seiten des
