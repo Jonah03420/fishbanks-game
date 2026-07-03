@@ -88,7 +88,7 @@ Deployment auf Render, siehe `render.yaml`, setzt z. B. `PORT=10000`).
 `.env.example` zeigt die unterstützten Variablen:
 
 ```
-PORT=3001
+PORT=3002
 CORS_ORIGIN=http://localhost:5173
 ```
 
