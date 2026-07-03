@@ -145,6 +145,15 @@ function kiTeamAktionen(team, gameState, params) {
 
 // ─── Core round simulation — MIT order of debits & credits ───────────────────
 //
+// DEV-FALLBACK, NICHT der autoritative Pfad: Im regulären Spielfluss (Client
+// verbunden mit einer Lobby/Raum) läuft die Rundenberechnung ausschließlich
+// serverseitig in processRound() (server.js), vgl. Abschnitt 4.3 der Arbeit.
+// simuliereRunde() dupliziert dieselbe Logik rein clientseitig und wird nur
+// erreicht, wenn isMultiplayer === false (kein socket/roomCode) sowie über
+// den Dev-Shortcut Strg/Cmd+Shift+S (siehe handleDevSkip, nur DEV-Build) zum
+// schnellen Durchspielen beim Testen. Bei jeder Änderung an der Rundenlogik
+// muss diese Kopie manuell synchron gehalten werden.
+//
 // humanDecisions: { [slotIndex]: { harbor, coastal, deepSea, boatsOffered, shipsOrdered } }
 //
 // MIT Step sequence within a round:

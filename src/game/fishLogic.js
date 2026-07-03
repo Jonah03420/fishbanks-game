@@ -1,4 +1,7 @@
-// Spielkonstanten – aligned with MIT Fish Banks values
+// Spielparameter-Konstanten (Instructor-Defaults) — vgl. Abschnitt 3.2.2 und
+// Tabelle 1 der Arbeit. Werden von initGameState() in server.js als Defaults
+// für eine neue Partie übernommen und können dort pro Raum überschrieben
+// werden (siehe createDefaultSettings() in server.js).
 export const GAME_CONFIG = {
   maxRunden: 20,
   startFischbestand: 4000,   // actual fish count
@@ -28,7 +31,21 @@ function clampBoote(value, max) {
 
 // ─── Core game functions ──────────────────────────────────────────────────────
 
-// Logistic growth after total catch is removed.
+// Fischpopulationsmodell: logistisches Wachstum (Verhulst-Modell) nach Abzug
+// des Gesamtfangs der Runde. Der Zuwachs pro Runde ergibt sich aus einer
+// einzigen kombinierten Rate (fishReproductionRate, Default 5%/Runde) und
+// einem dichteabhängigen Dämpfungsterm (1 - Bestand/Carrying Capacity):
+//
+//   Zuwachs   = reproductionRate * Bestand * (1 - Bestand / maxFishPopulation)
+//   neuerBestand = Bestand - Gesamtfang + Zuwachs   (auf [0, maxFishPopulation] begrenzt)
+//
+// Das bildet Regenerationsdynamik und Carrying Capacity ab: Der Zuwachs geht
+// gegen 0, sobald der Bestand die Kapazitätsgrenze erreicht, und ist bei sehr
+// niedrigem Bestand ebenfalls klein. Dies ist EINE kombinierte Wachstumsrate
+// und keine explizite Trennung von Hatch Rate und dichteabhängiger Death Rate
+// wie im Ausgangsmodell beschrieben — qualitativ vergleichbar mit dem in
+// Abschnitt 3.2.4 der Arbeit beschriebenen Modell, aber keine exakte 1:1-
+// Umsetzung von dessen Einzelparametern (Hatch Rate, Death Rate getrennt).
 export function berechneFischbestand(aktuellerBestand, gesamtFang, params) {
   const wachstum = (params?.fishReproductionRate ?? GAME_CONFIG.wachstumsRate)
     * aktuellerBestand
@@ -38,7 +55,15 @@ export function berechneFischbestand(aktuellerBestand, gesamtFang, params) {
   return Math.min(maxFisch, Math.max(0, Math.round(neuerBestand)))
 }
 
-// Per-team catch: ships × zoneMaxEff × sqrt(density).
+// Fangberechnung eines Teams: Total_Catch = SHIPS * Catch_per_Ship, mit
+// dichteabhängigem Catch_per_Ship = maxEff * sqrt(Fischdichte) — vgl.
+// Abschnitt 3.2.5, Gl. (1) der Arbeit. Die stochastische Abweichung
+// (Wetterfaktor, siehe erzeugeMarktereignis()) ist hier bewusst NICHT
+// enthalten, da diese Hilfsfunktion generisch für einen einzelnen Wert von
+// maxEff ausgelegt ist. Hinweis: Diese Funktion ist aktuell ungenutzt — die
+// tatsächlich aktive Fangberechnung (inkl. Wetterfaktor und getrennt nach
+// Küsten-/Tiefsee-Zone) ist inline in server.js (processRound, Schritt 3)
+// sowie in der clientseitigen Dev-Fallback-Kopie in GamePage.jsx implementiert.
 export function berechneFang(ausgesandteBoote, fischbestand, params) {
   if (ausgesandteBoote === 0) return 0
   const maxFisch = params?.maxFishPopulation ?? GAME_CONFIG.maxFischbestand
@@ -69,6 +94,13 @@ function berechneTrend(verlauf) {
 }
 
 // ─── Easy AI ─────────────────────────────────────────────────────────────────
+//
+// Einfache KI — vgl. Abschnitt 4.2 der Arbeit: Zonenwahl orientiert sich grob
+// am aktuellen Fischbestand (drei Dichte-Schwellen: >65% bevorzugt Tiefsee,
+// 40–65% hälftig Küste/Tiefsee, <40% bevorzugt Küste), bestellt/kauft max.
+// 1 Schiff pro Runde, und wählt in 20% der Fälle bewusst eine schwächere Zone
+// (zufällige Verschiebung eines Schiffs in Richtung Hafen), um ein nicht
+// perfekt optimierendes Verhalten zu simulieren.
 //
 // Reasonable but imperfect: uses current fish stock, 20% chance of suboptimal
 // zone choice, orders max 1 ship/round from shipyard when conditions allow.
@@ -133,6 +165,14 @@ export function kiDecisionEasy(team, gameState, params) {
 }
 
 // ─── Hard AI ─────────────────────────────────────────────────────────────────
+//
+// Schwere KI — vgl. Abschnitt 4.2 der Arbeit: berechnet je Fanggebiet einen
+// Erwartungswert aus Fischdichte, Betriebskosten und verbleibenden Runden
+// (expectedProfitPerShip = bestZoneProfit * roundsRemaining) und deployt die
+// Flotte in die profitabelste Zone. Berücksichtigt zusätzlich den
+// Bestandstrend der letzten drei Runden (berechneTrend) und drosselt die
+// Flottenauslastung auf 60%, sobald ein rascher Bestandsrückgang erkannt wird
+// (rapidDecline: Ø-Verlust > 100 Fische/Runde).
 //
 // Near-optimal: deploys all ships to the highest-profit zone, calculates ROI
 // before buying/ordering ships, tracks fish trend and other teams' deployment.
@@ -233,6 +273,7 @@ export function kiDecisionHard(team, gameState, params) {
 }
 
 // ─── AI Marketplace Participation ──────────────────────────────────────────
+// vgl. Abschnitt 4.2 der Arbeit
 //
 // Beyond the instant emergency buy/sell handled above (capped at 2/round,
 // premium/discount pricing), AI teams also react to the player-driven ship

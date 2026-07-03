@@ -73,6 +73,10 @@ function BtnGroup({ value, options, onChange }) {
   )
 }
 
+// Konzipiert, aber nicht an die UI angebunden — vgl. Abschnitt 4.4 (Ausblick)
+// der Arbeit. Änderungen hier landen nur in localStorage (adminSettings.js)
+// und werden beim Erstellen eines Raums aktuell nicht mit an den Server
+// übertragen (siehe LobbyPage.jsx doCreate()).
 export default function AdminPage({ onBack }) {
   const [settings, setSettings] = useState(() => getAdminSettings())
 

@@ -1,3 +1,10 @@
+// Konzipiert, aber nicht an die UI angebunden — vgl. Abschnitt 4.4 (Ausblick)
+// der Arbeit. Diese erweiterte Instructor-Konfiguration (inkl. der
+// Informationsasymmetrie-Schalter showFishStock/showOtherCatches) wird nur
+// lokal im Browser gespeichert (localStorage) und beim tatsächlichen
+// Erstellen eines Mehrspieler-Raums NICHT an den Server übergeben (siehe
+// LobbyPage.jsx doCreate(): `settings: {}`). AdminPage.jsx bleibt dadurch von
+// der eigentlichen Spiellogik entkoppelt.
 const STORAGE_KEY = 'fishbanks_admin'
 
 export const ADMIN_DEFAULTS = {

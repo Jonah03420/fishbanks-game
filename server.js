@@ -341,6 +341,11 @@ function initGameState(room) {
     maxFishPopulation: s.maxFishPopulation,
     startingFishStock: s.startingFish,
     fishReproductionRate: s.reproductionRate,
+    // Informationsasymmetrie-Schalter: konzipiert, aber nicht an die UI
+    // angebunden — vgl. Abschnitt 4.4 (Ausblick) der Arbeit. GamePage.jsx
+    // wertet beide Flags bereits aus (Fischbestand/andere Fangergebnisse
+    // ausblenden), sie sind hier aber fest auf "sichtbar" verdrahtet, da
+    // validateSettings()/update-settings sie aktuell nicht entgegennimmt.
     showFishStock: true,
     showOtherCatches: true,
   }
@@ -385,20 +390,24 @@ function initGameState(room) {
 }
 
 // ─── Round Processing ─────────────────────────────────────────────────────────
-//
-// Follows exact MIT order (mit_reference.md §3 and §7):
-//   Step 1  Deliver ships from previous round's orders
-//   Step 2  AI decisions (after delivery, uses current fish stock)
-//   Step 3  Auction buy / sell → track minBalance
-//   Step 4  Operating costs   → track minBalance
-//   Step 5  Fish catch + revenue → track minBalance
-//   Step 6  Interest on minBalance (MIT §6: same formula, sign auto)
-//   Step 7  New ship orders (pay now, deliver next round)
-//   Step 8  Update fish stock (logistic growth)
-//   Step 9  Market price (constant in Phase 3)
-//   Step 10 Recalculate net worth
-//   Step 11 Save round snapshot to verlauf
-//   Step 12 Check game end → emit 'game-ended' or 'round-complete'
+// Autoritative, serverseitige Rundenverarbeitung — vgl. Abschnitt 4.3 der
+// Arbeit. Läuft in fester, numerierter Abfolge (Client-seitige Kopien, z. B.
+// simuliereRunde() in GamePage.jsx, sind reine Dev-Fallbacks und müssen bei
+// Änderungen hier manuell nachgezogen werden):
+//   1. Offene Auktionen/Listings der Vorrunde abschließen (auktionsähnlicher
+//      Marktplatz, siehe Codeabschnitt vor Step 1 unten)
+//   2. Bestellte Schiffe aus der Vorrunde ausliefern                    (Step 1)
+//   3. Soforthandel (Emergency Buy/Distress Sale), Betriebskosten,
+//      Fangerlös — je Team, mit laufender Verfolgung des Mindestkontostands
+//                                                                (Step 3–5)
+//   4. Zinsberechnung auf den niedrigsten Kontostand der Runde           (Step 6)
+//   5. Neubestellungen prüfen (Limit, Bausperre letzte Runde) und abbuchen
+//                                                                        (Step 7)
+//   6. Fischbestand fortschreiben (logistisches Wachstum)                (Step 8)
+//   7. Marktpreis fortschreiben und Net Worth aller Teams neu berechnen
+//                                                                (Step 9–10)
+//   Danach: Rundensnapshot in verlauf sichern (Step 11) und Spielende
+//   prüfen → 'game-ended' bzw. 'round-complete' senden (Step 12).
 
 function processRound(room) {
   const gs = room.gameState
@@ -485,7 +494,12 @@ function processRound(room) {
     const dec  = room.pendingDecisions[i]
     if (!dec) continue
 
-    // Step 3: Emergency buy / distress sell — capped at 2 per round, premium/discount pricing
+    // Step 3: Emergency Buy / Distress Sale — vgl. Abschnitt 4.2 der Arbeit.
+    // Sofortiger, garantierter Kauf/Verkauf außerhalb der verhandelten
+    // Auktion: Emergency Buy zu einem Aufpreis von 50% auf den aktuellen
+    // Marktpreis, Distress Sale zu einem Abschlag von 50%. Transaktionslimit:
+    // max. 2 Käufe UND max. 2 Verkäufe pro Team und Runde (instantBuyCount /
+    // instantSellCount, unten pro Runde zurückgesetzt).
     const emergencyBuyPrice  = Math.round(gs.marketShipPrice * 1.5 / 10) * 10
     const distressSalePrice  = Math.round(gs.marketShipPrice * 0.5 / 10) * 10
     if (!team.instantBuyCount)  team.instantBuyCount  = 0
@@ -580,7 +594,12 @@ function processRound(room) {
   const fischbestandVor = gs.fischbestand
   gs.fischbestand = berechneFischbestand(gs.fischbestand, totalCatch, params)
 
-  // Step 9: Market price — blend toward auction avg if sales occurred, else supply/demand
+  // Step 9: Marktpreis-Fortschreibung — vgl. Abschnitt 4.2 der Arbeit. Gab es
+  // in dieser Runde erfolgreiche Auktionsverkäufe, bewegt sich der Marktpreis
+  // gewichtet (40/60) in Richtung des durchschnittlich erzielten
+  // Auktionspreises. Ohne Verkäufe richtet er sich stattdessen nach Angebot/
+  // Nachfrage anhand der Gesamtflottengröße aller Teams (>15 Schiffe → −5%,
+  // <9 Schiffe → +5%). In beiden Fällen auf [150€, 1500€] begrenzt.
   const auctionSales = (gs.listingEvents || []).filter(e => e.erfolg)
   if (auctionSales.length > 0) {
     const totalRevenue   = auctionSales.reduce((s, e) => s + e.preis * (e.ships || 1), 0)
@@ -1021,6 +1040,13 @@ io.on('connection', socket => {
 })
 
 // ─── Leave Helper ─────────────────────────────────────────────────────────────
+// Host-Übergabe und KI-Übernahme bei Verbindungsabbruch — vgl. Abschnitt 4.2
+// der Arbeit. Verlässt ein Team die Partie (freiwillig oder durch
+// Verbindungsabbruch), übernimmt eine KI (mit der Raum-Standardschwierigkeit)
+// nahtlos den Slot, damit das Spiel für die übrigen Teams weiterläuft. War
+// das ausgeschiedene Team der Host, wird die Host-Rolle automatisch an das
+// nächste verbleibende menschliche Team übergeben; sind keine menschlichen
+// Teams mehr im Raum, wird der Raum gelöscht.
 // voluntary=true  → player clicked "Leave"
 // voluntary=false → socket dropped (team gets disconnectedHuman flag for UI)
 

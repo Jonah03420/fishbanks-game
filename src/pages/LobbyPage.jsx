@@ -134,6 +134,10 @@ export default function LobbyPage({ socket, connected, onStart, onBack, initialV
   function doCreate() {
     if (!socket || !connected) { setError('Not connected to server.'); return }
     setError('')
+    // settings: {} bewusst leer — die erweiterte Instructor-Konfiguration aus
+    // AdminPage.jsx/adminSettings.js ist hier (noch) nicht angebunden, vgl.
+    // Abschnitt 4.4 (Ausblick) der Arbeit. Der Server füllt fehlende Werte
+    // mit GAME_CONFIG-Defaults (siehe createDefaultSettings() in server.js).
     socket.emit('create-room', { playerName: playerName.trim() || 'Player 1', settings: {} })
   }
 
